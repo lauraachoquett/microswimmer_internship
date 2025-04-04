@@ -4,6 +4,10 @@ import matplotlib.pyplot as plt
 def dW(delta_t):
     return np.random.normal(loc=0.0, scale=np.sqrt(delta_t),size=(2))
 
+def solver(x,U,p,Dt,D):
+    dW_t =  dW(Dt)
+    return x + U*p*Dt+ D*dW_t
+
 def run_sde(nb_steps,t_init,t_end,U=1,p = np.ones(2),x_0 = np.zeros(2)):
     D=0.1
 
@@ -13,9 +17,7 @@ def run_sde(nb_steps,t_init,t_end,U=1,p = np.ones(2),x_0 = np.zeros(2)):
     traj[0] = x_0
 
     for n in range(nb_steps-1) : 
-        dW_t =  dW(Dt)
-        traj[n+1] = traj[n] + U*p*Dt + D * dW_t
-
+        traj[n+1] = solver(traj[n],U,p,Dt,D)
     return traj
     
 def plot_simulation(num_sims,nb_steps,t_init,t_end):
