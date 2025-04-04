@@ -28,7 +28,7 @@ def plot_simulation(num_sims,nb_steps,t_init,t_end):
     plt.ylabel("y")
     plt.title(f"Trajectories with {nb_steps} steps for {t_end - t_init} (time)")
     plt.legend()
-    plt.savefig("SDE_test.png",dpi=100,bbox_inches='tight')
+    plt.savefig("fig/SDE_test.png",dpi=100,bbox_inches='tight')
 
 if __name__== '__main__':
     num_sims=5
