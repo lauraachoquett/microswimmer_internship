@@ -18,9 +18,9 @@ def distance_to_path(nb_steps,t_init,t_end,nb_points_path = 1000,U=1,p = np.ones
     distances = np.zeros((nb_steps,2))
     traj[0] = x_0
 
-    x_target = np.ones(2)
-
-    path = generate_simple_line(x_0,x_target,nb_points_path)
+    p_target = np.ones(2)
+    p_0 = x_0
+    path = generate_simple_line(p_0,p_target,nb_points_path)
 
     for n in range(nb_steps-1) : 
         traj[n+1] = solver(traj[n],U,p,Dt,D)
