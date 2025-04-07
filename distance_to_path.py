@@ -6,7 +6,8 @@ colors = plt.cm.tab10.colors
 def min_dist_closest_point(x,path):
     distances =np.linalg.norm(path-x,axis=1)
     min_dist = np.min(distances)
-    return min_dist
+    closest_point=np.argmin(distances)
+    return min_dist,closest_point
 
 
 def distance_to_path(nb_steps,t_init,t_end,nb_points_path = 1000,U=1,p = np.ones(2),x_0 = np.zeros(2)):
@@ -24,8 +25,8 @@ def distance_to_path(nb_steps,t_init,t_end,nb_points_path = 1000,U=1,p = np.ones
 
     for n in range(nb_steps-1) : 
         traj[n+1] = solver(traj[n],U,p,Dt,D)
-        distances[n]= min_dist_closest_point(traj[n],path)
-    distances[-1] = min_dist_closest_point(traj[-1],path)
+        distances[n],_= min_dist_closest_point(traj[n],path)
+    distances[-1],_ = min_dist_closest_point(traj[-1],path)
 
     return traj,path,distances
 

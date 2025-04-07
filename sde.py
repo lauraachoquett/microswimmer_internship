@@ -4,11 +4,11 @@ import matplotlib.pyplot as plt
 def dW(delta_t):
     return np.random.normal(loc=0.0, scale=np.sqrt(delta_t),size=(2))
 
-def solver(x,U,p,Dt,D):
+def solver(x,U,p,Dt,D,u_bg=np.zeros(2)):
     dW_t =  dW(Dt)
-    return x + U*p*Dt+ D*dW_t
+    return x + +u_bg+U*p*Dt+ D*dW_t
 
-def run_sde(nb_steps,t_init,t_end,U=1,p = np.ones(2),x_0 = np.zeros(2)):
+def run_sde(nb_steps,t_init,t_end,U=1,p = np.ones(2),x_0 = np.zeros(2),u_bg=np.zeros(2)):
     D=0.1
 
     Dt = (t_end-t_init)/nb_steps
