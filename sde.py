@@ -6,10 +6,11 @@ def dW(delta_t):
 
 def solver(x,U,p,Dt,D,u_bg=np.zeros(2)):
     dW_t =  dW(Dt)
-    return x + +u_bg+U*p*Dt+ D*dW_t
+    return x + u_bg*Dt+ U*p*Dt+ D*dW_t
 
 def run_sde(nb_steps,t_init,t_end,U=1,p = np.ones(2),x_0 = np.zeros(2),u_bg=np.zeros(2)):
     D=0.1
+    u_bg = np.array([0,1])*0.5
 
     Dt = (t_end-t_init)/nb_steps
 
@@ -17,7 +18,7 @@ def run_sde(nb_steps,t_init,t_end,U=1,p = np.ones(2),x_0 = np.zeros(2),u_bg=np.z
     traj[0] = x_0
 
     for n in range(nb_steps-1) : 
-        traj[n+1] = solver(traj[n],U,p,Dt,D)
+        traj[n+1] = solver(traj[n],U,p,Dt,D,u_bg)
     return traj
     
 def plot_simulation(num_sims,nb_steps,t_init,t_end):

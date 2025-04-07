@@ -25,6 +25,7 @@ class MicroSwimmer(gym.Env):
         self.threshold = threshold
         self.dir_path=np.zeros(2)
         self.beta=beta
+        
 
 
     def state(self,path):
