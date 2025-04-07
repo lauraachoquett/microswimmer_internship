@@ -9,7 +9,7 @@ from datetime import datetime
 from env_swimmer import MicroSwimmer
 from generate_path import generate_simple_line
 import matplotlib.pyplot as plt
-from invariant_state import coordinate_in_global_ref
+from invariant_state import *
 
 def evaluate_agent(agent,env,eval_episodes,config,save_path_result_fig):
     rewards = []
@@ -27,7 +27,6 @@ def evaluate_agent(agent,env,eval_episodes,config,save_path_result_fig):
     episode_num = 0
     episode_reward=0
     state,done = env.reset(p_0,T_0),False
-
     states_episode = []
     states_list_per_episode=[]
     while episode_num <eval_episodes:
@@ -42,19 +41,22 @@ def evaluate_agent(agent,env,eval_episodes,config,save_path_result_fig):
         rewards.append(episode_reward)
         
         if done or iter*Dt_sim> t_max: 
-            
             states_list_per_episode.append(np.array(states_episode))
             state,done =env.reset(p_0,T_0),False
             iter = 0
             episode_reward=0
             episode_num+=1
-            states_episode=[state]
+            states_episode=[]
+
     plt.close()
     path_save_fig= os.path.join(save_path_result_fig,"training_eval_trajectories.png")
     for list_state in states_list_per_episode :
         indices = np.linspace(0, len(path) - 1, n_t_sim).astype(int)
         path = path[indices]
-        plt.plot(path[:,0],path[:,1],label ='path',linewidth=3,color = 'r')
+        #path_local_ref = np.zeros_like(path)
+        #for i in range(len(path)):
+            #path_local_ref[i] = (coordinate_in_path_ref(p_0,T_0,path[i]))
+        plt.plot(path[:,0],path[:,1],label='path')
         plt.plot(list_state[:,0],list_state[:,1])
         plt.scatter(list_state[-1,0],list_state[-1,1])
         plt.xlabel("x")
@@ -107,12 +109,13 @@ def run_expe(config):
     agent = TD3.TD3(state_dim,action_dim,max_action)
 
     replay_buffer = utils.ReplayBuffer(state_dim,action_dim)
+
     save_path_result = f"./{file_name}/results"
     save_path_result_fig = os.path.join(save_path_result,'fig/')
     if not os.path.exists(save_path_result):
         os.makedirs(save_path_result)
         os.makedirs(save_path_result_fig)
-    save_path_model = f"./{file_name}/models"
+    save_path_model = f"./{file_name}/models/agent"
     if save_model and not os.path.exists(save_path_model):
         os.makedirs(save_path_model)
 
@@ -194,9 +197,76 @@ if __name__=='__main__':
         'path' : path,
         'p_0' : p_0,
         'p_target' : p_target,
-        'start_timesteps' :10
+        'start_timesteps' :10,
+        'load_model':""
     }
-    run_expe(config)
+    #run_expe(config)
+    ### EVAL ###
+
+    translation = np.ones(2)*1
+
+    theta = np.pi/8 
+    sin_th = sin(theta)
+    cos_th = cos(theta)
+    R = np.array([[cos_th, -sin_th],
+                  [sin_th,  cos_th]])
+    
+    p_target = np.ones(2) + translation
+    p_0 = np.zeros(2) + translation
+    T_0=p_target
+    nb_points_path = 1000
+
+    path = generate_simple_line(p_0,p_target,nb_points_path)
+    path_local_ref = np.zeros_like(path)
+    for i in range(len(path)):
+        path_local_ref[i] = (coordinate_in_path_ref(p_0,T_0,path[i]))
+    plt.plot(path_local_ref[:,0],path_local_ref[:,1],label='path_local_ref')
+    plt.plot(path[:,0],path[:,1],label='path')
+    plt.xlabel("x")
+    plt.ylabel("y")
+    plt.title(f"Path : line + transformation")
+    plt.legend()
+    plt.savefig(f"fig/path_test_transformatino.png",dpi=100,bbox_inches='tight')
+
+    config_eval = {
+        'x_0' : p_0,
+        'C' : 1,
+        'D' : 0.1,
+        'threshold' : 0.05,
+        't_max': 5,
+        'n_t_sim':200,
+        't_init':0,
+        'steps_per_action':5,
+        'nb_episode':500,
+        'batch_size':256,
+        'eval_freq':100,
+        'save_model':True,
+        'eval_episodes' : 5,
+        'path' : path,
+        'p_0' : p_0,
+        'p_target' : p_target,
+        'start_timesteps' :10,
+        'load_model':""
+    }
+    
+    policy_file = 'agent_TD3_2025-04-07_09-19/models'
+    n_t_sim = config_eval['n_t_sim']
+    t_init =config_eval['t_init']
+    t_max =config_eval['t_max']
+    Dt_sim = (t_max-t_init)/n_t_sim
+    env = MicroSwimmer(config_eval['x_0'],config_eval['C'],Dt_sim,config_eval['threshold'])
+
+    state_dim=env.observation_space.shape[0]
+    action_dim=env.action_space.shape[0]
+    max_action= float(env.action_space.high[0])
+    agent = TD3.TD3(state_dim,action_dim,max_action)
+    save_path_eval =  'agent_TD3_2025-04-07_09-19/eval'
+    os.makedirs(save_path_eval, exist_ok=True)
+    agent.load(policy_file)
+    evaluate_agent(agent,env,5,config_eval,save_path_eval)
+
+
+
 
 
 
