@@ -200,19 +200,19 @@ if __name__=='__main__':
         'start_timesteps' :10,
         'load_model':""
     }
-    #run_expe(config)
+    run_expe(config)
     ### EVAL ###
 
-    translation = np.ones(2)*1
+    translation = np.ones(2)*5
 
-    theta = np.pi/8 
+    theta = -np.pi/2
     sin_th = sin(theta)
     cos_th = cos(theta)
     R = np.array([[cos_th, -sin_th],
                   [sin_th,  cos_th]])
     
-    p_target = np.ones(2) + translation
-    p_0 = np.zeros(2) + translation
+    p_target = R@np.ones(2) + translation
+    p_0 = R@np.zeros(2) + translation
     T_0=p_target
     nb_points_path = 1000
 
@@ -249,7 +249,7 @@ if __name__=='__main__':
         'load_model':""
     }
     
-    policy_file = 'agent_TD3_2025-04-07_09-19/models'
+    policy_file = 'agent_TD3_2025-04-07_11-09/models/agent'
     n_t_sim = config_eval['n_t_sim']
     t_init =config_eval['t_init']
     t_max =config_eval['t_max']
@@ -260,7 +260,7 @@ if __name__=='__main__':
     action_dim=env.action_space.shape[0]
     max_action= float(env.action_space.high[0])
     agent = TD3.TD3(state_dim,action_dim,max_action)
-    save_path_eval =  'agent_TD3_2025-04-07_09-19/eval'
+    save_path_eval =  'agent_TD3_2025-04-07_11-09/eval'
     os.makedirs(save_path_eval, exist_ok=True)
     agent.load(policy_file)
     evaluate_agent(agent,env,5,config_eval,save_path_eval)

@@ -1,6 +1,6 @@
 import gymnasium as gym
 import numpy as np
-from invariant_state import coordinate_in_path_ref
+from invariant_state import *
 from distance_to_path import min_dist_closest_point
 from sde import solver
 
@@ -40,7 +40,8 @@ class MicroSwimmer(gym.Env):
     def step(self,action,path,x_target,p_0,T_0):
         rew= self.reward(path,x_target)
         self.previous_x=self.x
-        self.x = solver(x=self.x,U=self.U,p=action,Dt=self.Dt,D=self.D)
+        action_global_ref = coordinate_in_global_ref(np.zeros(2),T_0,action)
+        self.x = solver(x=self.x,U=self.U,p=action_global_ref,Dt=self.Dt,D=self.D)
         next_state = self.state(p_0,T_0)
         done = False
         d = np.linalg.norm(self.x-x_target)
