@@ -35,7 +35,7 @@ def generate_demi_circle_path(p_0, p_target, nb_points):
     rotated_points = circle_points @ R.T
     path = center + rotated_points
 
-    return path
+    return np.flip(path,axis=0)
 
 def plot_path(p_0,p_target,nb_points,type='line'):
     if type=='line':
