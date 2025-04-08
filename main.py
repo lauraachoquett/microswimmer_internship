@@ -17,7 +17,7 @@ from sde import rankine_vortex,uniform_velocity,plot_background_velocity
 colors = plt.cm.tab10.colors
 
 
-def evaluate_agent(agent,env,eval_episodes,config,save_path_result_fig,file_name):
+def evaluate_agent(agent,env,eval_episodes,config,save_path_result_fig,file_name,random):
     rewards = []
     t_max = config['t_max']
     path = config['path']
@@ -28,7 +28,6 @@ def evaluate_agent(agent,env,eval_episodes,config,save_path_result_fig,file_name
     t_max =config['t_max']
     Dt_sim = (t_max-t_init)/n_t_sim
     p_0 = config['p_0']
-    T_0 = (path[1]- path[0])/(np.linalg.norm(path[1]- path[0]))
     iter=0
     episode_num = 0
     episode_reward=0
@@ -37,7 +36,19 @@ def evaluate_agent(agent,env,eval_episodes,config,save_path_result_fig,file_name
     states_list_per_episode=[]
     x=p_0
     u_bg = np.zeros(2)
-    dir, norm,center,a ,cir=random_bg_parameters()
+    D = config['D']
+    type=''
+
+    count_succes = 0
+    if random : 
+        dir, norm,center,a ,cir = random_bg_parameters()
+    else : 
+        dir, norm,center,a ,cir= np.zeros(2),0, np.zeros(2),0,0
+    
+    if config['random_curve']:
+        k = (np.random.rand()-0.5)*4
+        path = generate_curve(p_0,p_target,k,config['nb_points_path'])
+
     while episode_num <eval_episodes:
         states_episode.append(x)
         iter+=1
@@ -52,14 +63,15 @@ def evaluate_agent(agent,env,eval_episodes,config,save_path_result_fig,file_name
             u_bg = rankine_vortex(x,a,center,cir)
             type='rankine'
             
-        next_state,x,reward,done,_ = env.step(action,path,p_target,u_bg)
+        next_state,x,reward,done,_ = env.step(action,path,p_target,D,u_bg)
 
-        next_state,x,reward,done,_ = env.step(action,path,p_target)
         state = next_state
         episode_reward += reward
         rewards.append(episode_reward)
         
         if done or iter*Dt_sim> t_max: 
+            if done : 
+                count_succes+=1
             states_list_per_episode.append(np.array(states_episode))
             state,done =env.reset(path),False
             iter = 0
@@ -74,7 +86,7 @@ def evaluate_agent(agent,env,eval_episodes,config,save_path_result_fig,file_name
 
     fig, ax = plt.subplots(figsize=(10, 8))
 
-    for idx, list_state in enumerate(states_list_per_episode):
+    for idx, list_state in enumerate(states_list_per_episode[:3]):
         indices = np.linspace(0, len(path) - 1, n_t_sim).astype(int)
         path_sampled = path[indices]
         ax.plot(path_sampled[:, 0], path_sampled[:, 1], label='path', color='black', linewidth=2)
@@ -96,16 +108,16 @@ def evaluate_agent(agent,env,eval_episodes,config,save_path_result_fig,file_name
     plt.close(fig) 
             
 
-    return mean(rewards)
+    return mean(rewards),np.std(np.array(rewards)),count_succes/eval_episodes
 
 def random_bg_parameters():
     dir = np.random.uniform(-1,1,2)
     dir = dir/np.linalg.norm(dir)
-    norm = np.random.rand()*0.4
+    norm = np.random.rand()*0.6
 
     a = np.random.rand()
     center = [np.random.rand()*2,np.random.rand()]
-    cir = (np.random.rand()-0.5)*2
+    cir = (np.random.rand()-0.5)*3
     return dir,norm,center,a,cir
 
 def run_expe(config):
@@ -122,7 +134,6 @@ def run_expe(config):
     p_target = config['p_target']
     x_0 = config['x_0']
     p_0 = config['p_0']
-    T_0 = (path[1]- path[0])/(np.linalg.norm(path[1]- path[0]))
 
     print(f'Starting point : {p_0}')
     print(f'Target point : {path[-1]}')
@@ -181,8 +192,12 @@ def run_expe(config):
 
     x=p_0
     u_bg = np.zeros(2)
+    D = config['D']
 
-    dir, norm,center,a ,cir=random_bg_parameters()
+    if config['random_curve']:
+        k = 2
+        path = generate_curve(p_0,p_target,k,config['nb_points_path'])
+
     ########### TRAINING LOOP ###########
     while episode_num <nb_episode:
         iter+=1
@@ -190,12 +205,13 @@ def run_expe(config):
         if iter%steps_per_action==0 or iter==1:
             action = agent.select_action(state)
 
-        if config['uniform_bg']:
-            u_bg = uniform_velocity(dir,norm)
-        if config['rankine_bg']:
-            u_bg = rankine_vortex(x,a,center,cir)
+        if episode_num>100: 
+            if config['uniform_bg']:
+                u_bg = uniform_velocity(dir,norm)
+            if config['rankine_bg']:
+                u_bg = rankine_vortex(x,a,center,cir)
 
-        next_state,x,reward,done,_ = env.step(action,path,p_target,u_bg)
+        next_state,x,reward,done,_ = env.step(action,path,p_target,D,u_bg)
         replay_buffer.add(state.flatten(), action, next_state.flatten(), reward, done)
             
 
@@ -213,7 +229,7 @@ def run_expe(config):
             if episode_num%eval_freq==0:
                 print(f"Total iter: {iter+1} Episode Num: {episode_num+1} Reward: {episode_reward:.3f} Counter target reached: {count_reach_target}")
                 path_save_fig= os.path.join(save_path_result_fig,"training_reward.png")
-                eval_rew = evaluate_agent(agent,env,eval_episodes,config,save_path_result_fig,"eval_during_training")
+                eval_rew = evaluate_agent(agent,env,eval_episodes,config,save_path_result_fig,"eval_during_training",False)
                 #evaluations.append(eval)
                 print(f"Eval result : {eval_rew}")
                 if best_eval_result<eval_rew : 
@@ -230,11 +246,16 @@ def run_expe(config):
             iter = 0
             episode_reward=0
             episode_num+=1
-
             dir, norm,center,a ,cir=random_bg_parameters()
+            if episode_num>100:
+                if config['random_curve']:
+                    k = (np.random.rand()-0.5)*4
+                    path = generate_curve(p_0,p_target,k,config['nb_points_path'])
+
+    agent.save(os.path.join(save_path_model,'last'))
 
 
-def evaluate_after_training(agent_name,file_name,config_eval,type,translation=None,theta=None):
+def evaluate_after_training(agent_name,file_name_or,type,translation=None,theta=None):
     if translation is not None : 
         translation = translation
     else : 
@@ -249,7 +270,7 @@ def evaluate_after_training(agent_name,file_name,config_eval,type,translation=No
     else : 
         R = np.eye(2)
         
-    p_target = R@[0,2]+translation
+    p_target = R@[4,4]+translation
     p_0 = R@np.zeros(2)+translation
     p_1 = [1/4,-1/4]+translation
     nb_points_path = 500
@@ -257,10 +278,41 @@ def evaluate_after_training(agent_name,file_name,config_eval,type,translation=No
         path = generate_line_two_part(p_0,p_1,p_target,nb_points_path)
     if type =='circle' : 
         path = generate_demi_circle_path(p_0,p_target,nb_points_path)
+    if type=='ondulating':
+        path = generate_random_ondulating_path(p_0,p_target,nb_points_path,amplitude = 0.7,frequency=3)
 
 
+    config_eval = {
+        'x_0' : np.zeros(2),
+        'C' : 1,
+        'D' : 0.1,
+        'u_bg' : np.array([0,1])*0.0,
+        'threshold' : 0.02,
+        't_max': 20,
+        'n_t_sim':600,
+        't_init':0,
+        'steps_per_action':5,
+        'nb_episode':800,
+        'batch_size':256,
+        'eval_freq':50,
+        'save_model':True,
+        'eval_episodes' : 100,
+        'episode_start_update' : 10,
+        'path' : path,
+        'p_0' : p_0,
+        'p_target' : p_target,
+        'start_timesteps' :100,
+        'load_model':"",
+        'episode_per_update' :3,
+        'discount_factor' : 1,
+        'beta':0.25,
+        'uniform_bg':True,
+        'rankine_bg':False,
+        'random_curve' : False,
+        'nb_points_path':500,
+        'D_varying':True
+    }
 
-    
     policy_file = os.path.join(agent_name,'models/agent')
     n_t_sim = config_eval['n_t_sim']
     t_init =config_eval['t_init']
@@ -276,15 +328,53 @@ def evaluate_after_training(agent_name,file_name,config_eval,type,translation=No
     save_path_eval = os.path.join(agent_name,'eval_bg/')
     os.makedirs(save_path_eval, exist_ok=True)
     agent.load(policy_file)
-    evaluate_agent(agent,env,config_eval['eval_episodes'],config_eval,save_path_eval,file_name=file_name)
+
+
+    nb_D=15
+    mean_reward_D = np.zeros(nb_D)
+    std_reward_D = np.zeros(nb_D)
+    success_rate_D = np.zeros(nb_D)
+    D_values = np.linspace(0.07, 0.5, nb_D)
+
+    for idx, D in enumerate(D_values):
+        config_eval['D'] = D
+        file_name = file_name_or + f'_{idx}'
+        mean_reward, std_reward, success_rate = evaluate_agent(agent, env, config_eval['eval_episodes'],
+                                                                config_eval, save_path_eval,
+                                                                file_name=file_name, random=False)
+        mean_reward_D[idx] = mean_reward
+        std_reward_D[idx] = std_reward
+        success_rate_D[idx] = success_rate
+
+    fig, axs = plt.subplots(1, 2, figsize=(12, 5))
+
+    axs[0].plot(D_values, mean_reward_D, label="Mean Reward")
+    axs[0].fill_between(D_values,
+                        mean_reward_D - std_reward_D,
+                        mean_reward_D + std_reward_D,
+                        alpha=0.3, color='blue', label="±1 Std")
+    axs[0].set_title('Mean reward with respect to the noise')
+    axs[0].set_xlabel('D')
+    axs[0].set_ylabel('Reward')
+    axs[0].legend()
+
+    axs[1].plot(D_values, success_rate_D, color='green')
+    axs[1].set_title('Success rate with respect to the noise')
+    axs[1].set_xlabel('D')
+    axs[1].set_ylabel('Success rate')
+
+    fig.tight_layout()
+    plt.show()
+
+
+    
         
 
 if __name__=='__main__':
     p_target = [2,0]
     p_0 = np.zeros(2)
-    p_1 = [1/2,1]
     nb_points_path = 500
-    path = generate_demi_circle_path(p_0,p_target,nb_points_path)
+    path = generate_random_ondulating_path(p_0,p_target,nb_points_path)
     config = {
         'x_0' : np.zeros(2),
         'C' : 1,
@@ -295,7 +385,7 @@ if __name__=='__main__':
         'n_t_sim':200,
         't_init':0,
         'steps_per_action':5,
-        'nb_episode':600,
+        'nb_episode':800,
         'batch_size':256,
         'eval_freq':50,
         'save_model':True,
@@ -309,38 +399,16 @@ if __name__=='__main__':
         'episode_per_update' :3,
         'discount_factor' : 1,
         'beta':0.25,
-        'uniform_bg':True,
-        'rankine_bg':False,
+        'uniform_bg':False,
+        'rankine_bg':True,
+        'random_curve' : True,
+        'nb_points_path':500,
     }
-    run_expe(config)
+    #run_expe(config)
     ### EVAL ## 
 
-    config_eval = {
-        'x_0' : p_0,
-        'C' : 1,
-        'D' : 0.1,
-        'u_bg' : np.array([1,1])/(sqrt(2))*-0.3,
-        'threshold' : 0.02,
-        't_max': 5,
-        'n_t_sim':200,
-        't_init':0,
-        'steps_per_action':5,
-        'nb_episode':500,
-        'batch_size':256,
-        'eval_freq':100,
-        'save_model':True,
-        'eval_episodes' : 3,
-        'episode_start_update' : 10,
-        'path' : path,
-        'p_0' : p_0,
-        'p_target' : p_target,
-        'start_timesteps' :50,
-        'load_model':"",
-        'episode_per_update' :3,
-        'discount_factor' : 1,
-        'beta':0.2
-    }
 
-    #evaluate_after_training('agent_TD3_2025-04-08_10-49',file_name=f"eval_with_u_bg_-1,-1_-0,2",config_eval=config_eval,type='circle')
+
+    evaluate_after_training('agent_TD3_2025-04-08_15-07',file_name_or=f"eval_with_ondulating_path",type='ondulating')
 
 

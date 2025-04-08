@@ -21,7 +21,6 @@ class MicroSwimmer(gym.Env):
         self.C = C
         self.Dt = Dt
         self.U = 1
-        self.D = 0.1
         self.threshold = threshold
         self.dir_path=np.zeros(2)
         self.beta=beta
@@ -57,11 +56,11 @@ class MicroSwimmer(gym.Env):
         #print(f"reward distance: {rew_d}")
         return rew
     
-    def step(self,action,path,x_target,u_bg=np.zeros(2)):
+    def step(self,action,path,x_target,D=0.1,u_bg=np.zeros(2)):
         rew= self.reward(path,x_target)
         self.previous_x=self.x
         action_global_ref = coordinate_in_global_ref(np.zeros(2),self.dir_path,action)
-        self.x = solver(x=self.x,U=self.U,p=action_global_ref,Dt=self.Dt,D=self.D,u_bg=u_bg)
+        self.x = solver(x=self.x,U=self.U,p=action_global_ref,Dt=self.Dt,D=D,u_bg=u_bg)
         next_state = self.state(path)
         done = False
         d = np.linalg.norm(self.x-x_target)

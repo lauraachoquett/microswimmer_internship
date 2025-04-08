@@ -1,6 +1,8 @@
 import numpy as np
 import matplotlib.pyplot as plt
 from math import atan2
+from scipy.interpolate import CubicSpline
+
 def generate_simple_line(p_0,p_target,nb_points):
     t = np.linspace(0,1,nb_points)
     path = p_0 * t[:,None] +(1-t)[:,None]*p_target
@@ -37,6 +39,22 @@ def generate_demi_circle_path(p_0, p_target, nb_points):
 
     return np.flip(path,axis=0)
 
+def generate_curve(p_0,p_target,k,nb_points): 
+    t = np.linspace(0, 1, nb_points)  
+    x = (1 - t) * p_0[0] + t * p_target[0]
+    y = (1 - t) * p_0[1] + t * p_target[1] + k * t * (1 - t) * (p_target[0] - p_0[0])  
+    return np.concatenate((x.reshape(nb_points,1),y.reshape(nb_points,1)),axis=1)
+
+def generate_random_ondulating_path(p_0, p_target, n_points=100, max_curvature=1.0, amplitude=0.1, frequency=5):
+    t = np.linspace(0, 1, n_points)
+    x_base = np.linspace(p_0[0], p_target[0], n_points)
+    y_base = np.linspace(p_0[1], p_target[1], n_points)
+    noise = amplitude * np.sin(frequency * 2 * np.pi * t)  
+    y_ondulating = y_base + noise
+    cs = CubicSpline(t, np.column_stack([x_base, y_ondulating]), bc_type='natural')
+    path = cs(t)
+    return path
+
 def plot_path(p_0,p_target,nb_points,type='line'):
     if type=='line':
         path = generate_simple_line(p_0,p_target,nb_points)
@@ -45,9 +63,17 @@ def plot_path(p_0,p_target,nb_points,type='line'):
         path = generate_line_two_part(p_0,p_1,p_target,nb_points)
     if type=='circle':
         path = generate_demi_circle_path(p_0,p_target,nb_points)
+    if type=='curve':
+        k=2
+        path = generate_curve(p_0,p_target,k,nb_points)
+    if type=='ondulating_path':
+        path=generate_random_ondulating_path(p_0,p_target,nb_points,amplitude=0.5,frequency=3)
     plt.plot(path[:,0],path[:,1],label='path')
     plt.xlabel("x")
     plt.ylabel("y")
+    plt.scatter(p_0[0], p_0[1], color='red', label="Starting point")
+    plt.scatter(p_target[0], p_target[1], color='blue', label="Ending point")
+    plt.legend()
     plt.title(f"Path : {type}")
     plt.savefig(f"fig/path_{type}.png",dpi=100,bbox_inches='tight')
 
@@ -55,4 +81,5 @@ if __name__  == '__main__' :
     p_0 = np.array([-2,-1])
     p_target  =np.array([2,1])
     nb_points = 200
-    plot_path(p_0,p_target,nb_points,'circle')
+    plot_path(p_0,p_target,nb_points,'ondulating_path')
+
