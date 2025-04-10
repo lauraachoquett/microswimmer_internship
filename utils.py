@@ -38,3 +38,26 @@ class ReplayBuffer(object):
 			torch.FloatTensor(self.reward[ind]).to(self.device),
 			torch.FloatTensor(self.not_done[ind]).to(self.device)
 		)
+
+def random_bg_parameters():
+    dir = np.random.uniform(-1,1,2)
+    dir = dir/np.linalg.norm(dir)
+    norm = np.random.rand()*0.6
+
+    a = np.random.rand()
+    center = [np.random.rand()*2,np.random.rand()]
+    cir = (np.random.rand()-0.5)*3
+    return dir,norm,center,a,cir
+
+
+def courbures(path):
+    dx = np.gradient(path[:, 0])
+    dy = np.gradient(path[:, 1])
+    ddx = np.gradient(dx)
+    ddy = np.gradient(dy)
+    
+    numerateur = np.abs(dx * ddy - dy * ddx)
+    denominateur = (dx**2 + dy**2)**1.5
+    courbure = numerateur / (denominateur + 1e-8)  # pour éviter la division par 0
+
+    return courbure

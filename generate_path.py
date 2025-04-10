@@ -1,12 +1,13 @@
 import numpy as np
 import matplotlib.pyplot as plt
-from math import atan2
+from math import atan2,pi
 from scipy.interpolate import CubicSpline
-
+from utils import courbures
 def generate_simple_line(p_0,p_target,nb_points):
     t = np.linspace(0,1,nb_points)
     path = p_0 * t[:,None] +(1-t)[:,None]*p_target
-    return np.flip(path,axis=0)
+    d = np.linalg.norm((p_target - p_0))
+    return np.flip(path,axis=0),d
 
 def generate_line_two_part(p_0,p_1,p_target,nb_points):
     t = np.linspace(0,1,nb_points)
@@ -14,7 +15,8 @@ def generate_line_two_part(p_0,p_1,p_target,nb_points):
     path_1 = np.flip(path_1,axis=0)
     path_2 = np.flip(p_1 * t[:,None] +(1-t)[:,None]*p_target,axis=0)
     path= np.concatenate((path_1,path_2),axis=0)
-    return path
+    d = np.linalg.norm(p_1-p_0) + np.linalg.norm(p_target - p_0)
+    return path,d
 
 def generate_demi_circle_path(p_0, p_target, nb_points):
     p_0 = np.array(p_0)
@@ -36,8 +38,8 @@ def generate_demi_circle_path(p_0, p_target, nb_points):
                   [sin_a,  cos_a]])
     rotated_points = circle_points @ R.T
     path = center + rotated_points
-
-    return np.flip(path,axis=0)
+    d = pi * r
+    return np.flip(path,axis=0),d
 
 def generate_curve(p_0,p_target,k,nb_points): 
     t = np.linspace(0, 1, nb_points)  
@@ -67,7 +69,9 @@ def plot_path(p_0,p_target,nb_points,type='line'):
         k=2
         path = generate_curve(p_0,p_target,k,nb_points)
     if type=='ondulating_path':
-        path=generate_random_ondulating_path(p_0,p_target,nb_points,amplitude=0.5,frequency=3)
+        path=generate_random_ondulating_path(p_0,p_target,nb_points,amplitude=0.8,frequency=10)
+        print(np.max(courbures(path)))
+    plt.close()
     plt.plot(path[:,0],path[:,1],label='path')
     plt.xlabel("x")
     plt.ylabel("y")

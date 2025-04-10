@@ -1,16 +1,15 @@
 from generate_path import generate_simple_line
 from sde import *
-
+import time
 colors = plt.cm.tab10.colors
+from scipy.spatial import KDTree
 
-def min_dist_closest_point(x,path):
-    distances =np.linalg.norm(path-x,axis=1)
-    min_dist = np.min(distances)
-    closest_point=np.argmin(distances)
-    return min_dist,closest_point
+def min_dist_closest_point(x,tree):
+    dist, idx = tree.query(x)
+    return dist, idx
 
 
-def distance_to_path(nb_steps,t_init,t_end,nb_points_path = 1000,U=1,p = np.ones(2),x_0 = np.zeros(2)):
+def distance_to_path(tree,nb_steps,t_init,t_end,U=1,p = np.ones(2),x_0 = np.zeros(2)):
     D=0.1
 
     Dt = (t_end-t_init)/nb_steps
@@ -19,22 +18,23 @@ def distance_to_path(nb_steps,t_init,t_end,nb_points_path = 1000,U=1,p = np.ones
     distances = np.zeros((nb_steps,2))
     traj[0] = x_0
 
-    p_target = np.ones(2)
-    p_0 = x_0
-    path = generate_simple_line(p_0,p_target,nb_points_path)
+
 
     for n in range(nb_steps-1) : 
         traj[n+1] = solver(traj[n],U,p,Dt,D)
-        distances[n],_= min_dist_closest_point(traj[n],path)
-    distances[-1],_ = min_dist_closest_point(traj[-1],path)
+        distances[n],_= min_dist_closest_point(traj[n],tree)
+    distances[-1],_ = min_dist_closest_point(traj[-1],tree)
 
-    return traj,path,distances
+    return traj,distances
 
 def plot_distances(nb_steps,t_init,t_end,nb_points_path,nb_sims):
+    p_target = np.ones(2)
+    p_0 = np.zeros(2)
     fig = plt.figure(figsize=(12, 4))
-
+    path = generate_simple_line(p_0,p_target,nb_points_path)
+    tree = KDTree(path)
     for i in range(nb_sims):
-        traj,path,distances = distance_to_path(nb_steps,t_init,t_end,nb_points_path)
+        traj,distances = distance_to_path(tree,nb_steps,t_init,t_end)
         plt.subplot(1,2,1)
         plt.plot(distances,color = colors[i])
         plt.xlabel("t")
@@ -55,6 +55,9 @@ if __name__ == '__main__':
     t_init=0
     t_end=1
     nb_points_path=1000
-    nb_sims=3
+    nb_sims=10
+    start = time.time()
     plot_distances(nb_steps,t_init,t_end,nb_points_path,nb_sims)
+    print("Durée:", time.time() - start)
+
     
