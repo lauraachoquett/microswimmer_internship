@@ -66,11 +66,14 @@ def plot_path(p_0,p_target,nb_points,type='line'):
     if type=='circle':
         path = generate_demi_circle_path(p_0,p_target,nb_points)
     if type=='curve':
-        k=2
+        p_0 = np.zeros(2)
+        p_target = np.array([1/4,1/8])
+        k=-0.4
+        nb_points=10
         path = generate_curve(p_0,p_target,k,nb_points)
     if type=='ondulating_path':
         path=generate_random_ondulating_path(p_0,p_target,nb_points,amplitude=0.8,frequency=10)
-        print(np.max(courbures(path)))
+    print(np.max(courbures(path)))
     plt.close()
     plt.plot(path[:,0],path[:,1],label='path')
     plt.xlabel("x")
@@ -85,5 +88,5 @@ if __name__  == '__main__' :
     p_0 = np.array([-2,-1])
     p_target  =np.array([2,1])
     nb_points = 200
-    plot_path(p_0,p_target,nb_points,'ondulating_path')
+    plot_path(p_0,p_target,nb_points,'curve')
 

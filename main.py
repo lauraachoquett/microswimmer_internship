@@ -14,14 +14,16 @@ import pickle
 from sde import rankine_vortex,uniform_velocity
 from evaluate_agent import evaluate_agent
 from scipy.spatial import KDTree
-
 colors = plt.cm.tab10.colors
 
+def format_sci(x):
+    return "{:.3e}".format(x)
 
-def run_expe(config):
-    
+
+def run_expe(config,agent_file='agents'):
+    print(" --------------- TRAINING ---------------")
     timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M")
-    file_name = f"agent_TD3_{timestamp}"
+    file_name = os.path.join(agent_file,f"agent_TD3_{timestamp}")
 
     os.makedirs(file_name, exist_ok=True) 
     with open(os.path.join(file_name,'config.pkl'), "wb") as f:
@@ -42,14 +44,13 @@ def run_expe(config):
     steps_per_action=config['steps_per_action']
     Dt_action =  config['Dt_action']
     Dt_sim = Dt_action /steps_per_action
-    print(f"Delta de temps entre chaque action : {Dt_action}")
 
     threshold = config['threshold']
     Dt_action = Dt_sim*steps_per_action
     beta = config['beta']
 
 
-    env = MicroSwimmer(x_0,C,Dt_sim,beta)
+    env = MicroSwimmer(x_0,C,Dt_sim,config['velocity_bool'])
 
     state_dim=env.observation_space.shape[0]
     action_dim=env.action_space.shape[0]
@@ -74,6 +75,17 @@ def run_expe(config):
     if save_model and not os.path.exists(save_path_model):
         os.makedirs(save_path_model)
 
+    if config['load_model'] != '':
+        policy_file = os.path.join(config['load_model'],'models/agent')
+        agent.load(policy_file)
+        path_config = os.path.join(config['load_model'],'config.pkl')
+        with open(path_config, "rb") as f:
+            config = pickle.load(f)
+        print("Policy loaded !")
+        episode_start_update= eval_freq*2
+        episode_update = 2
+
+
     iter = 0
     episode_reward = 0
     episode_num = 0
@@ -83,7 +95,6 @@ def run_expe(config):
     #random_eval = evaluate_agent(agent,env,eval_episodes,config,save_path_result)
     #print(f"Initial random evaluation : {random_eval}")
     state,done = env.reset(tree,path),False
-    print("Beginning of the training...")
     count_reach_target=0
 
     x=p_0
@@ -107,7 +118,7 @@ def run_expe(config):
             if config['rankine_bg']:
                 u_bg = rankine_vortex(x,a,center,cir)
 
-        next_state,x,reward,done,_ = env.step(action,tree,path,p_target,D,u_bg,threshold)
+        next_state,x,reward,done,_ = env.step(action,tree,path,p_target,beta,D,u_bg,threshold)
         replay_buffer.add(state.flatten(), action, next_state.flatten(), reward, done)
             
 
@@ -118,12 +129,14 @@ def run_expe(config):
             agent.train(replay_buffer, batch_size)
         if done:
             count_reach_target+=1
+            if config['load_model'] != '':
+                beta = beta * 1.001
         if done or iter*Dt_sim> t_max: 
             state,done =env.reset(tree,path),False
             training_reward.append(episode_reward)
 
-            if episode_num%eval_freq==0:
-                print(f"Total iter: {iter+1} Episode Num: {episode_num+1} Reward: {episode_reward:.3f} Counter target reached: {count_reach_target}")
+            if episode_num%eval_freq==0 and episode_num > 10:
+                print(f"Total iter: {iter+1} Episode Num: {episode_num+1} Reward: {episode_reward:.3f} Success rate: {count_reach_target/eval_freq}")
                 path_save_fig= os.path.join(save_path_result_fig,"training_reward.png")
                 eval_rew,_,_ = evaluate_agent(agent,env,eval_episodes,config,save_path_result_fig,"eval_during_training",False)
                 #evaluations.append(eval)
@@ -139,6 +152,12 @@ def run_expe(config):
                 plt.ylabel("reward")
                 plt.savefig(path_save_fig,dpi=100,bbox_inches='tight')
 
+                #if count_reach_target/eval_freq > 0.94 : 
+                    #beta = beta + 0.02
+                #print("Beta increased : ",beta)
+                count_reach_target = 0 
+
+
             iter = 0
             episode_reward=0
             episode_num+=1
@@ -150,8 +169,7 @@ def run_expe(config):
 
     agent.save(os.path.join(save_path_model,'last'))
 
-def format_sci(x):
-    return "{:.3e}".format(x)
+
 
 if __name__=='__main__':
     p_target = [2,0]
@@ -160,20 +178,21 @@ if __name__=='__main__':
     path,d = generate_demi_circle_path(p_0,p_target,nb_points_path)
     tree = KDTree(path)
 
-    print("Curvature max du chemin : ",np.max(courbures(path)))
+    print("Curvature max du chemin :  ", format_sci(np.max(courbures(path))))
     t_max = 8
     t_init= 0
     maximum_curvature = 30
     l = 1/maximum_curvature
     Dt_action = 1/maximum_curvature
-    threshold = 0.05
+    threshold = 0.07
     D = threshold**2/(20*Dt_action)
     print("D:                         ", format_sci(D))
-    print("Dt_action:                ", format_sci(Dt_action))
-    print("Threshold:                ", format_sci(threshold))
-    print("Mean diffusion distance: ", format_sci(sqrt(2 * Dt_action * D)))
-    print("Distance to cover:       ", format_sci(d))
-    print("Expected precision:      ", format_sci(threshold / d))
+    print("Dt_action:                 ", format_sci(Dt_action))
+    print("Threshold:                 ", format_sci(threshold))
+    print("Mean diffusion distance:   ", format_sci(sqrt(2 * Dt_action * D)))
+    print("Distance during Dt_action: ", format_sci(Dt_action))
+    print("Distance to cover:         ", format_sci(d))
+    print("Expected precision:        ", format_sci(threshold / d))
     config = {
         'x_0' : p_0,
         'C' : 1,
@@ -188,7 +207,7 @@ if __name__=='__main__':
         'eval_freq':50,
         'save_model':True,
         'eval_episodes' : 3,
-        'episode_start_update' : 20,
+        'episode_start_update' : 10,
         'path' : path,
         'tree' :tree,
         'p_0' : p_0,
@@ -197,14 +216,12 @@ if __name__=='__main__':
         'load_model':"",
         'episode_per_update' :5,
         'discount_factor' : 1,
-        'beta':0.22,
-        'uniform_bg':False,
-        'rankine_bg':True,
+        'beta':0.25,
+        'uniform_bg':True,
+        'rankine_bg':False,
         'random_curve' : False,
         'nb_points_path':300,
-        'Dt_action': Dt_action
+        'Dt_action': Dt_action,
+        'velocity_bool' : True,
     }
-
-
-    run_expe(config)
-    
+    #run_expe(config)

@@ -19,6 +19,7 @@ def evaluate_agent(agent,env,eval_episodes,config,save_path_result_fig,file_name
     Dt_action = config['Dt_action']
     Dt_sim = Dt_action/steps_per_action
     p_0 = config['p_0']
+    beta =config['beta']
     iter=0
     episode_num = 0
     episode_reward=0
@@ -61,7 +62,7 @@ def evaluate_agent(agent,env,eval_episodes,config,save_path_result_fig,file_name
             u_bg = rankine_vortex(x,a,center,cir)
             type='rankine'
             
-        next_state,x,reward,done,_ = env.step(action,tree,path,p_target,D,u_bg,threshold)
+        next_state,x,reward,done,_ = env.step(action,tree,path,p_target,beta,D,u_bg,threshold)
 
         state = next_state
         episode_reward += reward
