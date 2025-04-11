@@ -112,7 +112,7 @@ def run_expe(config,agent_file='agents'):
         if iter%steps_per_action==0 or iter==1:
             action = agent.select_action(state)
 
-        if episode_num>100: 
+        if episode_num>config['pertubation_after_episode']: 
             if config['uniform_bg']:
                 u_bg = uniform_velocity(dir,norm)
             if config['rankine_bg']:
@@ -138,7 +138,7 @@ def run_expe(config,agent_file='agents'):
             if episode_num%eval_freq==0 and episode_num > 10:
                 print(f"Total iter: {iter+1} Episode Num: {episode_num+1} Reward: {episode_reward:.3f} Success rate: {count_reach_target/eval_freq}")
                 path_save_fig= os.path.join(save_path_result_fig,"training_reward.png")
-                eval_rew,_,_ = evaluate_agent(agent,env,eval_episodes,config,save_path_result_fig,"eval_during_training",False)
+                eval_rew,_,_,_= evaluate_agent(agent,env,eval_episodes,config,save_path_result_fig,"eval_during_training",False)
                 #evaluations.append(eval)
                 print(f"Eval result : {eval_rew}")
                 if best_eval_result<eval_rew : 
@@ -152,9 +152,9 @@ def run_expe(config,agent_file='agents'):
                 plt.ylabel("reward")
                 plt.savefig(path_save_fig,dpi=100,bbox_inches='tight')
 
-                #if count_reach_target/eval_freq > 0.94 : 
-                    #beta = beta + 0.02
-                #print("Beta increased : ",beta)
+
+                if config['load_model'] != '':
+                    print("Beta increased : ",beta)
                 count_reach_target = 0 
 
 
@@ -198,7 +198,7 @@ if __name__=='__main__':
         'C' : 1,
         'D' : D,
         'u_bg' : np.array([0,1])*0.0,
-        'threshold' : 0.05,
+        'threshold' :threshold,
         't_max': t_max,
         't_init':t_init,
         'steps_per_action':5,
@@ -219,9 +219,10 @@ if __name__=='__main__':
         'beta':0.25,
         'uniform_bg':True,
         'rankine_bg':False,
+        'pertubation_after_episode' :150,
         'random_curve' : False,
-        'nb_points_path':300,
+        'nb_points_path':1000,
         'Dt_action': Dt_action,
         'velocity_bool' : True,
     }
-    #run_expe(config)
+    run_expe(config)

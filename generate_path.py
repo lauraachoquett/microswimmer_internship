@@ -3,6 +3,8 @@ import matplotlib.pyplot as plt
 from math import atan2,pi
 from scipy.interpolate import CubicSpline
 from utils import courbures
+
+
 def generate_simple_line(p_0,p_target,nb_points):
     t = np.linspace(0,1,nb_points)
     path = p_0 * t[:,None] +(1-t)[:,None]*p_target

@@ -61,3 +61,4 @@ def courbures(path):
     courbure = numerateur / (denominateur + 1e-8)  # pour éviter la division par 0
 
     return courbure
+
