@@ -176,8 +176,8 @@ if __name__=='__main__':
     p_0 = np.zeros(2)
     nb_points_path = 500
     path,d = generate_demi_circle_path(p_0,p_target,nb_points_path)
+    print("Distance path points:      ",format_sci(np.linalg.norm(path[1,:]-path[0,:])))
     tree = KDTree(path)
-
     print("Curvature max du chemin :  ", format_sci(np.max(courbures(path))))
     t_max = 8
     t_init= 0
@@ -221,7 +221,7 @@ if __name__=='__main__':
         'rankine_bg':False,
         'pertubation_after_episode' :150,
         'random_curve' : False,
-        'nb_points_path':1000,
+        'nb_points_path':500,
         'Dt_action': Dt_action,
         'velocity_bool' : True,
     }

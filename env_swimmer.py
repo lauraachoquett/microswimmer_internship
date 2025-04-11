@@ -7,7 +7,7 @@ from sde import solver
 class MicroSwimmer(gym.Env):
     def __init__(self,x_0,C,Dt,velocity_bool):
         super(MicroSwimmer,self).__init__()
-        self.n_lookahead = 5
+        self.n_lookahead = 10
         self.action_space = gym.spaces.Box(
             shape=(2,),low = -np.inf,high = np.inf,dtype=np.float32
         )

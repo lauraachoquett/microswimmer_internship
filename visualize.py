@@ -150,7 +150,7 @@ def plot_mean_reward_success_rate(mean_rewards, std_rewards, list_success_rate, 
 
 
 
-def visualize_streamline(agent,config_eval,file_name_or,save_path_eval,u_bg=np.zeros(2),type=''):
+def visualize_streamline(agent,config_eval,file_name_or,save_path_eval,u_bg=np.zeros(2),type='',title=''):
     save_path_streamline = os.path.join(save_path_eval,'streamlines/')
     if not os.path.exists(save_path_streamline):
             os.makedirs(save_path_streamline)
@@ -180,7 +180,7 @@ def visualize_streamline(agent,config_eval,file_name_or,save_path_eval,u_bg=np.z
     path_above_point = path_above_point[:-2]
     path_below_point = path_below_point[:-1]
     path_starting_point = np.concatenate((path_above_point,path_below_point),axis=0)
-    file_name_or += ''
+    file_name_or += title
     path_save_fig = os.path.join(save_path_streamline, file_name_or)
     fig, ax = plt.subplots(figsize=(10, 8))
     ax.plot(path[:, 0], path[:, 1], label='path', color='black', linewidth=2,zorder=10)

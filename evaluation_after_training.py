@@ -73,7 +73,7 @@ def evaluate_after_training(agent_name,config_eval,file_name_or,type=None,transl
     #plot_robust_D(config_eval,file_name_or,agent,env,save_path_eval,15,threshold)
     config_eval['D']=D
     #plot_robust_u_bg_uniform(config_eval,file_name_or,agent,env,save_path_eval,15,threshold)
-    visualize_streamline(agent,config_eval,file_name_or,save_path_eval,type='ondulating')
+    visualize_streamline(agent,config_eval,file_name_or,save_path_eval,u_bg=np.array([0.0,0]),type='ondulating',title='')
     #plot_robust_u_bg_rankine(config_eval,file_name_or,agent,env,save_path_eval,15,threshold)
 
 def policy_direction(agent_name,config_eval):
@@ -120,7 +120,7 @@ def policy_direction(agent_name,config_eval):
 
 
 if __name__=='__main__':
-    agent_file = 'agents/agent_TD3_2025-04-11_16-19'
+    agent_file = 'agents/agent_TD3_2025-04-11_17-06'
     path_config = os.path.join(agent_file,'config.pkl')
     print(os.path.getsize(path_config))
     with open(path_config, "rb") as f:
