@@ -194,7 +194,7 @@ def visualize_streamline(agent,config_eval,file_name_or,save_path_eval,u_bg=np.z
     config_eval['u_bg'] = u_bg
     for starting_point in path_starting_point:
         config_eval['x_0'] = starting_point
-        env = MicroSwimmer(config_eval['x_0'], config_eval['C'], config_eval['Dt_action'] / config_eval['steps_per_action'], config_eval['velocity_bool'])
+        env = MicroSwimmer(config_eval['x_0'], config_eval['C'], config_eval['Dt_action'] / config_eval['steps_per_action'], config_eval['velocity_bool'],config_eval['n_lookahead'])
         _, _, _,_, states_list_per_episode = evaluate_agent(agent, env, 1, config_eval, save_path_streamline, file_name_or, False, '', False)
         trajectories[f'{starting_point}'] = states_list_per_episode[0][0]
 

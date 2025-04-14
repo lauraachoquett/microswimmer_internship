@@ -48,7 +48,7 @@ def evaluate_agent(agent,env,eval_episodes,config,save_path_result_fig,file_name
                 dir,norm= parameters
                 dir = np.array(dir)
                 type='uniform'
-                center=np.zeros(2),0,0 
+                center,a,cir=np.zeros(2),0,0 
             if config['rankine_bg']:
                 type='rankine'
                 center,a,cir = parameters

@@ -15,6 +15,7 @@ from sde import rankine_vortex,uniform_velocity
 from evaluate_agent import evaluate_agent
 from scipy.spatial import KDTree
 colors = plt.cm.tab10.colors
+from statistics import mean
 
 def format_sci(x):
     return "{:.3e}".format(x)
@@ -26,7 +27,7 @@ def run_expe(config,agent_file='agents'):
     file_name = os.path.join(agent_file, f"agent_TD3_{timestamp}")
 
     os.makedirs(file_name, exist_ok=True)
-    with open(os.path.join(file_name, 'config.pkl'), "w") as f:
+    with open(os.path.join(file_name, 'config.pkl'), "wb") as f:
         pickle.dump(config, f)
 
 
@@ -40,7 +41,7 @@ def run_expe(config,agent_file='agents'):
 
     C = config['C']
     t_max =config['t_max']
-
+    n_lookahead = config['n_lookahead']
     steps_per_action=config['steps_per_action']
     Dt_action =  config['Dt_action']
     Dt_sim = Dt_action /steps_per_action
@@ -50,7 +51,7 @@ def run_expe(config,agent_file='agents'):
     beta = config['beta']
 
 
-    env = MicroSwimmer(x_0,C,Dt_sim,config['velocity_bool'])
+    env = MicroSwimmer(x_0,C,Dt_sim,config['velocity_bool'],n_lookahead)
 
     state_dim=env.observation_space.shape[0]
     action_dim=env.action_space.shape[0]
@@ -75,7 +76,9 @@ def run_expe(config,agent_file='agents'):
     if save_model and not os.path.exists(save_path_model):
         os.makedirs(save_path_model)
 
-    if config['load_model'] != '':
+    agent_to_load = config['load_model']
+
+    if agent_to_load != '':
         policy_file = os.path.join(config['load_model'],'models/agent')
         agent.load(policy_file)
         path_config = os.path.join(config['load_model'],'config.pkl')
@@ -84,6 +87,7 @@ def run_expe(config,agent_file='agents'):
         print("Policy loaded !")
         episode_start_update= eval_freq*2
         episode_update = 2
+    
 
 
     iter = 0
@@ -130,7 +134,7 @@ def run_expe(config,agent_file='agents'):
             agent.train(replay_buffer, batch_size)
         if done:
             count_reach_target+=1
-            if config['load_model'] != '':
+            if agent_to_load != '':
                 beta = beta * 1.001
         if done or iter*Dt_sim> t_max: 
             state,done =env.reset(tree,path),False
@@ -139,8 +143,9 @@ def run_expe(config,agent_file='agents'):
             if episode_num%eval_freq==0 and episode_num > 10:
                 print(f"Total iter: {iter+1} Episode Num: {episode_num+1} Reward: {episode_reward:.3f} Success rate: {count_reach_target/eval_freq}")
                 path_save_fig= os.path.join(save_path_result_fig,"training_reward.png")
-                eval_rew,_,_,_= evaluate_agent(agent,env,eval_episodes,config,save_path_result_fig,"eval_during_training",False)
+                eval_rew,_,_,_,_= evaluate_agent(agent,env,eval_episodes,config,save_path_result_fig,"eval_during_training",False)
                 #evaluations.append(eval)
+                eval_rew = mean(eval_rew)
                 print(f"Eval result : {eval_rew}")
                 if best_eval_result<eval_rew : 
                     best_eval_result=eval_rew
@@ -154,8 +159,9 @@ def run_expe(config,agent_file='agents'):
                 plt.savefig(path_save_fig,dpi=100,bbox_inches='tight')
 
 
-                if config['load_model'] != '':
+                if agent_to_load:
                     print("Beta increased : ",beta)
+                    
                 count_reach_target = 0 
 
 
@@ -197,7 +203,7 @@ if __name__=='__main__':
     config = {
         'x_0' : p_0,
         'C' : 1,
-        'D' : D,
+        'D' : 0,
         'u_bg' : np.array([0,1])*0.0,
         'threshold' :threshold,
         't_max': t_max,
@@ -218,13 +224,13 @@ if __name__=='__main__':
         'episode_per_update' :5,
         'discount_factor' : 1,
         'beta':0.25,
-        'uniform_bg':True,
+        'uniform_bg':False,
         'rankine_bg':False,
         'pertubation_after_episode' :150,
         'random_curve' : False,
         'nb_points_path':500,
         'Dt_action': Dt_action,
         'velocity_bool' : True,
-        'n_lookahead' : 10,
+        'n_lookahead' : 5,
     }
     run_expe(config)

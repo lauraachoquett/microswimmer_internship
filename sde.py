@@ -2,11 +2,13 @@ import numpy as np
 import matplotlib.pyplot as plt
 from math import sin, cos, atan2,sqrt
 
-def dW(delta_t):
-    return np.random.normal(loc=0.0, scale=np.sqrt(delta_t),size=(2))
+def dW(delta_t,rng=None):
+    return rng.normal(loc=0.0, scale=np.sqrt(delta_t),size=(2))
 
-def solver(x,U,p,Dt,D,u_bg=np.zeros(2)):
-    dW_t =  dW(Dt)
+def solver(x,U,p,Dt,D,u_bg=np.zeros(2),rng=None):
+    if rng is None:
+        rng = np.random.default_rng()  
+    dW_t =  dW(Dt,rng)
     return x + u_bg*Dt+ U*p*Dt+ sqrt(D)*dW_t
 
 
