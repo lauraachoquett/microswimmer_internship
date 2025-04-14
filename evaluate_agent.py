@@ -10,7 +10,7 @@ from generate_path import generate_curve
 from plot import plot_trajectories
 
 def evaluate_agent(agent,env,eval_episodes,config,save_path_result_fig,file_name,random_parameters,title='',plot=True,parameters=[],plot_background=False):
-    rewards = []
+    rewards_per_episode = []
     t_max = config['t_max']
     path = config['path']
     tree = config['tree']
@@ -24,7 +24,13 @@ def evaluate_agent(agent,env,eval_episodes,config,save_path_result_fig,file_name
     iter=0
     episode_num = 0
     episode_reward=0
+    episode_rew_t=0
+    episode_rew_d=0
+    rewards_t_per_episode = []
+    rewards_d_per_episode = []
+    
     state,done = env.reset(tree,path),False
+    
     states_episode = []
     states_list_per_episode=[]
     u_bg = config['u_bg']
@@ -38,9 +44,9 @@ def evaluate_agent(agent,env,eval_episodes,config,save_path_result_fig,file_name
         dir, norm,center,a ,cir = random_bg_parameters()
     else : 
         if len(parameters)!=0:
-            plot_background=True
             if config['uniform_bg']:
                 dir,norm= parameters
+                dir = np.array(dir)
                 type='uniform'
                 center=np.zeros(2),0,0 
             if config['rankine_bg']:
@@ -53,7 +59,7 @@ def evaluate_agent(agent,env,eval_episodes,config,save_path_result_fig,file_name
     if u_bg.any() != 0:
         type='uniform'
         norm = np.linalg.norm(u_bg)
-        dir = u_bg/norm
+        dir = np.array(u_bg/norm)
         plot_background=True
     
     if config['random_curve']:
@@ -68,15 +74,18 @@ def evaluate_agent(agent,env,eval_episodes,config,save_path_result_fig,file_name
             action = agent.select_action(state)
 
         if config['uniform_bg']:
-            u_bg = uniform_velocity(dir,norm)
+            u_bg = uniform_velocity(np.array(dir),norm)
         if config['rankine_bg']:
             u_bg = rankine_vortex(x,a,center,cir)
             
-        next_state,x,reward,done,_ = env.step(action,tree,path,p_target,beta,D,u_bg,threshold)
-
-        state = next_state
+        next_state,reward,done,info = env.step(action,tree,path,p_target,beta,D,u_bg,threshold)
+        
+        x= info['x']
+        episode_rew_t += info['rew_t']
+        episode_rew_d += info['rew_d']
         episode_reward += reward
-        rewards.append(episode_reward)
+        
+        state = next_state
         
         if done or iter*Dt_sim> t_max: 
             if done : 
@@ -84,10 +93,16 @@ def evaluate_agent(agent,env,eval_episodes,config,save_path_result_fig,file_name
             states_list_per_episode.append([np.array(states_episode),iter])
             state,done =env.reset(tree,path),False
             iter = 0
-            episode_reward=0
             episode_num+=1
             x=p_0
             states_episode=[]
+            rewards_per_episode.append(episode_reward)
+            rewards_t_per_episode.append(episode_rew_t)
+            rewards_d_per_episode.append(episode_rew_d)
+            episode_reward=0
+            episode_rew_t=0
+            episode_rew_d=0
+
 
     if plot : 
         path_save_fig = os.path.join(save_path_result_fig, file_name)
@@ -100,7 +115,7 @@ def evaluate_agent(agent,env,eval_episodes,config,save_path_result_fig,file_name
 
         plt.close(fig) 
 
-    return mean(rewards),np.std(np.array(rewards)),count_succes/eval_episodes,states_list_per_episode
+    return rewards_per_episode, rewards_t_per_episode, rewards_d_per_episode,count_succes/eval_episodes,states_list_per_episode
 
 
 

@@ -5,9 +5,9 @@ from distance_to_path import min_dist_closest_point
 from sde import solver
 
 class MicroSwimmer(gym.Env):
-    def __init__(self,x_0,C,Dt,velocity_bool):
+    def __init__(self,x_0,C,Dt,velocity_bool,n_lookahead=5):
         super(MicroSwimmer,self).__init__()
-        self.n_lookahead = 10
+        self.n_lookahead = n_lookahead
         self.action_space = gym.spaces.Box(
             shape=(2,),low = -np.inf,high = np.inf,dtype=np.float32
         )
@@ -62,15 +62,14 @@ class MicroSwimmer(gym.Env):
     
     def reward(self,x_target,beta):
         d =self.d
-        rew_t = -self.C * self.Dt - np.linalg.norm(self.x-x_target) +  np.linalg.norm(self.previous_x-x_target)
+        rew_t = -self.C * self.Dt 
+        rew_target=  - np.linalg.norm(self.x-x_target) +  np.linalg.norm(self.previous_x-x_target)
         rew_d = - beta*d
-        rew =  rew_t + rew_d
-        ##print(f"reward temps : {rew_t}")
-        #print(f"reward distance: {rew_d}")
-        return rew
+        rew =  rew_t + rew_d + rew_target
+        return rew_t,rew_d,rew_target,rew
     
     def step(self,action,tree,path,x_target,beta,D=0.1,u_bg=np.zeros(2),threshold=0.2):
-        rew= self.reward(x_target,beta)
+        rew_t,rew_d,rew_tar,rew= self.reward(x_target,beta)
         self.previous_x=self.x
         action_global_ref = coordinate_in_global_ref(np.zeros(2),self.dir_path,action)
         self.x = solver(x=self.x,U=self.U,p=action_global_ref,Dt=self.Dt,D=D,u_bg=u_bg)
@@ -79,7 +78,12 @@ class MicroSwimmer(gym.Env):
         d = np.linalg.norm(self.x-x_target)
         if d<threshold:
             done = True
-        return next_state,self.x,rew,done,{}
+        return next_state,rew,done,{
+            'x' :self.x,
+            'rew_t': rew_t,
+            'rew_d': rew_d,
+            'rew_target': rew_tar,
+        }
     
     def reset(self,tree,path): 
         self.x = self.x_0

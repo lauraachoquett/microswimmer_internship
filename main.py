@@ -23,10 +23,10 @@ def format_sci(x):
 def run_expe(config,agent_file='agents'):
     print(" --------------- TRAINING ---------------")
     timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M")
-    file_name = os.path.join(agent_file,f"agent_TD3_{timestamp}")
+    file_name = os.path.join(agent_file, f"agent_TD3_{timestamp}")
 
-    os.makedirs(file_name, exist_ok=True) 
-    with open(os.path.join(file_name,'config.pkl'), "wb") as f:
+    os.makedirs(file_name, exist_ok=True)
+    with open(os.path.join(file_name, 'config.pkl'), "w") as f:
         pickle.dump(config, f)
 
 
@@ -118,7 +118,8 @@ def run_expe(config,agent_file='agents'):
             if config['rankine_bg']:
                 u_bg = rankine_vortex(x,a,center,cir)
 
-        next_state,x,reward,done,_ = env.step(action,tree,path,p_target,beta,D,u_bg,threshold)
+        next_state,reward,done,info = env.step(action,tree,path,p_target,beta,D,u_bg,threshold)
+        x= info['x']
         replay_buffer.add(state.flatten(), action, next_state.flatten(), reward, done)
             
 
@@ -224,5 +225,6 @@ if __name__=='__main__':
         'nb_points_path':500,
         'Dt_action': Dt_action,
         'velocity_bool' : True,
+        'n_lookahead' : 10,
     }
     run_expe(config)

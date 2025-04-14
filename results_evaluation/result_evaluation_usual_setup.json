@@ -1,0 +1,227 @@
+{
+    "agents/semi-circle_u_bg/agent_TD3_2025-04-08_15-07_eval": {
+        "rewards": [
+            -16.074694022938946,
+            -19.525055771600154,
+            -40.61661244273993
+        ],
+        "rewards_time": [
+            -6.426666666666761,
+            -5.553333333333407,
+            -9.89999999999992
+        ],
+        "rewards_distance": [
+            -12.446562606093734,
+            -13.963414984975978,
+            -30.72496216817412
+        ],
+        "success_rate": 1.0,
+        "n_eval_episodes": 3,
+        "training type": {
+            "rankine_bg": false,
+            "uniform_bg": false,
+            "random_curve": false,
+            "velocity_bool": false
+        }
+    },
+    "agents/agent_TD3_2025-04-11_16-19": {
+        "rewards": [
+            -5.182242352735945,
+            -8.095459503886323,
+            -7.610652404420727
+        ],
+        "rewards_time": [
+            -4.81333333333339,
+            -5.200000000000066,
+            -4.826666666666724
+        ],
+        "rewards_distance": [
+            -3.1224942055456584,
+            -2.8988390809995597,
+            -2.774788624625526
+        ],
+        "success_rate": 1.0,
+        "n_eval_episodes": 3,
+        "training type": {
+            "rankine_bg": false,
+            "uniform_bg": false,
+            "random_curve": false,
+            "velocity_bool": true
+        }
+    },
+    "agents/retrained/agent_TD3_2025-04-10_11-26": {
+        "rewards": [
+            -5.085957403095326,
+            -9.329345073941937,
+            -9.12193896040175
+        ],
+        "rewards_time": [
+            -4.913333333333393,
+            -5.026666666666729,
+            -4.820000000000057
+        ],
+        "rewards_distance": [
+            -2.9484152330503157,
+            -4.301640859599126,
+            -4.300343426389843
+        ],
+        "success_rate": 1.0,
+        "n_eval_episodes": 3,
+        "training type": {
+            "rankine_bg": false,
+            "uniform_bg": false,
+            "random_curve": false,
+            "velocity_bool": false
+        }
+    },
+    "agents/state_velocity/agent_TD3_2025-04-10_13-59": {
+        "rewards": [
+            -6.0351502687568335,
+            -10.536447107003829,
+            -8.829508862467508
+        ],
+        "rewards_time": [
+            -4.933333333333393,
+            -5.886666666666748,
+            -5.113333333333397
+        ],
+        "rewards_distance": [
+            -3.8540464712839952,
+            -4.646073427041431,
+            -3.724239588113449
+        ],
+        "success_rate": 1.0,
+        "n_eval_episodes": 3,
+        "training type": {
+            "rankine_bg": false,
+            "uniform_bg": false,
+            "random_curve": false,
+            "velocity_bool": true
+        }
+    },
+    "agents/state_velocity/agent_TD3_2025-04-11_13-37": {
+        "rewards": [
+            -5.9010691847653325,
+            -8.595371468950637,
+            -8.712602182897085
+        ],
+        "rewards_time": [
+            -5.646666666666743,
+            -5.580000000000075,
+            -5.67333333333341
+        ],
+        "rewards_distance": [
+            -3.027950798096126,
+            -3.0187730702031232,
+            -3.037578123647037
+        ],
+        "success_rate": 1.0,
+        "n_eval_episodes": 3,
+        "training type": {
+            "rankine_bg": false,
+            "uniform_bg": false,
+            "random_curve": false,
+            "velocity_bool": true
+        }
+    },
+    "agents/state_velocity/agent_TD3_2025-04-11_14-01_retrained": {
+        "rewards": [
+            -5.452909817610632,
+            -8.763151913115067,
+            -8.209304115048019
+        ],
+        "rewards_time": [
+            -5.50666666666674,
+            -5.760000000000079,
+            -5.446666666666738
+        ],
+        "rewards_distance": [
+            -2.7231136655499997,
+            -3.001494353029197,
+            -2.761480206249781
+        ],
+        "success_rate": 1.0,
+        "n_eval_episodes": 3,
+        "training type": {
+            "rankine_bg": false,
+            "uniform_bg": false,
+            "random_curve": false,
+            "velocity_bool": true
+        }
+    },
+    "agents/state_velocity/agent_TD3_2025-04-11_14-28": {
+        "rewards": [
+            -5.684532749443757,
+            -8.501758298781105,
+            -9.040309927680939
+        ],
+        "rewards_time": [
+            -5.686666666666744,
+            -5.533333333333407,
+            -5.926666666666749
+        ],
+        "rewards_distance": [
+            -2.755998672846517,
+            -2.954829087041829,
+            -3.121556993132348
+        ],
+        "success_rate": 1.0,
+        "n_eval_episodes": 3,
+        "training type": {
+            "rankine_bg": false,
+            "uniform_bg": false,
+            "random_curve": false,
+            "velocity_bool": true
+        }
+    },
+    "agents/agent_TD3_2025-04-11_16-09": {
+        "rewards": [
+            -6.882142585625552,
+            -9.454064511954487,
+            -11.366182074690926
+        ],
+        "rewards_time": [
+            -4.9933333333333945,
+            -5.153333333333398,
+            -5.206666666666733
+        ],
+        "rewards_distance": [
+            -4.639702359069384,
+            -4.3030958677653794,
+            -6.1594650047573065
+        ],
+        "success_rate": 1.0,
+        "n_eval_episodes": 3,
+        "training type": {
+            "rankine_bg": false,
+            "uniform_bg": false,
+            "random_curve": false,
+            "velocity_bool": true
+        }
+    },
+    "agents/agent_TD3_2025-04-11_16-37": {
+        "rewards": [
+            -5.083675540996888,
+            -7.737488611182328,
+            -8.016903910820245
+        ],
+        "rewards_time": [
+            -5.200000000000066,
+            -4.966666666666727,
+            -5.226666666666733
+        ],
+        "rewards_distance": [
+            -2.6324759742318,
+            -2.7796511602029046,
+            -2.785925460913237
+        ],
+        "success_rate": 1.0,
+        "n_eval_episodes": 3,
+        "training type": {
+            "rankine_bg": false,
+            "uniform_bg": false,
+            "random_curve": false,
+            "velocity_bool": true
+        }
+    }
+}

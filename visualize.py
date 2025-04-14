@@ -9,6 +9,7 @@ from plot import plot_background_velocity
 from env_swimmer import MicroSwimmer
 from plot import plot_trajectories
 import pickle
+from statistics import mean,stdev
 
 def format_sci(x):
     return "{:.3e}".format(x)
@@ -34,11 +35,12 @@ def plot_robust_D(config_eval,file_name_or,agent,env,save_path_eval,nb_D,thresho
             formatted_val = format_sci(val)
             label = r'$\frac{2D}{U^2 \Delta t}$ = ' + formatted_val
 
-            mean_reward, std_reward, success_rate,_ = evaluate_agent(agent, env, config_eval_bis['eval_episodes'],
-                                                                    config_eval_bis, save_path_eval_D,
-                                                                    file_name=file_name, random_parameters=False,label = label)
-            mean_reward_D[idx] = mean_reward
-            std_reward_D[idx] = std_reward
+            rewards_per_episode, rewards_t_per_episode, rewards_d_per_episode,success_rate,states_list_per_episode = evaluate_agent(agent, env, config_eval_bis['eval_episodes'],
+                                                                                                                        config_eval_bis, save_path_eval_D,
+                                                                                                                        file_name=file_name, random_parameters=False,label = label)
+            
+            mean_reward_D[idx] = mean(rewards_per_episode)
+            std_reward_D[idx] = stdev(rewards_per_episode)
             success_rate_D[idx] = success_rate
 
         plot_mean_reward_success_rate(mean_reward_D,std_reward_D,success_rate_D,D_values * 2/config_eval['Dt_action'],r'$\frac{2D}{U^2 \Delta t}$',idx_tr,thr,fig,axs)
@@ -72,9 +74,12 @@ def plot_robust_u_bg_uniform(config_eval,file_name_or,agent,env,save_path_eval,n
             for idx,norm in enumerate(norm_values):
                 config_eval_dir['u_bg'] = vec * norm 
                 file_name = file_name_or + f'_{idx}'
-                mean_reward, std_reward, success_rate,_ = evaluate_agent(agent, env, config_eval_dir['eval_episodes'],
+                results= evaluate_agent(agent, env, config_eval_dir['eval_episodes'],
                                                                     config_eval_dir, save_path_eval_dir,
                                                                     file_name=file_name, random_parameters=False)
+                rewards_per_episode, rewards_t_per_episode, rewards_d_per_episode,success_rate,states_list_per_episode = results
+                mean_reward = mean(rewards_per_episode)
+                std_reward = stdev(rewards_per_episode)
                 mean_reward_D[idx] = mean_reward
                 std_reward_D[idx] = std_reward
                 success_rate_D[idx] = success_rate
@@ -110,9 +115,11 @@ def plot_robust_u_bg_rankine(config_eval,file_name_or,agent,env,save_path_eval,n
             result = evaluate_agent(agent, env, config_eval_rk['eval_episodes'],
                                                                 config_eval_rk, save_path_eval_rk,
                                                                 file_name=file_name, random_parameters=False,parameters=parameters)
-            mean_reward, std_reward, success_rate,states_list_per_epsiode = result
+            rewards_per_episode, rewards_t_per_episode, rewards_d_per_episode,success_rate,states_list_per_episode = result
             trajectories[f'thr_{thr}_cir_{cir}'] = result
             
+            mean_reward = mean(rewards_per_episode)
+            std_reward = stdev(rewards_per_episode)
             mean_reward_D[idx] = mean_reward
             std_reward_D[idx] = std_reward
             success_rate_D[idx] = success_rate
@@ -160,7 +167,7 @@ def visualize_streamline(agent,config_eval,file_name_or,save_path_eval,u_bg=np.z
     nb_points_path = config_eval['nb_points_path']
     
 
-    nb_starting_point = 40
+    nb_starting_point = 20
     p_0_above = p_0 + np.array([0,0.4])
     p_target_above = p_target + np.array([0, 0.4])
     p_0_below = p_0 + np.array([0,-0.4])
@@ -188,7 +195,7 @@ def visualize_streamline(agent,config_eval,file_name_or,save_path_eval,u_bg=np.z
     for starting_point in path_starting_point:
         config_eval['x_0'] = starting_point
         env = MicroSwimmer(config_eval['x_0'], config_eval['C'], config_eval['Dt_action'] / config_eval['steps_per_action'], config_eval['velocity_bool'])
-        _, _, _, states_list_per_episode = evaluate_agent(agent, env, 1, config_eval, save_path_streamline, file_name_or, False, '', False)
+        _, _, _,_, states_list_per_episode = evaluate_agent(agent, env, 1, config_eval, save_path_streamline, file_name_or, False, '', False)
         trajectories[f'{starting_point}'] = states_list_per_episode[0][0]
 
         plot_trajectories(ax, states_list_per_episode, path, title='streamlines')

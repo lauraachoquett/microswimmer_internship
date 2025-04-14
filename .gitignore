@@ -2,3 +2,4 @@
 agents/*/models/
 __pycache__/
 agents/
+results/
