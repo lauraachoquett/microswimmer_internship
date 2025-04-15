@@ -87,6 +87,7 @@ def run_expe(config,agent_file='agents'):
         print("Policy loaded !")
         episode_start_update= eval_freq*2
         episode_update = 2
+        config['random_curve'] = True
     
 
 
@@ -108,6 +109,8 @@ def run_expe(config,agent_file='agents'):
     if config['random_curve']:
         k = 2
         path = generate_curve(p_0,p_target,k,config['nb_points_path'])
+        tree = KDTree(path)
+        
 
     ########### TRAINING LOOP ###########
     while episode_num <nb_episode:
@@ -134,8 +137,8 @@ def run_expe(config,agent_file='agents'):
             agent.train(replay_buffer, batch_size)
         if done:
             count_reach_target+=1
-            if agent_to_load != '':
-                beta = beta * 1.001
+            # if agent_to_load != '':
+                #beta = beta * 1.001
         if done or iter*Dt_sim> t_max: 
             state,done =env.reset(tree,path),False
             training_reward.append(episode_reward)
@@ -169,10 +172,12 @@ def run_expe(config,agent_file='agents'):
             episode_reward=0
             episode_num+=1
             dir, norm,center,a ,cir=random_bg_parameters()
-            if episode_num>100:
+            if episode_num>config['pertubation_after_episode']:
                 if config['random_curve']:
                     k = (np.random.rand()-0.5)*4
                     path = generate_curve(p_0,p_target,k,config['nb_points_path'])
+                    tree = KDTree(path)
+
 
     agent.save(os.path.join(save_path_model,'last'))
 
@@ -203,7 +208,7 @@ if __name__=='__main__':
     config = {
         'x_0' : p_0,
         'C' : 1,
-        'D' : 0,
+        'D' : D,
         'u_bg' : np.array([0,1])*0.0,
         'threshold' :threshold,
         't_max': t_max,
@@ -225,7 +230,7 @@ if __name__=='__main__':
         'discount_factor' : 1,
         'beta':0.25,
         'uniform_bg':False,
-        'rankine_bg':False,
+        'rankine_bg':True,
         'pertubation_after_episode' :150,
         'random_curve' : False,
         'nb_points_path':500,

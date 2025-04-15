@@ -157,7 +157,7 @@ def plot_mean_reward_success_rate(mean_rewards, std_rewards, list_success_rate, 
 
 
 
-def visualize_streamline(agent,config_eval,file_name_or,save_path_eval,u_bg=np.zeros(2),type='',title=''):
+def visualize_streamline(agent,config_eval,file_name_or,save_path_eval,type='',title='',k=0,parameters=[]):
     save_path_streamline = os.path.join(save_path_eval,'streamlines/')
     if not os.path.exists(save_path_streamline):
             os.makedirs(save_path_streamline)
@@ -168,18 +168,22 @@ def visualize_streamline(agent,config_eval,file_name_or,save_path_eval,u_bg=np.z
     
 
     nb_starting_point = 20
-    p_0_above = p_0 + np.array([0,0.4])
-    p_target_above = p_target + np.array([0, 0.4])
-    p_0_below = p_0 + np.array([0,-0.4])
-    p_target_below = p_target + np.array([0,-0.4])
+    p_0_above = p_0 + np.array([0,0.2])
+    p_target_above = p_target + np.array([0, 0.2])
+    p_0_below = p_0 + np.array([0,-0.2])
+    p_target_below = p_target + np.array([0,-0.2])
     if type =='ondulating':
-        path = generate_random_ondulating_path(p_0,p_target,nb_points_path,amplitude = 0.5,frequency=2)
+        path= generate_random_ondulating_path(p_0,p_target,nb_points_path,amplitude = 0.5,frequency=2)
         path_above_point = generate_random_ondulating_path(p_0_above,p_target_above,nb_starting_point,amplitude = 0.5,frequency=2)
         path_below_point = generate_random_ondulating_path(p_0_below,p_target_below,nb_starting_point,amplitude = 0.5,frequency=2)
     if type == 'circle':
-        path = generate_demi_circle_path(p_0,p_target,nb_points_path)
-        path_above_point = generate_demi_circle_path(p_0_above,p_target_above,nb_starting_point)
-        path_below_point = generate_demi_circle_path(p_0_below,p_target_below,nb_starting_point)
+        path,_ = generate_demi_circle_path(p_0,p_target,nb_points_path)
+        path_above_point,_ = generate_demi_circle_path(p_0_above,p_target_above,nb_starting_point)
+        path_below_point,_ = generate_demi_circle_path(p_0_below,p_target_below,nb_starting_point)
+    if type == 'curve':
+        path = generate_curve(p_0,p_target,k,nb_points_path)
+        path_above_point = generate_curve(p_0_above,p_target_above,k,nb_starting_point)
+        path_below_point = generate_curve(p_0_below,p_target_below,k,nb_starting_point)
         
     config_eval['path'] = path
     config_eval['tree'] = KDTree(path)
@@ -191,12 +195,25 @@ def visualize_streamline(agent,config_eval,file_name_or,save_path_eval,u_bg=np.z
     path_save_fig = os.path.join(save_path_streamline, file_name_or)
     fig, ax = plt.subplots(figsize=(10, 8))
     ax.plot(path[:, 0], path[:, 1], label='path', color='black', linewidth=2,zorder=10)
-    config_eval['u_bg'] = u_bg
+    
+        
+    trajectories['path'] = path
     for starting_point in path_starting_point:
         config_eval['x_0'] = starting_point
         env = MicroSwimmer(config_eval['x_0'], config_eval['C'], config_eval['Dt_action'] / config_eval['steps_per_action'], config_eval['velocity_bool'],config_eval['n_lookahead'])
-        _, _, _,_, states_list_per_episode = evaluate_agent(agent, env, 1, config_eval, save_path_streamline, file_name_or, False, '', False)
-        trajectories[f'{starting_point}'] = states_list_per_episode[0][0]
+        _, _, _,_, states_list_per_episode = evaluate_agent(
+                                                    agent=agent,
+                                                    env=env,eval_episodes= 1,
+                                                    config= config_eval,
+                                                    save_path_result_fig= save_path_streamline,
+                                                    file_name=file_name_or,
+                                                    random_parameters= False,
+                                                    title='',
+                                                    plot=False,
+                                                    parameters=parameters,
+                                                    plot_background=False
+                                            )
+        trajectories[f'{starting_point}'] = states_list_per_episode
 
         plot_trajectories(ax, states_list_per_episode, path, title='streamlines')
     pkl_save_path = os.path.join(save_path_streamline, f"{file_name_or}_trajectories.pkl")
@@ -213,20 +230,51 @@ def visualize_streamline(agent,config_eval,file_name_or,save_path_eval,u_bg=np.z
     ax.set_xlim(x_center - max_range / 2, x_center + max_range / 2)
     ax.set_ylim(y_center - max_range / 2, y_center + max_range / 2)
     ax.set_aspect('equal')
-    if u_bg.any()!=0 :
+    if config_eval['uniform_bg']:
         x_bound = ax.get_xlim()
         y_bound = ax.get_ylim()  
-        norm = np.linalg.norm(u_bg)
-        dir = u_bg/norm
+        dir,norm = parameters
         type='uniform'
         plot_background_velocity(type,x_bound,y_bound,dir=dir,norm=norm)
+    elif config_eval['rankine_bg']:
+        x_bound = ax.get_xlim()
+        y_bound = ax.get_ylim()  
+        center,a,cir = parameters
+        type='rankine'
+        plot_background_velocity(type,x_bound,y_bound,a=a,center=center,cir=cir)
     fig.savefig(path_save_fig, dpi=100, bbox_inches='tight')
     plt.close(fig)
 
+    
 
 
-
-
-
+if __name__ == '__main__':
+    fig, ax = plt.subplots(figsize=(10, 8))
+    
+    agent_file_2 = 'agents/agent_TD3_2025-04-11_16-19'
+    agent_file_13 = 'agents/agent_TD3_2025-04-15_09-59_D0'
+    agent_file_9 = 'agents/agent_TD3_2025-04-11_16-37'
+    agent_files = [agent_file_2,agent_file_13]
+    file_name_or = 'streamline_circle_path_trajectories.pkl'
+    for i,agent_name in enumerate(agent_files) : 
+        save_path_eval = os.path.join(agent_name,'eval_bg/')
+        path_trajectories  = os.path.join(agent_name,'eval_bg/streamlines/',file_name_or)
+        with open(path_trajectories,'rb') as f:
+            trajectories = pickle.load(f)
+        path = trajectories['path']
+        ax.plot(path[:, 0], path[:, 1], label=f'{i}', color=colors[i], linewidth=2)
+        for key, trajectory in trajectories.items():
+            if key != 'path':
+                plot_trajectories(ax, trajectory, path, title='streamlines',color_id=i)
+    ax.plot(path[:, 0], path[:, 1], color='black', linewidth=2)
+    ax.set_aspect('equal')
+    ax.legend()
+    path_save_comparison = 'results_evaluation/streamlines_comparison_circle_bis'
+    fig.savefig(path_save_comparison, dpi=300, bbox_inches='tight')
+    plt.close(fig)
+    
+    
+    
+    
 
 
