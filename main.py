@@ -73,6 +73,7 @@ def run_expe(config,agent_file='agents'):
         os.makedirs(save_path_result)
         os.makedirs(save_path_result_fig)
     save_path_model = f"./{file_name}/models/agent"
+    
     if save_model and not os.path.exists(save_path_model):
         os.makedirs(save_path_model)
 
@@ -111,7 +112,7 @@ def run_expe(config,agent_file='agents'):
         path = generate_curve(p_0,p_target,k,config['nb_points_path'])
         tree = KDTree(path)
         
-
+    both_rankine_and_uniform = config['uniform_bg'] and config['rankine_bg']
     ########### TRAINING LOOP ###########
     while episode_num <nb_episode:
         iter+=1
@@ -120,6 +121,11 @@ def run_expe(config,agent_file='agents'):
             action = agent.select_action(state)
 
         if episode_num>config['pertubation_after_episode']: 
+            if both_rankine_and_uniform:
+                if episode_num%2==0:
+                    u_bg = uniform_velocity(dir,norm)
+                else:   
+                    u_bg = rankine_vortex(x,a,center,cir)
             if config['uniform_bg']:
                 u_bg = uniform_velocity(dir,norm)
             if config['rankine_bg']:
@@ -230,7 +236,7 @@ if __name__=='__main__':
         'discount_factor' : 1,
         'beta':0.25,
         'uniform_bg':False,
-        'rankine_bg':True,
+        'rankine_bg':False,
         'pertubation_after_episode' :150,
         'random_curve' : False,
         'nb_points_path':500,
@@ -238,4 +244,5 @@ if __name__=='__main__':
         'velocity_bool' : True,
         'n_lookahead' : 5,
     }
-    run_expe(config)
+    for i in range(5):
+        run_expe(config)

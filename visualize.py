@@ -3,7 +3,7 @@ import os
 import numpy as np
 import matplotlib.pyplot as plt
 colors = plt.cm.tab10.colors
-from generate_path import generate_curve,generate_demi_circle_path,generate_random_ondulating_path
+from generate_path import generate_curve,generate_demi_circle_path,generate_random_ondulating_path,generate_simple_line
 from scipy.spatial import KDTree
 from plot import plot_background_velocity
 from env_swimmer import MicroSwimmer
@@ -184,6 +184,10 @@ def visualize_streamline(agent,config_eval,file_name_or,save_path_eval,type='',t
         path = generate_curve(p_0,p_target,k,nb_points_path)
         path_above_point = generate_curve(p_0_above,p_target_above,k,nb_starting_point)
         path_below_point = generate_curve(p_0_below,p_target_below,k,nb_starting_point)
+    if type == 'line':
+        path,_ = generate_simple_line(p_0,p_target,nb_points_path)
+        path_above_point,_ = generate_simple_line(p_0_above,p_target_above,nb_starting_point)
+        path_below_point,_ = generate_simple_line(p_0_below,p_target_below,nb_starting_point)
         
     config_eval['path'] = path
     config_eval['tree'] = KDTree(path)

@@ -109,6 +109,9 @@ def evaluate_agent(agent,env,eval_episodes,config,save_path_result_fig,file_name
         fig, ax = plt.subplots(figsize=(10, 8))
         ax.plot(path[:, 0], path[:, 1], label='path', color='black', linewidth=2,zorder=10)
         plot_trajectories(ax,states_list_per_episode[-3:],path,title,a,center,cir,dir,norm,plot_background,type=type)
+        ylim = ax.get_ylim()
+        if ylim[1]-ylim[0]<1:
+            ax.set_ylim(top=1.1)
 
         ax.set_aspect("equal")
         fig.savefig(path_save_fig, dpi=100, bbox_inches='tight')

@@ -74,8 +74,8 @@ def rank_agents_all_criterion(files_results):
         agent_stats_lists.append(agent_stats)
     merged_stats = merge_agent_stats(agent_stats_lists)
     merged_stats = sorted(merged_stats, key=lambda x: x['mean_reward'], reverse=True)
-    print("\nMerged Top 5 agents by mean_reward:")
-    for i, agent in enumerate(merged_stats[:5], 1):
+    print("\nMerged Top 10 agents by mean_reward:")
+    for i, agent in enumerate(merged_stats[:10], 1):
         print(f"{i} Mean Reward: {agent['mean_reward']:.3f} __ {agent['agent_name']}__{agent['training type']} ")
         print()
     
@@ -83,6 +83,8 @@ if __name__ == '__main__':
     types = ['circle','ondulating','curve']
     files_results = []
     for type in types :
-        files_results.extend([f'results_evaluation/result_evaluation_east_05_{type}.json', f'results_evaluation/result_evaluation_west_05_{type}.json', f'results_evaluation/result_evaluation_north_05_{type}.json',f'results_evaluation/result_evaluation_south_05_ondulating.json'])
+        #files_results.extend([f'results_evaluation/result_evaluation_east_05_{type}.json', f'results_evaluation/result_evaluation_west_05_{type}.json', f'results_evaluation/result_evaluation_north_05_{type}.json',f'results_evaluation/result_evaluation_south_05_ondulating.json'])
+        files_results.extend([f'results_evaluation/result_evaluation_rankine_a_05__cir_3_center_1_075_{type}.json'])
+        #files_results.extend([f'results_evaluation/result_evaluation_free_{type}.json'])
     print("Overall ranking of agents:")
     rank_agents_all_criterion(files_results)
