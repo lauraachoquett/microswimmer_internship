@@ -4,4 +4,4 @@ __pycache__/
 agents/
 results_evaluation/
 fig/
-vscode/
+.vscode/
