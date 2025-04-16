@@ -49,7 +49,9 @@ def run_expe(config,agent_file='agents'):
     threshold = config['threshold']
     Dt_action = Dt_sim*steps_per_action
     beta = config['beta']
-
+    uniform_bg = config['uniform_bg']
+    rankine_bg = config['rankine_bg']
+    random_curve = config['random_curve']
 
     env = MicroSwimmer(x_0,C,Dt_sim,config['velocity_bool'],n_lookahead)
 
@@ -88,7 +90,9 @@ def run_expe(config,agent_file='agents'):
         print("Policy loaded !")
         episode_start_update= eval_freq*2
         episode_update = 2
-        config['random_curve'] = True
+        config['random_curve'] = random_curve
+        config['uniform_bg'] = uniform_bg
+        config['rankine_bg'] = rankine_bg
     
 
 
@@ -107,12 +111,22 @@ def run_expe(config,agent_file='agents'):
     u_bg = np.zeros(2)
     D = config['D']
 
+
     if config['random_curve']:
-        k = 2
-        path = generate_curve(p_0,p_target,k,config['nb_points_path'])
-        tree = KDTree(path)
-        
+        print("Random curve")
+        A=2
+        T=1/2
+        line_path,_= generate_simple_line(p_0,p_target,config['nb_points_path'])
+        line_tree = KDTree(path)
+        config['path'] = line_path
+        config['tree'] = line_tree
+    
+    config_eval_bis=config
+    config_eval_bis['uniform_bg'] =  False
+    config_eval_bis['rankine_bg'] =  False
     both_rankine_and_uniform = config['uniform_bg'] and config['rankine_bg']
+    
+    
     ########### TRAINING LOOP ###########
     while episode_num <nb_episode:
         iter+=1
@@ -126,9 +140,9 @@ def run_expe(config,agent_file='agents'):
                     u_bg = uniform_velocity(dir,norm)
                 else:   
                     u_bg = rankine_vortex(x,a,center,cir)
-            if config['uniform_bg']:
+            if uniform_bg:
                 u_bg = uniform_velocity(dir,norm)
-            if config['rankine_bg']:
+            if rankine_bg:
                 u_bg = rankine_vortex(x,a,center,cir)
 
         next_state,reward,done,info = env.step(action,tree,path,p_target,beta,D,u_bg,threshold)
@@ -143,20 +157,21 @@ def run_expe(config,agent_file='agents'):
             agent.train(replay_buffer, batch_size)
         if done:
             count_reach_target+=1
-            # if agent_to_load != '':
-                #beta = beta * 1.001
+            if agent_to_load != '':
+                beta = beta * 1.001
         if done or iter*Dt_sim> t_max: 
             state,done =env.reset(tree,path),False
             training_reward.append(episode_reward)
 
-            if episode_num%eval_freq==0 and episode_num > 10:
-                print(f"Total iter: {iter+1} Episode Num: {episode_num+1} Reward: {episode_reward:.3f} Success rate: {count_reach_target/eval_freq}")
+            if (episode_num-1)%eval_freq==0 and episode_num > 10:
+                print(f"Total iter: {iter+1} Episode Num: {episode_num} Reward: {episode_reward:.3f} Success rate: {count_reach_target/eval_freq}")
                 path_save_fig= os.path.join(save_path_result_fig,"training_reward.png")
-                eval_rew,_,_,_,_= evaluate_agent(agent,env,eval_episodes,config,save_path_result_fig,"eval_during_training",False)
-                #evaluations.append(eval)
+                config_eval_bis['path'] = line_path
+                config_eval_bis['tree'] = line_tree
+                eval_rew,_,_,_,_= evaluate_agent(agent,env,eval_episodes,config_eval_bis,save_path_result_fig,"eval_during_training",False,'',True)
                 eval_rew = mean(eval_rew)
-                print(f"Eval result : {eval_rew}")
-                if best_eval_result<eval_rew : 
+                print(f"Eval result : {eval_rew:.3f}")
+                if best_eval_result<eval_rew and episode_num>(config['pertubation_after_episode']*2): 
                     best_eval_result=eval_rew
                     if save_model: 
                         agent.save(save_path_model)
@@ -178,11 +193,13 @@ def run_expe(config,agent_file='agents'):
             episode_reward=0
             episode_num+=1
             dir, norm,center,a ,cir=random_bg_parameters()
-            if episode_num>config['pertubation_after_episode']:
-                if config['random_curve']:
-                    k = (np.random.rand()-0.5)*4
-                    path = generate_curve(p_0,p_target,k,config['nb_points_path'])
-                    tree = KDTree(path)
+            
+            if config['random_curve']:
+                k = func_k_max(A,nb_episode,T,episode_num)
+                path = generate_curve(p_0,p_target,k,config['nb_points_path'])
+                tree = KDTree(path)
+                config['path'] = path
+                config['tree'] = tree
 
 
     agent.save(os.path.join(save_path_model,'last'))
@@ -220,8 +237,8 @@ if __name__=='__main__':
         't_max': t_max,
         't_init':t_init,
         'steps_per_action':5,
-        'nb_episode':500,
-        'batch_size':128,
+        'nb_episode':700,
+        'batch_size':256,
         'eval_freq':50,
         'save_model':True,
         'eval_episodes' : 3,
@@ -235,14 +252,13 @@ if __name__=='__main__':
         'episode_per_update' :5,
         'discount_factor' : 1,
         'beta':0.25,
-        'uniform_bg':False,
-        'rankine_bg':False,
+        'uniform_bg':True,
+        'rankine_bg':True,
         'pertubation_after_episode' :150,
-        'random_curve' : False,
+        'random_curve' : True,
         'nb_points_path':500,
         'Dt_action': Dt_action,
         'velocity_bool' : True,
         'n_lookahead' : 5,
     }
-    for i in range(5):
-        run_expe(config)
+    run_expe(config)

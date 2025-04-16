@@ -62,9 +62,7 @@ def evaluate_agent(agent,env,eval_episodes,config,save_path_result_fig,file_name
         dir = np.array(u_bg/norm)
         plot_background=True
     
-    if config['random_curve']:
-        k = (np.random.rand()-0.5)*4
-        path = generate_curve(p_0,p_target,k,config['nb_points_path'])
+
 
     while episode_num <eval_episodes:
         states_episode.append(x)
@@ -108,11 +106,11 @@ def evaluate_agent(agent,env,eval_episodes,config,save_path_result_fig,file_name
         path_save_fig = os.path.join(save_path_result_fig, file_name)
         fig, ax = plt.subplots(figsize=(10, 8))
         ax.plot(path[:, 0], path[:, 1], label='path', color='black', linewidth=2,zorder=10)
-        plot_trajectories(ax,states_list_per_episode[-3:],path,title,a,center,cir,dir,norm,plot_background,type=type)
         ylim = ax.get_ylim()
-        if ylim[1]-ylim[0]<1:
-            ax.set_ylim(top=1.1)
+        if ylim[1]-ylim[0]<1/3:
+            ax.set_ylim(top=1.0,bottom=-1)
 
+        plot_trajectories(ax,states_list_per_episode[-3:],path,title,a,center,cir,dir,norm,plot_background,type=type)
         ax.set_aspect("equal")
         fig.savefig(path_save_fig, dpi=100, bbox_inches='tight')
 

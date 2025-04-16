@@ -156,7 +156,6 @@ def plot_mean_reward_success_rate(mean_rewards, std_rewards, list_success_rate, 
 
 
 
-
 def visualize_streamline(agent,config_eval,file_name_or,save_path_eval,type='',title='',k=0,parameters=[]):
     save_path_streamline = os.path.join(save_path_eval,'streamlines/')
     if not os.path.exists(save_path_streamline):

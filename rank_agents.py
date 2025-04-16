@@ -1,6 +1,8 @@
 from statistics import mean
 import json
 from collections import defaultdict
+import os 
+from datetime import datetime 
 
 def rank_agents_by_rewards(results,print_stats=True):
     # Calculer les moyennes pour chaque agent
@@ -47,11 +49,12 @@ def merge_agent_stats(agent_stats_lists):
     for agent_stats in agent_stats_lists:
         for agent in agent_stats:
             name = agent['agent_name']
-            merged_stats[name]['training type'] = agent['training type']
-            merged_stats[name]['mean_reward'] += agent['mean_reward']
-            merged_stats[name]['mean_reward_t'] += agent['mean_reward_t']
-            merged_stats[name]['mean_reward_d'] += agent['mean_reward_d']
-            merged_stats[name]['count'] += 1
+            if '' in name:
+                merged_stats[name]['training type'] = agent['training type']
+                merged_stats[name]['mean_reward'] += agent['mean_reward']
+                merged_stats[name]['mean_reward_t'] += agent['mean_reward_t']
+                merged_stats[name]['mean_reward_d'] += agent['mean_reward_d']
+                merged_stats[name]['count'] += 1
 
     final_stats = []
     for name, stats in merged_stats.items():
@@ -78,13 +81,19 @@ def rank_agents_all_criterion(files_results):
     for i, agent in enumerate(merged_stats[:10], 1):
         print(f"{i} Mean Reward: {agent['mean_reward']:.3f} __ {agent['agent_name']}__{agent['training type']} ")
         print()
+    return merged_stats
     
 if __name__ == '__main__':
-    types = ['circle','ondulating','curve']
+    types = ['circle','ondulating','curve','line']
+    file = "results_evaluation"
     files_results = []
     for type in types :
         #files_results.extend([f'results_evaluation/result_evaluation_east_05_{type}.json', f'results_evaluation/result_evaluation_west_05_{type}.json', f'results_evaluation/result_evaluation_north_05_{type}.json',f'results_evaluation/result_evaluation_south_05_ondulating.json'])
-        files_results.extend([f'results_evaluation/result_evaluation_rankine_a_05__cir_3_center_1_075_{type}.json'])
-        #files_results.extend([f'results_evaluation/result_evaluation_free_{type}.json'])
+        #files_results.extend([f'results_evaluation/result_evaluation_rankine_a_05__cir_3_center_1_075_{type}.json'])
+        files_results.extend([f'results_evaluation/result_evaluation_free_{type}.json'])
     print("Overall ranking of agents:")
-    rank_agents_all_criterion(files_results)
+    stats = rank_agents_all_criterion(files_results)
+    timestamp = datetime.now().strftime("%Y-%m-%d_%H")
+    save_rank_file = os.path.join(file,f"results_rank_overall_{timestamp}.json")
+    with open (save_rank_file,"w") as f:
+        json.dump(stats,f, indent=4)

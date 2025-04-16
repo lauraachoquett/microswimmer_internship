@@ -1,6 +1,6 @@
 import numpy as np
 import matplotlib.pyplot as plt
-from math import atan2,pi
+from math import atan2,pi,exp,cos
 from scipy.interpolate import CubicSpline
 from utils import courbures
 
@@ -59,6 +59,11 @@ def generate_random_ondulating_path(p_0, p_target, n_points=100, max_curvature=1
     path = cs(t)
     return path
 
+def func_k_max(A,N,T,n):
+    return -A*(1-exp(n/N))*cos(n*T)
+
+
+
 def plot_path(p_0,p_target,nb_points,type='line'):
     if type=='line':
         path = generate_simple_line(p_0,p_target,nb_points)
@@ -66,12 +71,12 @@ def plot_path(p_0,p_target,nb_points,type='line'):
         p_1 = [1/2,1]
         path = generate_line_two_part(p_0,p_1,p_target,nb_points)
     if type=='circle':
-        path = generate_demi_circle_path(p_0,p_target,nb_points)
+        path,_ = generate_demi_circle_path(p_0,p_target,nb_points)
     if type=='curve':
         p_0 = np.zeros(2)
         p_target = np.array([1/4,1/8])
-        k=-0.4
-        nb_points=10
+        nb_points=100
+        k=2
         path = generate_curve(p_0,p_target,k,nb_points)
     if type=='ondulating_path':
         path=generate_random_ondulating_path(p_0,p_target,nb_points,amplitude=0.8,frequency=10)
@@ -85,10 +90,40 @@ def plot_path(p_0,p_target,nb_points,type='line'):
     plt.legend()
     plt.title(f"Path : {type}")
     plt.savefig(f"fig/path_{type}.png",dpi=100,bbox_inches='tight')
-
+    
 if __name__  == '__main__' : 
-    p_0 = np.array([-2,-1])
-    p_target  =np.array([2,1])
+    p_0 = np.array([0,0])
+    p_target  =np.array([2,0])
     nb_points = 200
-    plot_path(p_0,p_target,nb_points,'curve')
-
+    #plot_path(p_0,p_target,nb_points,'circle')
+    A=2
+    N=500
+    T=1/2
+    n_values = np.linspace(1,N+1,500,dtype=int)
+    output = [func_k_max(A,N,T,n) for n in n_values]
+    nb_points=500
+    plt.figure(figsize=(25,10))
+    plt.subplot(1,2,1)
+    plt.plot(n_values,output)
+    colors = plt.cm.viridis(np.linspace(0, 1, 20))
+    for n in n_values:
+        if n>440 and n<460:
+            k= func_k_max(A,N,T,n)
+            plt.scatter(n, k, color=colors[n%20]) 
+            
+    plt.subplot(1,2,2)
+    for n in n_values:
+        if n>440  and n<460:
+            k= func_k_max(A,N,T,n)
+            path = generate_curve(p_0,p_target,k,nb_points)
+            plt.plot(path[:,0],path[:,1],label=f'k : {k:.2f}',color = colors[n%20])
+    plt.xlabel("x")
+    plt.ylabel("y")
+    plt.scatter(p_0[0], p_0[1],color = 'black')
+    plt.scatter(p_target[0], p_target[1], color='black')
+    plt.legend()
+    plt.savefig('fig/smooth_curve.png',dpi=200,bbox_inches='tight')
+            
+            
+    
+    
