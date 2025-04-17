@@ -16,6 +16,7 @@ from evaluate_agent import evaluate_agent
 from scipy.spatial import KDTree
 colors = plt.cm.tab10.colors
 from statistics import mean
+import copy
 
 def format_sci(x):
     return "{:.3e}".format(x)
@@ -31,10 +32,10 @@ def run_expe(config,agent_file='agents'):
         pickle.dump(config, f)
 
 
-    path = config['path']
     p_target = config['p_target']
     x_0 = config['x_0']
     p_0 = config['p_0']
+    path = config['path']
     tree = config['tree']
     print(f'Starting point : {p_0}')
     print(f'Target point : {path[-1]}')
@@ -51,6 +52,8 @@ def run_expe(config,agent_file='agents'):
     beta = config['beta']
     uniform_bg = config['uniform_bg']
     rankine_bg = config['rankine_bg']
+    both_rankine_and_uniform = config['uniform_bg'] and config['rankine_bg']
+    print("Both pertubations : ",both_rankine_and_uniform)
     random_curve = config['random_curve']
 
     env = MicroSwimmer(x_0,C,Dt_sim,config['velocity_bool'],n_lookahead)
@@ -110,22 +113,29 @@ def run_expe(config,agent_file='agents'):
     x=p_0
     u_bg = np.zeros(2)
     D = config['D']
-
+    k_list=[]
 
     if config['random_curve']:
         print("Random curve")
         A=2
-        T=1/2
-        line_path,_= generate_simple_line(p_0,p_target,config['nb_points_path'])
-        line_tree = KDTree(path)
+        f=4
+        curve_path_plus= generate_curve(p_0,p_target,1,config['nb_points_path'])
+        curve_path_minus= generate_curve(p_0,p_target,-1,config['nb_points_path'])
+        curve_tree_plus = KDTree(curve_path_plus)
+        curve_tree_minus = KDTree(curve_path_minus)
+        list_of_path_tree =[[curve_path_plus,curve_tree_plus],[curve_path_minus,curve_tree_minus]]
+        
+        line_path,_ = generate_simple_line(p_0,p_target,config['nb_points_path'])
+        line_tree = KDTree(line_path)
         config['path'] = line_path
         config['tree'] = line_tree
-    
-    config_eval_bis=config
-    config_eval_bis['uniform_bg'] =  False
-    config_eval_bis['rankine_bg'] =  False
-    both_rankine_and_uniform = config['uniform_bg'] and config['rankine_bg']
-    
+        
+
+    config_eval_bis = copy.deepcopy(config)
+    config_eval_bis['uniform_bg'] = False
+    config_eval_bis['rankine_bg'] = False
+
+    print("Both pertubations : ", config['uniform_bg'], config['rankine_bg'])
     
     ########### TRAINING LOOP ###########
     while episode_num <nb_episode:
@@ -134,7 +144,7 @@ def run_expe(config,agent_file='agents'):
         if iter%steps_per_action==0 or iter==1:
             action = agent.select_action(state)
 
-        if episode_num>config['pertubation_after_episode']: 
+        if episode_num>0: 
             if both_rankine_and_uniform:
                 if episode_num%2==0:
                     u_bg = uniform_velocity(dir,norm)
@@ -166,12 +176,10 @@ def run_expe(config,agent_file='agents'):
             if (episode_num-1)%eval_freq==0 and episode_num > 10:
                 print(f"Total iter: {iter+1} Episode Num: {episode_num} Reward: {episode_reward:.3f} Success rate: {count_reach_target/eval_freq}")
                 path_save_fig= os.path.join(save_path_result_fig,"training_reward.png")
-                config_eval_bis['path'] = line_path
-                config_eval_bis['tree'] = line_tree
-                eval_rew,_,_,_,_= evaluate_agent(agent,env,eval_episodes,config_eval_bis,save_path_result_fig,"eval_during_training",False,'',True)
+                eval_rew,_,_,_,_= evaluate_agent(agent,env,eval_episodes,config_eval_bis,save_path_result_fig,"eval_during_training",False,list_of_path_tree,'',True)
                 eval_rew = mean(eval_rew)
                 print(f"Eval result : {eval_rew:.3f}")
-                if best_eval_result<eval_rew and episode_num>(config['pertubation_after_episode']*2): 
+                if best_eval_result<eval_rew and episode_num>(config['pertubation_after_episode']*5/2): 
                     best_eval_result=eval_rew
                     if save_model: 
                         agent.save(save_path_model)
@@ -194,15 +202,29 @@ def run_expe(config,agent_file='agents'):
             episode_num+=1
             dir, norm,center,a ,cir=random_bg_parameters()
             
-            if config['random_curve']:
-                k = func_k_max(A,nb_episode,T,episode_num)
-                path = generate_curve(p_0,p_target,k,config['nb_points_path'])
+            if config['random_curve'] and episode_num > 10:
+                k = func_k_max(A, nb_episode, f, episode_num)
+                k_list.append(k)
+                if episode_num == 450:
+                    print(" k :", k)
+                    print("parameters :", dir, norm,center,a ,cir)
+                path = generate_curve(p_0, p_target, k, config['nb_points_path'])
                 tree = KDTree(path)
                 config['path'] = path
                 config['tree'] = tree
 
+    agent.save(os.path.join(save_path_model, 'last'))
 
-    agent.save(os.path.join(save_path_model,'last'))
+    if config['random_curve']:
+        plt.figure()
+        plt.hist(k_list, bins=20, color='blue', alpha=0.7)
+        plt.title("Distribution of k")
+        plt.xlabel("k values")
+        plt.ylabel("Frequency")
+        plt.grid(True)
+        plt.savefig(os.path.join(save_path_result_fig, "k_distribution.png"), dpi=100, bbox_inches='tight')
+        plt.close()
+    
 
 
 
@@ -241,7 +263,7 @@ if __name__=='__main__':
         'batch_size':256,
         'eval_freq':50,
         'save_model':True,
-        'eval_episodes' : 3,
+        'eval_episodes' : 4,
         'episode_start_update' : 10,
         'path' : path,
         'tree' :tree,

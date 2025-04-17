@@ -7,7 +7,7 @@ def f(v, v_target, beta):
     return np.linalg.norm(v - v_target) + beta * abs(v[1])
 
 
-def find_next_v(v_t, v_target, beta, Dt, num_angles=90):
+def find_next_v(v_t, v_target, beta, Dt, num_angles=120):
     dir = v_target - v_t
     theta = atan2(dir[1],dir[0])
     alpha = np.pi/8

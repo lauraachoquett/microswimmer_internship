@@ -3,7 +3,7 @@ import torch
 
 
 class ReplayBuffer(object):
-	def __init__(self, state_dim, action_dim, max_size=3000):
+	def __init__(self, state_dim, action_dim, max_size=10000):
 		self.max_size = max_size
 		self.ptr = 0
 		self.size = 0

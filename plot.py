@@ -5,15 +5,13 @@ from generate_path import generate_curve,generate_demi_circle_path,generate_rand
 from sde import rankine_vortex,uniform_velocity
 
 def plot_trajectories(ax,trajectories_list,path,title,a=0,center=np.zeros(2),cir=0,dir=np.zeros(2),norm=0,plot_background=False,type='',color_id=0):
-    
-    if len(trajectories_list[0])>2 : 
+    if isinstance(trajectories_list[0][0],np.ndarray): 
         for idx, list_state in enumerate(trajectories_list):
-            print(list_state)
             """indices = np.linspace(0, len(path) - 1, list_state[1]).astype(int)
             path_sampled = path[indices]
             ax.plot(path_sampled[:, 0], path_sampled[:, 1], label='path', color='black', linewidth=2) """
             states = list_state[0]
-                
+            
             color_id_t = max(idx,color_id)
             ax.plot(states[:, 0], states[:, 1], color=colors[color_id_t])
             ax.scatter(states[-1, 0], states[-1, 1], color=colors[color_id_t],s=5)

@@ -10,7 +10,7 @@ from env_swimmer import MicroSwimmer
 from plot import plot_trajectories
 import pickle
 from statistics import mean,stdev
-
+import copy  
 def format_sci(x):
     return "{:.3e}".format(x)
 
@@ -21,7 +21,7 @@ def plot_robust_D(config_eval,file_name_or,agent,env,save_path_eval,nb_D,thresho
             os.makedirs(save_path_eval_D)
     fig, axs = plt.subplots(1, 2, figsize=(12, 5))
     D_values = np.linspace(0.0, 1.3*config_eval['Dt_action'], nb_D) 
-    config_eval_bis=config_eval
+    config_eval_bis=copy.deepcopy(config_eval)
     for idx_tr,thr in enumerate(threshold):
         mean_reward_D = np.zeros(nb_D)
         std_reward_D = np.zeros(nb_D)
@@ -59,7 +59,7 @@ def plot_robust_u_bg_uniform(config_eval,file_name_or,agent,env,save_path_eval,n
         'East':np.array([1,0]),
         }
     norm_values = np.linspace(0.1,0.7,nb_norm)
-    config_eval_dir = config_eval
+    config_eval_dir = copy.deepcopy(config_eval)
     for dir,vec in dir_d.items():
         save_path_eval_dir = os.path.join(save_path_eval,dir)
         print(dir)
@@ -94,13 +94,13 @@ def plot_robust_u_bg_rankine(config_eval,file_name_or,agent,env,save_path_eval,n
     center = [1,1.5]
     a = 0.5
     cir_values = np.linspace(-3,3,nb_cir)
-    config_eval_rk = config_eval
+    config_eval_rk = copy.deepcopy(config_eval)
     save_path_eval_rk = os.path.join(save_path_eval,'rankine')
     trajectories={}
     if not os.path.exists(save_path_eval_rk):
         os.makedirs(save_path_eval_rk)
     fig, axs = plt.subplots(1, 2, figsize=(12, 5))
-    config_eval['rankine_bg'] = True
+    config_eval_rk['rankine_bg'] = True
     for idx_tr,thr in enumerate(threshold):
         config_eval_rk['threshold'] = thr
         mean_reward_D = np.zeros(nb_cir)
@@ -161,9 +161,10 @@ def visualize_streamline(agent,config_eval,file_name_or,save_path_eval,type='',t
     if not os.path.exists(save_path_streamline):
             os.makedirs(save_path_streamline)
     trajectories = {}
-    p_target = config_eval['p_target']
-    p_0 = config_eval['p_0']
-    nb_points_path = config_eval['nb_points_path']
+    config_eval_v = copy.deepcopy(config_eval)
+    p_target = config_eval_v['p_target']
+    p_0 = config_eval_v['p_0']
+    nb_points_path = config_eval_v['nb_points_path']
     
 
     nb_starting_point = 20
@@ -179,7 +180,7 @@ def visualize_streamline(agent,config_eval,file_name_or,save_path_eval,type='',t
         path,_ = generate_demi_circle_path(p_0,p_target,nb_points_path)
         path_above_point,_ = generate_demi_circle_path(p_0_above,p_target_above,nb_starting_point)
         path_below_point,_ = generate_demi_circle_path(p_0_below,p_target_below,nb_starting_point)
-    if type == 'curve':
+    if 'curve' in type:
         path = generate_curve(p_0,p_target,k,nb_points_path)
         path_above_point = generate_curve(p_0_above,p_target_above,k,nb_starting_point)
         path_below_point = generate_curve(p_0_below,p_target_below,k,nb_starting_point)
@@ -188,9 +189,9 @@ def visualize_streamline(agent,config_eval,file_name_or,save_path_eval,type='',t
         path_above_point,_ = generate_simple_line(p_0_above,p_target_above,nb_starting_point)
         path_below_point,_ = generate_simple_line(p_0_below,p_target_below,nb_starting_point)
         
-    config_eval['path'] = path
-    config_eval['tree'] = KDTree(path)
-    config_eval['D'] = 0
+    config_eval_v['path'] = path
+    config_eval_v['tree'] = KDTree(path)
+    config_eval_v['D'] = 0
     path_above_point = path_above_point[:-2]
     path_below_point = path_below_point[:-1]
     path_starting_point = np.concatenate((path_above_point,path_below_point),axis=0)
@@ -202,12 +203,12 @@ def visualize_streamline(agent,config_eval,file_name_or,save_path_eval,type='',t
         
     trajectories['path'] = path
     for starting_point in path_starting_point:
-        config_eval['x_0'] = starting_point
-        env = MicroSwimmer(config_eval['x_0'], config_eval['C'], config_eval['Dt_action'] / config_eval['steps_per_action'], config_eval['velocity_bool'],config_eval['n_lookahead'])
+        config_eval_v['x_0'] = starting_point
+        env = MicroSwimmer(config_eval_v['x_0'], config_eval_v['C'], config_eval_v['Dt_action'] / config_eval_v['steps_per_action'], config_eval_v['velocity_bool'],config_eval_v['n_lookahead'])
         _, _, _,_, states_list_per_episode = evaluate_agent(
                                                     agent=agent,
                                                     env=env,eval_episodes= 1,
-                                                    config= config_eval,
+                                                    config= config_eval_v,
                                                     save_path_result_fig= save_path_streamline,
                                                     file_name=file_name_or,
                                                     random_parameters= False,
@@ -217,7 +218,6 @@ def visualize_streamline(agent,config_eval,file_name_or,save_path_eval,type='',t
                                                     plot_background=False
                                             )
         trajectories[f'{starting_point}'] = states_list_per_episode
-
         plot_trajectories(ax, states_list_per_episode, path, title='streamlines')
     pkl_save_path = os.path.join(save_path_streamline, f"{file_name_or}_trajectories.pkl")
     with open(pkl_save_path, 'wb') as f:
@@ -233,13 +233,13 @@ def visualize_streamline(agent,config_eval,file_name_or,save_path_eval,type='',t
     ax.set_xlim(x_center - max_range / 2, x_center + max_range / 2)
     ax.set_ylim(y_center - max_range / 2, y_center + max_range / 2)
     ax.set_aspect('equal')
-    if config_eval['uniform_bg']:
+    if config_eval_v['uniform_bg']:
         x_bound = ax.get_xlim()
         y_bound = ax.get_ylim()  
         dir,norm = parameters
         type='uniform'
         plot_background_velocity(type,x_bound,y_bound,dir=dir,norm=norm)
-    elif config_eval['rankine_bg']:
+    elif config_eval_v['rankine_bg']:
         x_bound = ax.get_xlim()
         y_bound = ax.get_ylim()  
         center,a,cir = parameters

@@ -8,12 +8,12 @@ import os
 colors = plt.cm.tab10.colors
 from generate_path import generate_curve
 from plot import plot_trajectories
-
-def evaluate_agent(agent,env,eval_episodes,config,save_path_result_fig,file_name,random_parameters,title='',plot=True,parameters=[],plot_background=False):
+import copy
+def evaluate_agent(agent,env,eval_episodes,config,save_path_result_fig,file_name,random_parameters,list_of_path_tree=None,title='',plot=True,parameters=[],plot_background=False):
+    config = copy.deepcopy(config)
+    parameters = copy.deepcopy(parameters)
     rewards_per_episode = []
     t_max = config['t_max']
-    path = config['path']
-    tree = config['tree']
     p_target = config['p_target']
     steps_per_action=config['steps_per_action']
     t_max =config['t_max']
@@ -28,8 +28,6 @@ def evaluate_agent(agent,env,eval_episodes,config,save_path_result_fig,file_name
     episode_rew_d=0
     rewards_t_per_episode = []
     rewards_d_per_episode = []
-    
-    state,done = env.reset(tree,path),False
     
     states_episode = []
     states_list_per_episode=[]
@@ -63,7 +61,15 @@ def evaluate_agent(agent,env,eval_episodes,config,save_path_result_fig,file_name
         plot_background=True
     
 
-
+    if list_of_path_tree is not None : 
+        path,tree = list_of_path_tree[0]
+        nb_of_path = len(list_of_path_tree)
+    else : 
+        list_of_path_tree = [[config['path'],config['tree']]]
+        path,tree = list_of_path_tree[0]
+        nb_of_path=1
+        
+    state,done = env.reset(tree,path),False
     while episode_num <eval_episodes:
         states_episode.append(x)
         iter+=1
@@ -75,14 +81,13 @@ def evaluate_agent(agent,env,eval_episodes,config,save_path_result_fig,file_name
             u_bg = uniform_velocity(np.array(dir),norm)
         if config['rankine_bg']:
             u_bg = rankine_vortex(x,a,center,cir)
-            
+
         next_state,reward,done,info = env.step(action,tree,path,p_target,beta,D,u_bg,threshold)
         
         x= info['x']
         episode_rew_t += info['rew_t']
         episode_rew_d += info['rew_d']
         episode_reward += reward
-        
         state = next_state
         
         if done or iter*Dt_sim> t_max: 
@@ -100,22 +105,28 @@ def evaluate_agent(agent,env,eval_episodes,config,save_path_result_fig,file_name
             episode_reward=0
             episode_rew_t=0
             episode_rew_d=0
+            path,tree = list_of_path_tree[episode_num%nb_of_path]
+        
+            
+            
 
 
     if plot : 
         path_save_fig = os.path.join(save_path_result_fig, file_name)
         fig, ax = plt.subplots(figsize=(10, 8))
-        ax.plot(path[:, 0], path[:, 1], label='path', color='black', linewidth=2,zorder=10)
+        for elt in list_of_path_tree:
+            path,_ = elt
+            ax.plot(path[:, 0], path[:, 1], label='path', color='black', linewidth=2,zorder=10)
         ylim = ax.get_ylim()
         if ylim[1]-ylim[0]<1/3:
             ax.set_ylim(top=1.0,bottom=-1)
-
-        plot_trajectories(ax,states_list_per_episode[-3:],path,title,a,center,cir,dir,norm,plot_background,type=type)
+        plot_trajectories(ax,states_list_per_episode[-4:],path,title,a,center,cir,dir,norm,plot_background,type=type)
         ax.set_aspect("equal")
         fig.savefig(path_save_fig, dpi=100, bbox_inches='tight')
 
         plt.close(fig) 
-
+        
+    
     return rewards_per_episode, rewards_t_per_episode, rewards_d_per_episode,count_succes/eval_episodes,states_list_per_episode
 
 

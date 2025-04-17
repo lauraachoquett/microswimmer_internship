@@ -19,6 +19,7 @@ import random
 from pathlib import Path
 from analytic_solution_line import find_next_v
 from sde import solver
+import copy
 
 def format_sci(x):
     return "{:.3e}".format(x)
@@ -53,8 +54,11 @@ def evaluate_after_training(agent_files,file_name_or,p_target,p_0,seed=42,type=N
         path,_ = generate_demi_circle_path(p_0,p_target,nb_points_path)
     if type=='ondulating':
         path = generate_random_ondulating_path(p_0,p_target,nb_points_path,amplitude = 0.5,frequency=2)
-    if type =='curve':
-        k=-4
+    if type =='curve_minus':
+        k=-0.2
+        path = generate_curve(p_0,p_target,k,nb_points_path)
+    if type =='curve_plus':
+        k=0.2
         path = generate_curve(p_0,p_target,k,nb_points_path)
     tree=  KDTree(path)
     
@@ -87,8 +91,9 @@ def evaluate_after_training(agent_files,file_name_or,p_target,p_0,seed=42,type=N
     for agent_name in agent_files:
 
         config_eval = initialize_parameters(agent_name,p_target,p_0)
+        config_eval = copy.deepcopy(config_eval)
         training_type = {'rankine_bg':config_eval['rankine_bg'],'uniform_bg':config_eval['uniform_bg'],'random_curve':config_eval['random_curve'],'velocity_bool':config_eval['velocity_bool'],'load_model':config_eval['load_model'],'n_lookahead':config_eval['n_lookahead']}
-        if agent_name in results.keys():
+        if agent_name in results.keys() and agent_name!='agents/agent_TD3_2025-04-17_09-56':
             results[agent_name]['training type'] = training_type
             print(f"Agent {agent_name} already evaluated.")
             continue
@@ -303,7 +308,7 @@ def initialize_parameters(agent_file,p_target,p_0):
     # print("Training with random curve :", config['random_curve'] if 'random_curve' in config else "False") 
     # print("Training with velocity in its state :", config['velocity_bool'] if 'velocity_bool' in config else "False") 
     # print("Retrained on : ",config['load_model'])
-    config_eval =config
+    config_eval =copy.deepcopy(config)
     config_eval['random_curve'] =  config['random_curve'] if 'random_curve' in config else False
     config_eval['p_target'] = p_target
     config_eval['p_0'] = p_0
@@ -350,7 +355,7 @@ if __name__=='__main__':
             
             
     print("Agents files : ",agents_file)
-    types = ['circle','curve','ondulating','line']
+    types = ['line','curve_minus','curve_plus','ondulating']
     print("---------------------Evaluation with no bg---------------------")
     title_add = 'free'
     for type in types:
@@ -359,7 +364,7 @@ if __name__=='__main__':
         
     title_add = 'rankine_a_05__cir_3_center_1_075'
     print("---------------------Evaluation with rankine bg---------------------")
-    for type in types[:-1]:
+    for type in types:
         a= 0.5
         cir = 2
         center = np.array([1,3/4])
@@ -373,7 +378,7 @@ if __name__=='__main__':
         'south_05': np.array([0,-1]),
     }
     print("---------------------Evaluation with uniform bg---------------------")
-    for type in types[:-1]:
+    for type in types:
         for title_add,dir in dict.items():
             results = evaluate_after_training(agents_file,f'result_evaluation_{title_add}_{type}.json',type=type,p_target = [2,0],p_0 = [0,0],title_add=title_add,dir=dir,norm=norm)
             rank_agents_by_rewards(results)
