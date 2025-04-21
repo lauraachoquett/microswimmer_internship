@@ -1,5 +1,5 @@
 from generate_path import generate_simple_line
-from sde import *
+from simulation import *
 import time
 colors = plt.cm.tab10.colors
 from scipy.spatial import KDTree

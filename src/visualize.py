@@ -156,19 +156,22 @@ def plot_mean_reward_success_rate(mean_rewards, std_rewards, list_success_rate, 
 
 
 
-def visualize_streamline(agent,config_eval,file_name_or,save_path_eval,type='',title='',k=0,parameters=[]):
+def visualize_streamline(agent,config_eval,file_name_or,save_path_eval,type='',title='',k=0,parameters=[],offset=0.2):
     save_path_streamline = os.path.join(save_path_eval,'streamlines/')
     if not os.path.exists(save_path_streamline):
             os.makedirs(save_path_streamline)
     trajectories = {}
     config_eval_v = copy.deepcopy(config_eval)
-    p_target = config_eval_v['p_target']
+    if type == 'line':
+        p_target = config_eval_v['p_target']/4
+    else : 
+        p_target = config_eval_v['p_target']
     p_0 = config_eval_v['p_0']
     nb_points_path = config_eval_v['nb_points_path']
     
 
     nb_starting_point = 20
-    offset = 0.2
+    offset = 0.02
     p_0_above = p_0 + np.array([0,offset])
     p_target_above = p_target + np.array([0, offset])
     p_0_below = p_0 + np.array([0,-offset])
@@ -224,15 +227,16 @@ def visualize_streamline(agent,config_eval,file_name_or,save_path_eval,type='',t
     with open(pkl_save_path, 'wb') as f:
         pickle.dump(trajectories, f)
        
-    x_min, x_max = ax.get_xlim()
+    # x_min, x_max = ax.get_xlim()
     y_min, y_max = ax.get_ylim()
-    x_range = x_max - x_min
-    y_range = y_max - y_min
-    max_range = max(x_range, y_range)
-    x_center = (x_min + x_max) / 2
-    y_center = (y_min + y_max) / 2
-    ax.set_xlim(x_center - max_range / 2, x_center + max_range / 2)
-    ax.set_ylim(y_center - max_range / 2, y_center + max_range / 2)
+    # x_range = x_max - x_min
+    # y_range = y_max - y_min
+    # max_range = max(x_range, y_range)
+    # x_center = (x_min + x_max) / 2
+    # y_center = (y_min + y_max) / 2
+    # ax.set_xlim(x_center - max_range / 2, x_center + max_range / 2)
+    ax.set_ylim(y_min - offset, y_max + offset)
+    
     ax.set_aspect('equal')
     if config_eval_v['uniform_bg']:
         x_bound = ax.get_xlim()

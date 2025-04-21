@@ -1,7 +1,7 @@
 
 from statistics import mean
 from utils import random_bg_parameters
-from sde import uniform_velocity,rankine_vortex
+from simulation import uniform_velocity,rankine_vortex
 import matplotlib.pyplot as plt
 import numpy as np
 import os

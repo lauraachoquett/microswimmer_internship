@@ -2,7 +2,7 @@ import gymnasium as gym
 import numpy as np
 from invariant_state import *
 from distance_to_path import min_dist_closest_point
-from src.simulation import solver
+from simulation import solver
 import torch 
 class MicroSwimmer(gym.Env):
     def __init__(self,x_0,C,Dt,velocity_bool,n_lookahead=5,seed =None):

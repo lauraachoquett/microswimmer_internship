@@ -8,7 +8,8 @@ import json
 import pandas as pd
 import matplotlib.pyplot as plt
 import numpy as np
-
+import seaborn as sns
+from collections import OrderedDict
 
 
 def rank_agents_by_rewards(results,print_stats=True):
@@ -146,8 +147,24 @@ if __name__ == '__main__':
     print(agent_counts)
 
     # Filter training types with more than 5 agents
-    filtered_training_types = agent_counts[agent_counts['agent_count'] > 5]['training_type']
+    filtered_training_types = agent_counts[agent_counts['agent_count'] >= 5]['training_type']
     df = df[df['training_type_str'].isin(filtered_training_types)]
+    
+    def format_training_type_label(training_type):
+        # Split the training type string into key-value pairs and format them
+        label = training_type.split(', ')
+        print(label)
+        if 'False' in label[0] or 'False' in label[1]: 
+            label_bis = ['Free']
+        else : 
+            label_bis = ['Varying background']
+        if 'True' in label[2]:
+            label_bis.append('Varying Curve')
+        else : 
+            label_bis.append('Circle')
+        n = int(label[-1].split('=')[1])
+        label_bis.append(f'Lookahed (n={n})')
+        return '\n'.join(label_bis)
     
     # Save the agent counts to a file
     agent_counts_file = './results_evaluation/agent_counts.json'
@@ -157,30 +174,63 @@ if __name__ == '__main__':
     
     grouped = df.groupby('training_type_str')
     
-    stats = grouped.agg({
-        "mean_reward": ["mean", "std"],
-        "mean_reward_t": ["mean", "std"],
-        "mean_reward_d": ["mean", "std"]
-    }).reset_index()
+
+    # On récupère juste les colonnes nécessaires
+    df_melted = df.melt(
+        id_vars=['training_type_str'],
+        value_vars=['mean_reward', 'mean_reward_t', 'mean_reward_d'],
+        var_name='metric',
+        value_name='reward'
+    )
+
+    # On filtre les training types avec suffisamment d'agents (déjà fait avant)
+    df_melted = df_melted[df_melted['training_type_str'].isin(filtered_training_types)]
+
+    # On mappe les noms des métriques pour les rendre plus lisibles
+    df_melted['metric'] = df_melted['metric'].map({
+        'mean_reward': 'Overall mean return',
+        'mean_reward_t': r'Time return: $-C \sum \Delta t_{sim}$',
+        'mean_reward_d': r'Distance return: $-\beta \sum d$'
+    })
+
+    df_melted['training_label'] = df_melted['training_type_str'].apply(format_training_type_label)
+
+    plt.figure(figsize=(16, 9))
+    sns.set(style="whitegrid")
     
-    stats.columns = ['training_type', 'mean_reward_mean', 'mean_reward_std', 
-                     'mean_reward_t_mean', 'mean_reward_t_std', 
-                     'mean_reward_d_mean', 'mean_reward_d_std']
-    print(stats.head())
-    x = np.arange(len(stats)) 
-    width = 0.25 
+    ax = sns.stripplot(
+        data=df_melted,
+        x='training_label',
+        y='reward',
+        hue='metric',
+        dodge=True,
+        jitter=True,
+        size=6,
+        palette='Set2'
+    )
+
+
+    plt.rcParams['text.usetex'] = True
+    plt.title("Rewards per training", fontsize=14)
+    plt.xlabel("Training type", fontsize=12)
+    plt.ylabel("Reward", fontsize=12)
+    plt.xticks(rotation=45, ha='right', fontsize=9)
+    xticks = ax.get_xticks()
+    for i in range(len(xticks) - 1):
+        xpos = (xticks[i] + xticks[i + 1]) / 2
+        ax.axvline(x=xpos, color='grey', linestyle='--', linewidth=0.7, alpha=0.5)
+    handles, labels = ax.get_legend_handles_labels()
     
-    fig, ax = plt.subplots(figsize=(14, 8))
-    ax.bar(x - width, stats['mean_reward_mean'], width, label='mean_reward', capsize=5)
-    ax.bar(x, stats['mean_reward_t_mean'], width, label='mean_reward_t', capsize=5)
-    ax.bar(x + width, stats['mean_reward_d_mean'], width, label='mean_reward_d', capsize=5)
-    ax.set_xlabel("Training")
-    ax.set_ylabel("Reward")
-    ax.set_title("Mean and Standard Deviation of Rewards by Training Type")
-    ax.set_xticks(x)
-    ax.set_xticklabels(stats['training_type'], rotation=45, ha="right", fontsize=8)
-    ax.legend()
-    plt.tight_layout()
-    plt.savefig('./fig/rank.png', dpi=400, bbox_inches='tight')
-    
-   
+    by_label = OrderedDict(zip(labels, handles))
+    ax.legend(
+        by_label.values(), 
+        by_label.keys(), 
+        fontsize=15, 
+        title_fontsize=17,
+        loc='center left',
+        bbox_to_anchor=(1.01, 0.5),  
+        borderaxespad=0.
+    )
+
+    plt.tight_layout(rect=[0, 0, 0.85, 1])  
+    plt.savefig('./fig/return_per_training.png', dpi=300, bbox_inches='tight')

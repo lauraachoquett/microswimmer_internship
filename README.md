@@ -9,6 +9,8 @@ The hyperparameters used in this project are as follows :
 <img src="fig/sde.jpeg" alt="Policy Streamlines" width="200"/>
 </div>
 
+
+
 - $U = 1$: Speed magnitude  
 - $\mathbf{P}$: Direction (action predicted by the agent)  
 - $\mathbf{u}(\mathbf{X})$: Background velocity  
@@ -35,6 +37,7 @@ We simulate the dynamics using an Euler–Maruyama scheme:
 
 ## 🤖 Reinforcement Learning : 
 <img src="fig/Agent_state.drawio.svg" alt="Policy Streamlines" width="400"/>
+<p align="center"><i>Figure 1</i></p>
 
 ### State Space
 
@@ -84,7 +87,7 @@ To enhance robustness, training can include different types of background flows:
 
 <img src="fig/smooth_curve.png" width="600"/>
 
-<i>Figure 1 — Left : curvature of the curve along epsiode. Right : Example of curve between episode 100 and 120</i>
+<i>Figure 2 — Left : curvature of the curve along epsiode. Right : Example of curve between episode 100 and 120</i>
 </div>
 
 ### Random background flow parameters
@@ -126,7 +129,7 @@ def random_bg_parameters():
     cir = (np.random.rand() - 0.5) * 2
     return dir, norm, center, a, cir
 ```
-## 📊 Agent Evaluation :
+## ⏱️ Agent Evaluation :
 After training, agents are evaluated on a variety of path types and background flow configurations to assess their generalization ability and robustness. 
 ### Path types : 
 Agents are evaluated on the following five types of target paths:
@@ -161,6 +164,54 @@ The results are saved in JSON format and ranked using:
 ```python
 rank_agents_by_rewards(results)
 ```
+## 📉 Preliminary result 
+### Velocity in the state
+<div align="center">
+<img src="agents/agent_TD3_2025-04-18_16-15/eval_bg/eval_with_west_05_ondulating.png" alt="reward per training" width="500"/>
+<img src="agents/agent_TD3_2025-04-18_13-33/eval_bg/eval_with_west_05_ondulating.png" alt="reward per training" width="550"/>
+</div>
+
+<p align="center"><i>Figure 3 — Left : Velocity not includes in the state. Right : Velocity includes in the states.</i></p>
+
+**Comments on the inclusion of velocity in the state** :
+Adding velocity to state representation increase the robustness to varying background flow as shown in the illustrating example of the Figure 3. 
+
+### Comparison of training types
+With velocity includes in the state : 
+<div align="center">
+<img src="fig/return_per_training.png" alt="reward per training" width="800"/>
+</div>
+
+### Best agent 
+| Reward                 | Varying Background | Path          | Lookahed (n)| Name         |
+|------------------------|--------------------|---------------|-------------|--------------|
+| -6.584                 |  True              | Varying Curve | 10          | 04-18_13-33  |
+| -6.585                 |  True              | Varying Curve | 10          | 04-18_12-51  |                                                            
+| -6.606                 |  True              | Circle        | 5           | 04-15_14-19  |                                                                
+| -6.659                 |  True              | Varying Curve | 5           |04-17_14-27   |                                                                
+
+**Comments on returns** : 
+The best agents have very similar returns acorss the different scenarios presented in the evaluation. Increasing the lookahead points and introducing varying background flow appear to stabilize the agents' performance . Using the same path across all episodes does not decrease the performance during the evaluation. 
+### Streamlines 
+
+
+Training on **circle**  : 
+<p align="center">
+  <img src="agents/agent_TD3_2025-04-15_14-19/eval_bg/streamlines/streamline_free_line.png" width="500"/>
+  <img src="agents/agent_TD3_2025-04-14_15-15/eval_bg/streamlines/streamline_free_line.png" width="500"/>
+  <img src="agents/agent_TD3_2025-04-11_16-37/eval_bg/streamlines/streamline_free_line.png" width="500"/>
+</p>
+
+Training on **varying curve** : 
+<p align="center">
+  <img src="agents/agent_TD3_2025-04-18_13-33/eval_bg/streamlines/streamline_free_line.png" width="500"/>
+  <img src="agents/agent_TD3_2025-04-18_12-51/eval_bg/streamlines/streamline_free_line.png" width="500"/>
+  <img src="agents/agent_TD3_2025-04-17_14-27/eval_bg/streamlines/streamline_free_line.png" width="500"/>
+</p>
+<p align="center"><i>Figure 3 — Left : 3. Right : 4.</i></p>
+
+**Comments on streamlines** : 
+Training with non-symmetrical paths introduces a bias in the policy's action, which can be observed when visualizing the streamline across differents starting points along a straight line. 
 
 ## ⚙️ Main configuration parameters
 

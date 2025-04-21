@@ -2,7 +2,7 @@ import numpy as np
 from generate_path import *
 from math import cos,sin
 import os
-import TD3
+import TD3 as TD3
 from env_swimmer import MicroSwimmer
 import pickle
 import json
@@ -18,7 +18,7 @@ from rank_agents import rank_agents_by_rewards
 import random
 from pathlib import Path
 from analytic_solution_line import find_next_v
-from sde import solver
+from simulation import solver
 import copy
 
 def format_sci(x):
@@ -94,10 +94,10 @@ def evaluate_after_training(agent_files,file_name_or,p_target,p_0,seed=42,type=N
         config_eval = initialize_parameters(agent_name,p_target,p_0)
         config_eval = copy.deepcopy(config_eval)
         training_type = {'rankine_bg':config_eval['rankine_bg'],'uniform_bg':config_eval['uniform_bg'],'random_curve':config_eval['random_curve'],'velocity_bool':config_eval['velocity_bool'],'load_model':config_eval['load_model'],'n_lookahead':config_eval['n_lookahead']}
-        if agent_name in results.keys():
-            results[agent_name]['training type'] = training_type
-            print(f"Agent {agent_name} already evaluated.")
-            continue
+        # if agent_name in results.keys():
+        #     results[agent_name]['training type'] = training_type
+        #     print(f"Agent {agent_name} already evaluated.")
+        #     continue
         print("Agent name : ", agent_name)
         config_eval['uniform_bg'] = uniform_bg
         config_eval['rankine_bg'] = rankine_bg
@@ -140,7 +140,8 @@ def evaluate_after_training(agent_files,file_name_or,p_target,p_0,seed=42,type=N
         print("Mean rewards t : ",format_sci(mean(rewards_t_per_episode)))
         print("Mean rewards d : ",format_sci(mean(rewards_d_per_episode)))
         print('-----------------------------------------------')
-        visualize_streamline(agent,config_eval,f'streamline_{title_add}_{type}',save_path_eval,type=type,title='',k=k,parameters=parameters)
+        if type == 'line':
+            visualize_streamline(agent,config_eval,f'streamline_{title_add}_{type}',save_path_eval,type=type,title='',k=k,parameters=parameters,offset=0.02)
 
         
     
@@ -356,52 +357,55 @@ if __name__=='__main__':
     # offset=0.2
     # compare_p_line(agent_name,config_eval_comp,'comparison_north_02',save_path_eval,u_bg,'',offset)
     
-    agent_file_1 = 'agents/semi-circle_u_bg/agent_TD3_2025-04-08_15-07_eval'
-    agent_file_3 = 'agents/retrained/agent_TD3_2025-04-10_11-26'
-    agent_file_4 = 'agents/state_velocity/agent_TD3_2025-04-10_13-59'
-    agent_file_5 = 'agents/state_velocity/agent_TD3_2025-04-11_13-37'
-    agent_file_6 = 'agents/state_velocity/agent_TD3_2025-04-11_14-01_retrained'
-    agent_file_7 = 'agents/state_velocity/agent_TD3_2025-04-11_14-28'
+    agent_file_1 = 'agents/agent_TD3_2025-04-18_13-33'
+    agent_file_3 = 'agents/agent_TD3_2025-04-18_12-51'
+    agent_file_4 = "agents/agent_TD3_2025-04-15_14-19"
+    agent_file_5 = "agents/agent_TD3_2025-04-17_14-27"
+    agent_file_6 =  "agents/agent_TD3_2025-04-18_11-53"
+    agent_file_7 =  "agents/agent_TD3_2025-04-18_11-53"
 
     agents_file = [agent_file_1,agent_file_3,agent_file_4,agent_file_5,agent_file_6,agent_file_7]
-    directory_path = Path("agents/")
     
-    for item in directory_path.iterdir():
-        if item.is_dir() and "agent_TD3" in item.name :
-            #if '2025-04-17_14-27' not in item.name:
-            agents_file.append(os.path.join(directory_path, item.name))
+    agents_file=["agents/agent_TD3_2025-04-14_15-15"]
+    # directory_path = Path("agents/")
+    
+    # for item in directory_path.iterdir():
+    #     if item.is_dir() and "agent_TD3" in item.name :
+    #         #if '2025-04-17_14-27' not in item.name:
+    #         agents_file.append(os.path.join(directory_path, item.name))
             
     print("Agents files : ",agents_file)
-    types = ['line','curve_minus','curve_plus','ondulating','circle']
+    # types = ['line','curve_minus','curve_plus','ondulating','circle']
     # agents_file = ['agents/retrained/agent_TD3_2025-04-10_11-26']
-    # types = ['line']
-    norm=0.5
-    dict = {
-        'east_05': np.array([1,0]),
-        'west_05': np.array([-1,0]),
-        'north_05': np.array([0,1]),
-        'south_05': np.array([0,-1]),
-    }
-    print("---------------------Evaluation with uniform bg---------------------")
-    for type in types:
-        for title_add,dir in dict.items():
-            results = evaluate_after_training(agents_file,f'result_evaluation_{title_add}_{type}.json',type=type,p_target = [2,0],p_0 = [0,0],title_add=title_add,dir=dir,norm=norm)
-            rank_agents_by_rewards(results)
-            
+    types = ['line']
     print("---------------------Evaluation with no bg---------------------")
     title_add = 'free'
     for type in types:
         results = evaluate_after_training(agents_file,f'result_evaluation_{title_add}_{type}.json',type=type,p_target = [2,0],p_0 = [0,0],title_add=title_add)
         rank_agents_by_rewards(results)
         
+    # norm=0.5
+    # dict = {
+    #     'east_05': np.array([1,0]),
+    #     'west_05': np.array([-1,0]),
+    #     'north_05': np.array([0,1]),
+    #     'south_05': np.array([0,-1]),
+    # }
+    # print("---------------------Evaluation with uniform bg---------------------")
+    # for type in types:
+    #     for title_add,dir in dict.items():
+    #         results = evaluate_after_training(agents_file,f'result_evaluation_{title_add}_{type}.json',type=type,p_target = [2,0],p_0 = [0,0],title_add=title_add,dir=dir,norm=norm)
+    #         rank_agents_by_rewards(results)
+            
+        
 
 
     
-    title_add = 'rankine_a_05__cir_3_center_1_075'
-    print("---------------------Evaluation with rankine bg---------------------")
-    for type in types:
-        a= 0.5
-        cir = 2
-        center = np.array([1,3/4])
-        results = evaluate_after_training(agents_file,f'result_evaluation_{title_add}_{type}.json',type=type,p_target = [2,0],p_0 = [0,0],title_add=title_add,a=a,center=center,cir=cir)
+    # title_add = 'rankine_a_05__cir_3_center_1_075'
+    # print("---------------------Evaluation with rankine bg---------------------")
+    # for type in types:
+    #     a= 0.5
+    #     cir = 2
+    #     center = np.array([1,3/4])
+    #     results = evaluate_after_training(agents_file,f'result_evaluation_{title_add}_{type}.json',type=type,p_target = [2,0],p_0 = [0,0],title_add=title_add,a=a,center=center,cir=cir)
 
