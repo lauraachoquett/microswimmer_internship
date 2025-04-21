@@ -146,7 +146,7 @@ if __name__ == '__main__':
     print(agent_counts)
 
     # Filter training types with more than 5 agents
-    filtered_training_types = agent_counts[agent_counts['agent_count'] >= 4]['training_type']
+    filtered_training_types = agent_counts[agent_counts['agent_count'] > 5]['training_type']
     df = df[df['training_type_str'].isin(filtered_training_types)]
     
     # Save the agent counts to a file
@@ -166,7 +166,7 @@ if __name__ == '__main__':
     stats.columns = ['training_type', 'mean_reward_mean', 'mean_reward_std', 
                      'mean_reward_t_mean', 'mean_reward_t_std', 
                      'mean_reward_d_mean', 'mean_reward_d_std']
-    
+    print(stats.head())
     x = np.arange(len(stats)) 
     width = 0.25 
     

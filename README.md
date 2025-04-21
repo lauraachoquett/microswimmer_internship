@@ -1,6 +1,6 @@
 # Micro-Swimmer Control using Deep Reinforcement Learning
 This project uses a Deep Reinforcement Learning algorithm (TD3) to control a microswimmer moving under stochastic dynamics and background flows.
-## Physical Model and Dynamics : 
+## 🧮 Physical Model and Dynamics : 
 
 The hyperparameters used in this project are as follows : 
 
@@ -33,7 +33,7 @@ We simulate the dynamics using an Euler–Maruyama scheme:
 * Target update rate $\tau$ : 0.005
 * Policy update frequency : 5
 
-## Reinforcement Learning : 
+## 🤖 Reinforcement Learning : 
 <img src="fig/Agent_state.drawio.svg" alt="Policy Streamlines" width="400"/>
 
 ### State Space
@@ -59,7 +59,7 @@ Where:
 - $C, \beta$ : Constant weights
 
 
-## Training Protocol
+## 🏊‍♂️ Training Protocol
 ### Epsiode ending conditions
 - Agent reaches target within threshold $\delta$
 - Episode time exceeds $t_{\text{max}}$
@@ -74,6 +74,7 @@ To enhance robustness, training can include different types of background flows:
     <img src="fig/Rankine.jpeg" alt="Policy Streamlines" width="300"/>
     </div>
 
+
 ### Path Variants 
 - Straight line  
 - Semi-circle  
@@ -81,10 +82,85 @@ To enhance robustness, training can include different types of background flows:
 - Curves with varying curvature  
 <div align="center">
 
-<img src="fig/smooth_curve.png" width="400"/>
+<img src="fig/smooth_curve.png" width="600"/>
 
 <i>Figure 1 — Left : curvature of the curve along epsiode. Right : Example of curve between episode 100 and 120</i>
 </div>
+
+### Random background flow parameters
+The parameters of the background flow are randomly sampled at the beginning of each episode as follows:
+
+- **Uniform flow**:
+  - Direction vector $\,\mathbf{d} \in \mathbb{R}^2\,$ is sampled uniformly:
+    $$
+    \mathbf{d} \sim \mathcal{U}([-1,1]^2), \quad \mathbf{d} \leftarrow \frac{\mathbf{d}}{\|\mathbf{d}\|}
+    $$
+  - Norm of the velocity:
+    $$
+    \|\mathbf{u}\| \sim \mathcal{U}(0, 0.6)
+    $$
+
+- **Rankine vortex**:
+  - Center of the vortex $\,\mathbf{c} = (x_c, y_c)\,$ is sampled as:
+    $$
+    x_c \sim \mathcal{U}(0, 2), \quad y_c \sim \mathcal{U}(0, 1)
+    $$
+  - Core radius:
+    $$
+    a \sim \mathcal{U}(0, 1)
+    $$
+  - Circulation (positive or negative):
+    $$
+    \Gamma \sim \mathcal{U}(-1, 1)
+    $$
+
+The function `random_bg_parameters()` returns these five values:
+```python
+def random_bg_parameters():
+    dir = np.random.uniform(-1, 1, 2)
+    dir = dir / np.linalg.norm(dir)
+    norm = np.random.rand() * 0.6
+
+    a = np.random.rand()
+    center = [np.random.rand() * 2, np.random.rand()]
+    cir = (np.random.rand() - 0.5) * 2
+    return dir, norm, center, a, cir
+```
+## 📊 Agent Evaluation :
+After training, agents are evaluated on a variety of path types and background flow configurations to assess their generalization ability and robustness. 
+### Path types : 
+Agents are evaluated on the following five types of target paths:
+* line: a straight line.
+* curve_minus: a negatively curved path.
+*	curve_plus: a positively curved path.
+*	ondulating: a sinusoidal path.
+*	circle: a circular trajectory.
+### Background Flow Configurations
+
+Three types of background flow are considered during evaluation:
+
+1. **Uniform Background Flow**  
+   The agent swims in a constant flow with different directions:
+   - `east_05`: vector $(1, 0)$
+   - `west_05`: vector $(-1, 0)$
+   - `north_05`: vector $(0, 1)$
+   - `south_05`: vector $(0, -1)$
+
+   Each direction is tested with a flow norm of $0.5$.
+
+2. **No Background Flow**  
+   The environment is evaluated without any background flow (`free` configuration).
+
+3. **Rankine Vortex**  
+   The agent is evaluated in a rotational background flow with a Rankine vortex defined by:
+   - circulation intensity: $cir = 2$
+   - vortex core strength: $a = 0.5$
+   - vortex center: $(1, \frac{3}{4})$
+  
+The results are saved in JSON format and ranked using: 
+```python
+rank_agents_by_rewards(results)
+```
 
 ## ⚙️ Main configuration parameters
 
