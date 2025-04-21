@@ -60,8 +60,13 @@ def generate_random_ondulating_path(p_0, p_target, n_points=100, max_curvature=1
     return path
 
 def func_k_max(A,N,f,n):
-    freq = f / (8*(1 + (n /N)**(3/2)))
-    return -A*(1-exp(n/N))*cos(n*freq)
+    if n>N : 
+        amp = 1-exp(1)
+        freq = f/16
+    else : 
+        amp = (1-exp(n/N))
+        freq = f / (8*(1 + (n /N)**(3/2)))
+    return -A*amp*cos(n*freq)
 
 
 
@@ -98,9 +103,9 @@ if __name__  == '__main__' :
     nb_points = 200
     # plot_path(p_0,p_target,nb_points,'line')
     A=2
-    N=700
+    N=400
     f = 4
-    n_values = np.linspace(1,N+1,700,dtype=int)
+    n_values = np.linspace(1,700,700,dtype=int)
     output = [func_k_max(A,N,f,n) for n in n_values]
     nb_points=700
     plt.figure(figsize=(25,10))
@@ -108,13 +113,13 @@ if __name__  == '__main__' :
     plt.plot(n_values,output)
     colors = plt.cm.viridis(np.linspace(0, 1, 20))
     for n in n_values:
-        if n>440 and n<460:
+        if n>100 and n<120:
             k= func_k_max(A,N,f,n)
             plt.scatter(n, k, color=colors[n%20]) 
             
     plt.subplot(1,2,2)
     for n in n_values:
-        if n>440  and n<460:
+        if n>100  and n<120:
             k= func_k_max(A,N,f,n)
             path = generate_curve(p_0,p_target,k,nb_points)
             plt.plot(path[:,0],path[:,1],label=f'k : {k:.2f}',color = colors[n%20])

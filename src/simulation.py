@@ -32,7 +32,7 @@ def rankine_vortex(pos, a, center, cir):
     
 
 def uniform_velocity(dir, norm):
-    return dir*norm
+    return dir * norm
 
 
 def run_sde(nb_steps,t_init,t_end,U=1,D=0.1,p = np.ones(2),x_0 = np.zeros(2)):

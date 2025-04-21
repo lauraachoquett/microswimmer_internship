@@ -3,7 +3,7 @@ import torch
 
 
 class ReplayBuffer(object):
-	def __init__(self, state_dim, action_dim, max_size=10000):
+	def __init__(self, state_dim, action_dim, max_size=100000):
 		self.max_size = max_size
 		self.ptr = 0
 		self.size = 0
@@ -61,4 +61,11 @@ def courbures(path):
     courbure = numerateur / (denominateur + 1e-8)  # pour éviter la division par 0
 
     return courbure
+
+
+def mirror(vec):
+	mirrored = vec.clone()
+	mirrored[0] = mirrored[0]  
+	mirrored[1] = -mirrored[1]  
+	return mirrored
 

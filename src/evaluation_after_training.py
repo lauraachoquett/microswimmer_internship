@@ -27,6 +27,7 @@ def format_sci(x):
 def evaluate_after_training(agent_files,file_name_or,p_target,p_0,seed=42,type=None,translation=None,theta=None,dir=None,norm=None,a=None,center=None,cir=None,title_add=''):
     np.random.seed(seed)
     random.seed(seed)
+    rng= np.random.default_rng(seed) 
     if translation is not None : 
         translation = translation
     else : 
@@ -93,7 +94,7 @@ def evaluate_after_training(agent_files,file_name_or,p_target,p_0,seed=42,type=N
         config_eval = initialize_parameters(agent_name,p_target,p_0)
         config_eval = copy.deepcopy(config_eval)
         training_type = {'rankine_bg':config_eval['rankine_bg'],'uniform_bg':config_eval['uniform_bg'],'random_curve':config_eval['random_curve'],'velocity_bool':config_eval['velocity_bool'],'load_model':config_eval['load_model'],'n_lookahead':config_eval['n_lookahead']}
-        if agent_name in results.keys() and agent_name!='agents/agent_TD3_2025-04-17_09-56':
+        if agent_name in results.keys():
             results[agent_name]['training type'] = training_type
             print(f"Agent {agent_name} already evaluated.")
             continue
@@ -116,13 +117,13 @@ def evaluate_after_training(agent_files,file_name_or,p_target,p_0,seed=42,type=N
         action_dim=env.action_space.shape[0]
         max_action= float(env.action_space.high[0])
         agent = TD3.TD3(state_dim,action_dim,max_action)
-
         save_path_eval = os.path.join(agent_name,'eval_bg/')
+
         os.makedirs(save_path_eval, exist_ok=True)
         
         policy_file = os.path.join(agent_name,'models/agent')
         agent.load(policy_file)
-        rewards_per_episode, rewards_t_per_episode, rewards_d_per_episode,success_rate,_=evaluate_agent(agent,env,config_eval['eval_episodes'],config_eval,save_path_eval,f'eval_with_{title_add}_{type}',False,title='',plot=True,parameters=parameters,plot_background=True)
+        rewards_per_episode, rewards_t_per_episode, rewards_d_per_episode,success_rate,_=evaluate_agent(agent,env,config_eval['eval_episodes'],config_eval,save_path_eval,f'eval_with_{title_add}_{type}',False,title='',plot=True,parameters=parameters,plot_background=True,rng=rng)
         
         
         results[agent_name] = {
@@ -158,8 +159,8 @@ def evaluate_after_training(agent_files,file_name_or,p_target,p_0,seed=42,type=N
     plt.close()
     return results
 
-def compare_p_line(agent_name, config_eval, file_name_or, save_path_eval, type='', title=''):
-
+def compare_p_line(agent_name, config_eval, file_name_or, save_path_eval, u_bg = np.zeros(2), title='',offset=0.2):
+    config_eval = copy.deepcopy(config_eval)
     save_path_comparison = os.path.join(save_path_eval, 'comparison_graph/')
     if not os.path.exists(save_path_comparison):
         os.makedirs(save_path_comparison)
@@ -167,11 +168,11 @@ def compare_p_line(agent_name, config_eval, file_name_or, save_path_eval, type='
     p_target = config_eval['p_target']
     p_0 = config_eval['p_0']
     nb_points_path = config_eval['nb_points_path']
-    nb_starting_point = 2
-    p_0_above = p_0 + np.array([0.2, 0.2])
-    p_target_above = p_target + np.array([0, 0.2])
-    p_0_below = p_0 + np.array([0.2, -0.2])
-    p_target_below = p_target + np.array([0, -0.2])
+    nb_starting_point = 4
+    p_0_above = p_0 + np.array([0.2, offset])
+    p_target_above = p_target + np.array([0, offset])
+    p_0_below = p_0 + np.array([0.2, -offset])
+    p_target_below = p_target + np.array([0, -offset])
 
     path, _ = generate_simple_line(p_0, p_target, nb_points_path)
     path_above_point, _ = generate_simple_line(p_0_above, p_target_above, nb_starting_point)
@@ -213,6 +214,7 @@ def compare_p_line(agent_name, config_eval, file_name_or, save_path_eval, type='
     states_list = [x]
 
     fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(16, 8))
+
     ax1.plot(path[:, 0], path[:, 1], label='path', color='black', linewidth=2, zorder=10)
 
     while id < len(path_starting_point):
@@ -221,21 +223,28 @@ def compare_p_line(agent_name, config_eval, file_name_or, save_path_eval, type='
             action = agent.select_action(state)
             v, p_dir = find_next_v(x, config_eval['p_target'], config_eval['beta'], Dt_sim, num_angles=90)
             x_previous = x
-        next_state, reward, done, info = env.step(action, tree, path, p_target, config_eval['beta'], config_eval['D'], config_eval['u_bg'], config_eval['threshold'])
+        next_state, reward, done, info = env.step(
+            action, tree, path, p_target,
+            config_eval['beta'], config_eval['D'],
+            u_bg, config_eval['threshold']
+        )
         x = info['x']
         states_list.append(x)
         state = next_state
+
         if iter % steps_per_action == 1:
-            dir_act = (x - x_previous) / np.linalg.norm((x - x_previous))
+            dir_act = (x - x_previous) / np.linalg.norm(x - x_previous)
             product = dir_act @ p_dir
             dot_product.append(product)
 
         if done or iter * Dt_sim > t_max:
             trajectories[f'{path_starting_point[id]}'] = dot_product
             color = plot_trajectories(ax1, np.array(states_list), path, title='streamlines', color_id=id)
-            ax1.set_aspect('equal')
-            ax2.plot(np.linspace(0, 2, len(dot_product)), dot_product, label=f'Start {id}', color=color)
-            ax2.set_aspect('auto')
+
+            p_1 = path_starting_point[id]
+            x_values = np.linspace(p_1[0], p_target[0], len(dot_product))
+            ax2.plot(x_values, dot_product, color=color, label=f'Traj {id}')
+
             iter = 0
             id += 1
             if id < L:
@@ -243,18 +252,25 @@ def compare_p_line(agent_name, config_eval, file_name_or, save_path_eval, type='
                 config_eval['x_0'] = x_0
                 dot_product = []
                 states_list = [x_0]
-                x = path_starting_point[id]
-                env = MicroSwimmer(config_eval['x_0'], config_eval['C'], Dt_sim, config_eval['velocity_bool'], config_eval['n_lookahead'])
+                x = x_0
+                env = MicroSwimmer(config_eval['x_0'], config_eval['C'], Dt_sim,
+                                config_eval['velocity_bool'], config_eval['n_lookahead'])
                 state, done = env.reset(config_eval['tree'], config_eval['path']), False
-
-    ax1.legend()
+            if ax1.get_ylim()[1] - ax1.get_ylim()[0] < 0.5:
+                ax1.set_ylim(-0.3, 0.3)
+                
+    ax1.set_aspect('equal')
     ax1.set_title("Trajectories")
-    ax2.legend()
-    
+    ax1.legend()
+
+
+    ax2.set_aspect('equal') 
     ax2.set_title("Dot Product Evolution")
-    ax1.set_aspect('equal')  # Ensure equal scaling for x and y axes
+    ax2.set_ylim(0, 1)
+    ax2.legend()
+
+    plt.tight_layout()
     plt.savefig(path_save_fig, dpi=200, bbox_inches='tight')
-    plt.show()
 
             
     
@@ -330,13 +346,15 @@ def initialize_parameters(agent_file,p_target,p_0):
     
 
 if __name__=='__main__':
-    # agent_name='agents/agent_TD3_2025-04-16_14-27'
+    # agent_name='agents/agent_TD3_2025-04-17_13-28'
     # p_target = np.array([2,0])
     # p_0 = np.array([0,0])
+    # u_bg = np.array([0.0,0.2])
     # config_eval_comp = initialize_parameters(agent_name,p_target,p_0)
     # save_path_eval = os.path.join(agent_name,'eval_bg/')
     # os.makedirs(save_path_eval, exist_ok=True)
-    # compare_p_line(agent_name,config_eval_comp,'comparison',save_path_eval)
+    # offset=0.2
+    # compare_p_line(agent_name,config_eval_comp,'comparison_north_02',save_path_eval,u_bg,'',offset)
     
     agent_file_1 = 'agents/semi-circle_u_bg/agent_TD3_2025-04-08_15-07_eval'
     agent_file_3 = 'agents/retrained/agent_TD3_2025-04-10_11-26'
@@ -345,31 +363,18 @@ if __name__=='__main__':
     agent_file_6 = 'agents/state_velocity/agent_TD3_2025-04-11_14-01_retrained'
     agent_file_7 = 'agents/state_velocity/agent_TD3_2025-04-11_14-28'
 
-    
     agents_file = [agent_file_1,agent_file_3,agent_file_4,agent_file_5,agent_file_6,agent_file_7]
     directory_path = Path("agents/")
     
     for item in directory_path.iterdir():
         if item.is_dir() and "agent_TD3" in item.name :
+            #if '2025-04-17_14-27' not in item.name:
             agents_file.append(os.path.join(directory_path, item.name))
             
-            
     print("Agents files : ",agents_file)
-    types = ['line','curve_minus','curve_plus','ondulating']
-    print("---------------------Evaluation with no bg---------------------")
-    title_add = 'free'
-    for type in types:
-        results = evaluate_after_training(agents_file,f'result_evaluation_{title_add}_{type}.json',type=type,p_target = [2,0],p_0 = [0,0],title_add=title_add)
-        rank_agents_by_rewards(results)
-        
-    title_add = 'rankine_a_05__cir_3_center_1_075'
-    print("---------------------Evaluation with rankine bg---------------------")
-    for type in types:
-        a= 0.5
-        cir = 2
-        center = np.array([1,3/4])
-        results = evaluate_after_training(agents_file,f'result_evaluation_{title_add}_{type}.json',type=type,p_target = [2,0],p_0 = [0,0],title_add=title_add,a=a,center=center,cir=cir)
-
+    types = ['line','curve_minus','curve_plus','ondulating','circle']
+    # agents_file = ['agents/retrained/agent_TD3_2025-04-10_11-26']
+    # types = ['line']
     norm=0.5
     dict = {
         'east_05': np.array([1,0]),
@@ -382,6 +387,21 @@ if __name__=='__main__':
         for title_add,dir in dict.items():
             results = evaluate_after_training(agents_file,f'result_evaluation_{title_add}_{type}.json',type=type,p_target = [2,0],p_0 = [0,0],title_add=title_add,dir=dir,norm=norm)
             rank_agents_by_rewards(results)
+            
+    print("---------------------Evaluation with no bg---------------------")
+    title_add = 'free'
+    for type in types:
+        results = evaluate_after_training(agents_file,f'result_evaluation_{title_add}_{type}.json',type=type,p_target = [2,0],p_0 = [0,0],title_add=title_add)
+        rank_agents_by_rewards(results)
+        
+
 
     
+    title_add = 'rankine_a_05__cir_3_center_1_075'
+    print("---------------------Evaluation with rankine bg---------------------")
+    for type in types:
+        a= 0.5
+        cir = 2
+        center = np.array([1,3/4])
+        results = evaluate_after_training(agents_file,f'result_evaluation_{title_add}_{type}.json',type=type,p_target = [2,0],p_0 = [0,0],title_add=title_add,a=a,center=center,cir=cir)
 

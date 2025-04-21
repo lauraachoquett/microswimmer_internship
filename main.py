@@ -2,28 +2,36 @@ import numpy as np
 import torch
 import argparse
 import os
-from utils import ReplayBuffer,random_bg_parameters
-import TD3
+from src.utils import ReplayBuffer,random_bg_parameters,mirror
+import src.TD3 as TD3
 from datetime import datetime 
-from env_swimmer import MicroSwimmer
-from generate_path import *
+from src.env_swimmer import MicroSwimmer
+from src.generate_path import *
 import matplotlib.pyplot as plt
-from invariant_state import *
+from src.invariant_state import *
 from math import sqrt
 import pickle
-from sde import rankine_vortex,uniform_velocity
-from evaluate_agent import evaluate_agent
+from src.simulation import rankine_vortex,uniform_velocity
+from src.evaluate_agent import evaluate_agent
 from scipy.spatial import KDTree
 colors = plt.cm.tab10.colors
 from statistics import mean
 import copy
+from src.visualize import visualize_streamline
+import random
+import json
 
 def format_sci(x):
     return "{:.3e}".format(x)
 
 
 def run_expe(config,agent_file='agents'):
-    print(" --------------- TRAINING ---------------")
+    seed=12
+    np.random.seed(seed)
+    random.seed(seed)
+    rng= np.random.default_rng(seed) 
+    print(rng)
+
     timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M")
     file_name = os.path.join(agent_file, f"agent_TD3_{timestamp}")
 
@@ -53,7 +61,6 @@ def run_expe(config,agent_file='agents'):
     uniform_bg = config['uniform_bg']
     rankine_bg = config['rankine_bg']
     both_rankine_and_uniform = config['uniform_bg'] and config['rankine_bg']
-    print("Both pertubations : ",both_rankine_and_uniform)
     random_curve = config['random_curve']
 
     env = MicroSwimmer(x_0,C,Dt_sim,config['velocity_bool'],n_lookahead)
@@ -101,10 +108,10 @@ def run_expe(config,agent_file='agents'):
 
     iter = 0
     episode_reward = 0
-    episode_num = 0
+    episode_num = 1
     training_reward=[]
     best_eval_result=-np.inf
-
+    eval_list=[]
     #random_eval = evaluate_agent(agent,env,eval_episodes,config,save_path_result)
     #print(f"Initial random evaluation : {random_eval}")
     state,done = env.reset(tree,path),False
@@ -115,10 +122,12 @@ def run_expe(config,agent_file='agents'):
     D = config['D']
     k_list=[]
 
+    list_of_path_tree=None
     if config['random_curve']:
         print("Random curve")
         A=2
         f=4
+        N = nb_episode/2
         curve_path_plus= generate_curve(p_0,p_target,1,config['nb_points_path'])
         curve_path_minus= generate_curve(p_0,p_target,-1,config['nb_points_path'])
         curve_tree_plus = KDTree(curve_path_plus)
@@ -135,7 +144,7 @@ def run_expe(config,agent_file='agents'):
     config_eval_bis['uniform_bg'] = False
     config_eval_bis['rankine_bg'] = False
 
-    print("Both pertubations : ", config['uniform_bg'], config['rankine_bg'])
+    print("Both pertubations : ", config['uniform_bg'] and config['rankine_bg'])
     
     ########### TRAINING LOOP ###########
     while episode_num <nb_episode:
@@ -144,7 +153,7 @@ def run_expe(config,agent_file='agents'):
         if iter%steps_per_action==0 or iter==1:
             action = agent.select_action(state)
 
-        if episode_num>0: 
+        if episode_num>config['pertubation_after_episode']: 
             if both_rankine_and_uniform:
                 if episode_num%2==0:
                     u_bg = uniform_velocity(dir,norm)
@@ -154,7 +163,7 @@ def run_expe(config,agent_file='agents'):
                 u_bg = uniform_velocity(dir,norm)
             if rankine_bg:
                 u_bg = rankine_vortex(x,a,center,cir)
-
+            
         next_state,reward,done,info = env.step(action,tree,path,p_target,beta,D,u_bg,threshold)
         x= info['x']
         replay_buffer.add(state.flatten(), action, next_state.flatten(), reward, done)
@@ -168,27 +177,36 @@ def run_expe(config,agent_file='agents'):
         if done:
             count_reach_target+=1
             if agent_to_load != '':
-                beta = beta * 1.001
+                beta = beta * 1.0005
         if done or iter*Dt_sim> t_max: 
             state,done =env.reset(tree,path),False
             training_reward.append(episode_reward)
 
-            if (episode_num-1)%eval_freq==0 and episode_num > 10:
+            if (episode_num)%eval_freq==0 and episode_num >=10:
                 print(f"Total iter: {iter+1} Episode Num: {episode_num} Reward: {episode_reward:.3f} Success rate: {count_reach_target/eval_freq}")
                 path_save_fig= os.path.join(save_path_result_fig,"training_reward.png")
-                eval_rew,_,_,_,_= evaluate_agent(agent,env,eval_episodes,config_eval_bis,save_path_result_fig,"eval_during_training",False,list_of_path_tree,'',True)
+                eval_rew,_,_,_,_= evaluate_agent(agent,env,eval_episodes,config_eval_bis,save_path_result_fig,"eval_during_training",False,list_of_path_tree,'',True,[],False,rng)
+                visualize_streamline(agent,config_eval_bis,f'eval_during_training_streamline_{beta:.3f}.png',save_path_result_fig,type='line',title='',k=0,parameters=[])
                 eval_rew = mean(eval_rew)
+                eval_list.append(eval_rew)
                 print(f"Eval result : {eval_rew:.3f}")
-                if best_eval_result<eval_rew and episode_num>(config['pertubation_after_episode']*5/2): 
+                if best_eval_result<eval_rew and episode_num>(config['pertubation_after_episode']*3): 
                     best_eval_result=eval_rew
                     if save_model: 
                         agent.save(save_path_model)
                         print("Best reward during evaluation : Model saved")
                 plt.close()
-                plt.plot(training_reward)
+                episodes_values = np.linspace(1,episode_num,episode_num,dtype='int')
+                episodes_values_freq = np.linspace(10,episode_num,(episode_num-10)//eval_freq+1,dtype='int')
+                plt.plot(episodes_values,-np.array(training_reward),color='blue',label='training')
+                plt.plot(episodes_values_freq,-np.array(eval_list),color='black',label='evaluation')
                 plt.xlabel("episode")
                 plt.ylabel("reward")
+                plt.yscale('log')
+                plt.legend()
                 plt.savefig(path_save_fig,dpi=100,bbox_inches='tight')
+                
+                
 
 
                 if agent_to_load:
@@ -203,7 +221,7 @@ def run_expe(config,agent_file='agents'):
             dir, norm,center,a ,cir=random_bg_parameters()
             
             if config['random_curve'] and episode_num > 10:
-                k = func_k_max(A, nb_episode, f, episode_num)
+                k = func_k_max(A, N, f, episode_num)
                 k_list.append(k)
                 if episode_num == 450:
                     print(" k :", k)
@@ -217,7 +235,7 @@ def run_expe(config,agent_file='agents'):
 
     if config['random_curve']:
         plt.figure()
-        plt.hist(k_list, bins=20, color='blue', alpha=0.7)
+        plt.hist(k_list, bins=40, color='blue', alpha=0.7)
         plt.title("Distribution of k")
         plt.xlabel("k values")
         plt.ylabel("Frequency")
@@ -225,14 +243,18 @@ def run_expe(config,agent_file='agents'):
         plt.savefig(os.path.join(save_path_result_fig, "k_distribution.png"), dpi=100, bbox_inches='tight')
         plt.close()
     
+    file_reward_eval = os.path.join(save_path_result,'rewards_eval')
+    with open(file_reward_eval,'w') as f:
+        json.dump(eval_list,f,indent=4)
 
 
 
 if __name__=='__main__':
+
     p_target = [2,0]
     p_0 = np.zeros(2)
     nb_points_path = 500
-    path,d = generate_demi_circle_path(p_0,p_target,nb_points_path)
+    path,d = generate_simple_line(p_0,p_target,nb_points_path)
     print("Distance path points:      ",format_sci(np.linalg.norm(path[1,:]-path[0,:])))
     tree = KDTree(path)
     print("Curvature max du chemin :  ", format_sci(np.max(courbures(path))))
@@ -251,36 +273,37 @@ if __name__=='__main__':
     print("Distance to cover:         ", format_sci(d))
     print("Expected precision:        ", format_sci(threshold / d))
     config = {
-        'x_0' : p_0,
-        'C' : 1,
-        'D' : D,
-        'u_bg' : np.array([0,1])*0.0,
-        'threshold' :threshold,
-        't_max': t_max,
-        't_init':t_init,
+        'x_0' : p_0,                        #m
+        'C' : 1,                            #m/s
+        'D' : D,                            #m2/s (Diffusion coefficient)
+        'u_bg' : np.array([0,1])*0.0,       #m/s
+        'threshold' :threshold,             #m
+        't_max': t_max,                     #s
+        't_init':t_init,                    #s
         'steps_per_action':5,
-        'nb_episode':700,
+        'nb_episode':650,
         'batch_size':256,
         'eval_freq':50,
         'save_model':True,
-        'eval_episodes' : 4,
+        'eval_episodes' : 8,
         'episode_start_update' : 10,
         'path' : path,
         'tree' :tree,
-        'p_0' : p_0,
-        'p_target' : p_target,
-        'start_timesteps' :100,
+        'p_0' : p_0,                        #m
+        'p_target' : p_target,              #m
+        'start_timesteps' :256,
         'load_model':"",
-        'episode_per_update' :5,
+        'episode_per_update' :3,
         'discount_factor' : 1,
         'beta':0.25,
-        'uniform_bg':True,
-        'rankine_bg':True,
-        'pertubation_after_episode' :150,
-        'random_curve' : True,
-        'nb_points_path':500,
-        'Dt_action': Dt_action,
-        'velocity_bool' : True,
-        'n_lookahead' : 5,
-    }
-    run_expe(config)
+        'uniform_bg':True,                  #Random uniform background flow during the training
+        'rankine_bg':True,                  #Random rankine vortex during the training 
+        'pertubation_after_episode' :100,   #Background flow add in the training after this episode
+        'random_curve' : True,              #To train on varying curve (no longer random)
+        'nb_points_path':500,               #Discretization of the path
+        'Dt_action': Dt_action, 
+        'velocity_bool' : False,            #Add the velocity in the state or not
+        'n_lookahead' : 10,                 #Number of points in the lookahead 
+    }   
+    for i in range(1):
+        run_expe(config)

@@ -168,10 +168,11 @@ def visualize_streamline(agent,config_eval,file_name_or,save_path_eval,type='',t
     
 
     nb_starting_point = 20
-    p_0_above = p_0 + np.array([0,0.2])
-    p_target_above = p_target + np.array([0, 0.2])
-    p_0_below = p_0 + np.array([0,-0.2])
-    p_target_below = p_target + np.array([0,-0.2])
+    offset = 0.2
+    p_0_above = p_0 + np.array([0,offset])
+    p_target_above = p_target + np.array([0, offset])
+    p_0_below = p_0 + np.array([0,-offset])
+    p_target_below = p_target + np.array([0,-offset])
     if type =='ondulating':
         path= generate_random_ondulating_path(p_0,p_target,nb_points_path,amplitude = 0.5,frequency=2)
         path_above_point = generate_random_ondulating_path(p_0_above,p_target_above,nb_starting_point,amplitude = 0.5,frequency=2)
@@ -192,7 +193,7 @@ def visualize_streamline(agent,config_eval,file_name_or,save_path_eval,type='',t
     config_eval_v['path'] = path
     config_eval_v['tree'] = KDTree(path)
     config_eval_v['D'] = 0
-    path_above_point = path_above_point[:-2]
+    path_above_point = path_above_point[:-1]
     path_below_point = path_below_point[:-1]
     path_starting_point = np.concatenate((path_above_point,path_below_point),axis=0)
     file_name_or += title
@@ -245,36 +246,48 @@ def visualize_streamline(agent,config_eval,file_name_or,save_path_eval,type='',t
         center,a,cir = parameters
         type='rankine'
         plot_background_velocity(type,x_bound,y_bound,a=a,center=center,cir=cir)
-    fig.savefig(path_save_fig, dpi=100, bbox_inches='tight')
+    fig.savefig(path_save_fig, dpi=200, bbox_inches='tight')
     plt.close(fig)
 
     
 
 
 if __name__ == '__main__':
-    fig, ax = plt.subplots(figsize=(10, 8))
     
-    agent_file_2 = 'agents/agent_TD3_2025-04-11_16-19'
-    agent_file_13 = 'agents/agent_TD3_2025-04-15_09-59_D0'
-    agent_file_9 = 'agents/agent_TD3_2025-04-11_16-37'
-    agent_files = [agent_file_2,agent_file_13]
-    file_name_or = 'streamline_circle_path_trajectories.pkl'
-    for i,agent_name in enumerate(agent_files) : 
-        save_path_eval = os.path.join(agent_name,'eval_bg/')
-        path_trajectories  = os.path.join(agent_name,'eval_bg/streamlines/',file_name_or)
-        with open(path_trajectories,'rb') as f:
-            trajectories = pickle.load(f)
-        path = trajectories['path']
-        ax.plot(path[:, 0], path[:, 1], label=f'{i}', color=colors[i], linewidth=2)
-        for key, trajectory in trajectories.items():
-            if key != 'path':
-                plot_trajectories(ax, trajectory, path, title='streamlines',color_id=i)
-    ax.plot(path[:, 0], path[:, 1], color='black', linewidth=2)
-    ax.set_aspect('equal')
-    ax.legend()
-    path_save_comparison = 'results_evaluation/streamlines_comparison_circle_bis'
-    fig.savefig(path_save_comparison, dpi=300, bbox_inches='tight')
-    plt.close(fig)
+    agent_file_2 = 'agents/agent_TD3_2025-04-17_09-56'
+    agent_file_3 =  "agents/agent_TD3_2025-04-15_14-19"
+    agent_file_4 =  "agents/agent_TD3_2025-04-17_14-27"
+    agent_file_5 = "agents/agent_TD3_2025-04-17_13-28"
+    agent_file_6 = "agents/agent_TD3_2025-04-16_11-12"
+    # agent_file_13 = ''
+    agents_files = ['agents/retrained/agent_TD3_2025-04-10_11-26']
+    dict = {
+        'free' : np.array([0,0]),
+        'east_02': np.array([1,0]),
+        'west_02': np.array([-1,0]),
+        # 'north_05': np.array([0,1]),
+        # 'south_05': np.array([0,-1]),
+    }
+    for agent_file in agents_files:
+        fig, ax = plt.subplots(figsize=(8, 5))
+        save_path_eval = os.path.join(agent_file, 'eval_bg/')
+        for i, key in enumerate(dict.keys()):
+            file_name_or = f'streamline_{key}_line_trajectories.pkl'
+            path_trajectories = os.path.join(agent_file, 'eval_bg/streamlines/', file_name_or)
+            with open(path_trajectories, 'rb') as f:
+                trajectories = pickle.load(f)
+            path = trajectories['path']
+            ax.plot(path[:, 0], path[:, 1], label=f'{key}', color=colors[i], linewidth=1)
+            for traj_key, trajectory in trajectories.items():
+                if traj_key != 'path':
+                    plot_trajectories(ax, trajectory, path, title='streamlines', color_id=i)
+        ax.plot(path[:, 0], path[:, 1], color='black', linewidth=2)
+        ax.set_ylim([-0.5, 0.5])
+        ax.set_aspect('equal')
+        ax.legend()
+        path_save_comparison = os.path.join(save_path_eval, f'comparison_streamlines')
+        fig.savefig(path_save_comparison, dpi=300, bbox_inches='tight')
+        plt.close(fig)
     
     
     

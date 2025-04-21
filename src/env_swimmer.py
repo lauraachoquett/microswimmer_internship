@@ -2,8 +2,8 @@ import gymnasium as gym
 import numpy as np
 from invariant_state import *
 from distance_to_path import min_dist_closest_point
-from sde import solver
-
+from src.simulation import solver
+import torch 
 class MicroSwimmer(gym.Env):
     def __init__(self,x_0,C,Dt,velocity_bool,n_lookahead=5,seed =None):
         super(MicroSwimmer,self).__init__()
@@ -30,8 +30,8 @@ class MicroSwimmer(gym.Env):
         self.id_cp = 0
         self.d_cp = 0
         self.velocity_bool =velocity_bool
-        self.seed = seed
-        self.rng = np.random.default_rng(seed) 
+        self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
 
 
 
@@ -53,13 +53,13 @@ class MicroSwimmer(gym.Env):
                 lookahead.append(path[idx])
             lookahead_local = [coordinate_in_path_ref(p_cp, self.dir_path, p) for p in lookahead]
             if self.velocity_bool: 
-                return np.concatenate((s.reshape(1,2),v_local_path.reshape(1,2),np.array(lookahead_local)),axis=0)
+               return  np.concatenate((s.reshape(1,2),v_local_path.reshape(1,2),np.array(lookahead_local)),axis=0)
             else : 
-                return np.concatenate((s.reshape(1,2).reshape(1,2),np.array(lookahead_local)),axis=0)
+               return  np.concatenate((s.reshape(1,2).reshape(1,2),np.array(lookahead_local)),axis=0)
         if self.velocity_bool: 
-            return np.concatenate((s.reshape(1,2),v_local_path.reshape(1,2)),axis=0)
+           return np.concatenate((s.reshape(1,2),v_local_path.reshape(1,2)),axis=0)
         else : 
-            return np.concatenate((s.reshape(1,2).reshape(1,2)),axis=0)
+           return  np.concatenate((s.reshape(1,2).reshape(1,2)),axis=0)
 
     
     def reward(self,x_target,beta):
@@ -70,11 +70,11 @@ class MicroSwimmer(gym.Env):
         rew =  rew_t + rew_d + rew_target
         return rew_t,rew_d,rew_target,rew
     
-    def step(self,action,tree,path,x_target,beta,D=0.1,u_bg=np.zeros(2),threshold=0.2):
+    def step(self,action,tree,path,x_target,beta,D=0.1,u_bg=np.zeros(2),threshold=0.2,rng=None):
         rew_t,rew_d,rew_tar,rew= self.reward(x_target,beta)
         self.previous_x=self.x
         action_global_ref = coordinate_in_global_ref(np.zeros(2),self.dir_path,action)
-        self.x = solver(x=self.x,U=self.U,p=action_global_ref,Dt=self.Dt,D=D,u_bg=u_bg,rng=self.rng)
+        self.x = solver(x=self.x,U=self.U,p=action_global_ref,Dt=self.Dt,D=D,u_bg=u_bg,rng=rng)
         next_state = self.state(tree,path)
         done = False
         d = np.linalg.norm(self.x-x_target)

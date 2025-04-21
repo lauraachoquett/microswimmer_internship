@@ -9,7 +9,8 @@ colors = plt.cm.tab10.colors
 from generate_path import generate_curve
 from plot import plot_trajectories
 import copy
-def evaluate_agent(agent,env,eval_episodes,config,save_path_result_fig,file_name,random_parameters,list_of_path_tree=None,title='',plot=True,parameters=[],plot_background=False):
+
+def evaluate_agent(agent,env,eval_episodes,config,save_path_result_fig,file_name,random_parameters,list_of_path_tree=None,title='',plot=True,parameters=[],plot_background=False,rng = None):
     config = copy.deepcopy(config)
     parameters = copy.deepcopy(parameters)
     rewards_per_episode = []
@@ -82,7 +83,7 @@ def evaluate_agent(agent,env,eval_episodes,config,save_path_result_fig,file_name
         if config['rankine_bg']:
             u_bg = rankine_vortex(x,a,center,cir)
 
-        next_state,reward,done,info = env.step(action,tree,path,p_target,beta,D,u_bg,threshold)
+        next_state,reward,done,info = env.step(action,tree,path,p_target,beta,D,u_bg,threshold,rng)
         
         x= info['x']
         episode_rew_t += info['rew_t']
