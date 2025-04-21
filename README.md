@@ -4,10 +4,10 @@ This project uses a Deep Reinforcement Learning algorithm (TD3) to control a mic
 
 The hyperparameters used in this project are as follows : 
 
-### 1. **Stochastic Dynamics** : 
-$$ 
-\mathbf{\dot{X}} = U \cdot \mathbf{P} + \mathbf{u}(\mathbf{X}) + \sqrt{D} \cdot \boldsymbol{\xi}
-$$ 
+### 1. **Stochastic Dynamics** :
+<div align="center">
+<img src="fig/sde.jpeg" alt="Policy Streamlines" width="200"/>
+</div>
 
 - $U = 1$: Speed magnitude  
 - $\mathbf{P}$: Direction (action predicted by the agent)  
@@ -17,10 +17,10 @@ $$
 
 ### 2. **Numerical Integration** : 
 We simulate the dynamics using an Euler–Maruyama scheme:
+<div align="center">
+<img src="fig/integration.jpeg" alt="Policy Streamlines" width="600"/>
+</div>
 
-$$ 
-\forall t \geq 1, \qquad \mathbf{X}_t = \mathbf{X}_{t-1} + U   \cdot \mathbf{P}_{t-1} \cdot \Delta t_{sim} + \mathbf{u}(\mathbf{X}_{t-1})  \cdot  \Delta t_{sim}  + \sqrt{D\Delta t_{sim}} \cdot \mathbf{\xi}
-$$ 
 * The time between each action is chosen to be able to follow a certain curvature : $\Delta t_{a} = \frac{1}{\kappa \cdot U}$ and the simulation time step is derived as : $\Delta t_{sim} = 5 \cdot \Delta t_{a}$
 * $a$ is the accuracy wanted, thus the threshold is $\delta = a\cdot L$. With L the typical lenght of the path.
 * $D \ll \frac{\delta^2}{\Delta t_a}$
@@ -70,13 +70,10 @@ To enhance robustness, training can include different types of background flows:
     f the Rankine vortex, expressed in terms of the cylindrical coordinate system 
     $(r, \theta, z)$, 
     are given by :
-    $$
-    v_r = 0, \quad v_\theta(r) = \frac{\Gamma}{2\pi} \begin{cases}
-    \frac{r}{a^2}, & r \leq a, \\
-    \frac{1}{r}, & r > a,
-    \end{cases}
-    \quad v_z = 0
-    $$
+    <div align="center">
+    <img src="fig/Rankine.jpeg" alt="Policy Streamlines" width="300"/>
+    </div>
+
 ### Path Variants 
 - Straight line  
 - Semi-circle  
