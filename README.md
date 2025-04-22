@@ -95,27 +95,27 @@ The parameters of the background flow are randomly sampled at the beginning of e
 
 - **Uniform flow**:
   - Direction vector $\,\mathbf{d} \in \mathbb{R}^2\,$ is sampled uniformly:
-    $$
+    $
     \mathbf{d} \sim \mathcal{U}([-1,1]^2), \quad \mathbf{d} \leftarrow \frac{\mathbf{d}}{\|\mathbf{d}\|}
-    $$
+    $
   - Norm of the velocity:
-    $$
+    $
     \|\mathbf{u}\| \sim \mathcal{U}(0, 0.6)
-    $$
+    $
 
 - **Rankine vortex**:
   - Center of the vortex $\,\mathbf{c} = (x_c, y_c)\,$ is sampled as:
-    $$
+    $
     x_c \sim \mathcal{U}(0, 2), \quad y_c \sim \mathcal{U}(0, 1)
-    $$
+    $
   - Core radius:
-    $$
+    $
     a \sim \mathcal{U}(0, 1)
-    $$
+    $
   - Circulation (positive or negative):
-    $$
+    $
     \Gamma \sim \mathcal{U}(-1, 1)
-    $$
+    $
 
 The function `random_bg_parameters()` returns these five values:
 ```python
@@ -167,11 +167,11 @@ rank_agents_by_rewards(results)
 ## 📉 Preliminary result 
 ### Velocity in the state
 <div align="center">
-<img src="agents/agent_TD3_2025-04-18_16-15/eval_bg/eval_with_west_05_ondulating.png" alt="reward per training" width="500"/>
-<img src="agents/agent_TD3_2025-04-18_13-33/eval_bg/eval_with_west_05_ondulating.png" alt="reward per training" width="550"/>
+<img src="fig/readme_fig/04-18_16-15_eval_with_west_05_ondulating.png" alt="reward per training" width="500"/>
+<img src="fig/readme_fig/04-18_13-33_eval_with_west_05_ondulating.png" alt="reward per training" width="550"/>
 </div>
 
-<p align="center"><i>Figure 3 — Left : Velocity not includes in the state. Right : Velocity includes in the states.</i></p>
+<p align="center"><i>Figure 3 — Left : Velocity not includes in the state. Right : Velocity includes in the state.</i></p>
 
 **Comments on the inclusion of velocity in the state** :
 Adding velocity to state representation increase the robustness to varying background flow as shown in the illustrating example of the Figure 3. 
@@ -188,7 +188,7 @@ With velocity includes in the state :
 | -6.584                 |  True              | Varying Curve | 10          | 04-18_13-33  |
 | -6.585                 |  True              | Varying Curve | 10          | 04-18_12-51  |                                                            
 | -6.606                 |  True              | Circle        | 5           | 04-15_14-19  |                                                                
-| -6.659                 |  True              | Varying Curve | 5           |04-17_14-27   |                                                                
+| -6.659                 |  True              | Varying Curve | 5           | 04-17_14-27  |                                                                
 
 **Comments on returns** : 
 The best agents have very similar returns acorss the different scenarios presented in the evaluation. Increasing the lookahead points and introducing varying background flow appear to stabilize the agents' performance . Using the same path across all episodes does not decrease the performance during the evaluation. 
@@ -197,16 +197,16 @@ The best agents have very similar returns acorss the different scenarios present
 
 Training on **circle**  : 
 <p align="center">
-  <img src="agents/agent_TD3_2025-04-15_14-19/eval_bg/streamlines/streamline_free_line.png" width="500"/>
-  <img src="agents/agent_TD3_2025-04-14_15-15/eval_bg/streamlines/streamline_free_line.png" width="500"/>
-  <img src="agents/agent_TD3_2025-04-11_16-37/eval_bg/streamlines/streamline_free_line.png" width="500"/>
+  <img src="fig/readme_fig/04-15_14-19_streamline_free_line.png" width="500"/>
+  <img src="fig/readme_fig/04-14_15-15_streamline_free_line.png" width="500"/>
+  <img src="fig/readme_fig/04-11_16-37_streamline_free_line.png" width="500"/>
 </p>
 
 Training on **varying curve** : 
 <p align="center">
-  <img src="agents/agent_TD3_2025-04-18_13-33/eval_bg/streamlines/streamline_free_line.png" width="500"/>
-  <img src="agents/agent_TD3_2025-04-18_12-51/eval_bg/streamlines/streamline_free_line.png" width="500"/>
-  <img src="agents/agent_TD3_2025-04-17_14-27/eval_bg/streamlines/streamline_free_line.png" width="500"/>
+  <img src="fig/readme_fig/04-18_13-33_streamline_free_line.png" width="500"/>
+  <img src="fig/readme_fig/04-18_12-51_streamline_free_line.png" width="500"/>
+  <img src="fig/readme_fig/04-17_14-27_streamline_free_line.png" width="500"/>
 </p>
 <p align="center"><i>Figure 3 — Left : 3. Right : 4.</i></p>
 
