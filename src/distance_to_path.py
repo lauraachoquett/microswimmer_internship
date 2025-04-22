@@ -1,5 +1,5 @@
-from generate_path import generate_simple_line
-from simulation import *
+from .generate_path import generate_simple_line
+from .simulation import *
 import time
 colors = plt.cm.tab10.colors
 from scipy.spatial import KDTree
@@ -9,23 +9,26 @@ def min_dist_closest_point(x,tree):
     return dist, idx
 
 
-def distance_to_path(tree,nb_steps,t_init,t_end,U=1,p = np.ones(2),x_0 = np.zeros(2)):
-    D=0.1
+def distance_to_path(tree, nb_steps, t_init, t_end, U=1, p=np.ones(2), x_0=np.zeros(2), device="cpu"):
+    D = 0.1
+    Dt = (t_end - t_init) / nb_steps
 
-    Dt = (t_end-t_init)/nb_steps
+    traj = [x_0]
+    distances = []
 
-    traj = np.zeros((nb_steps,2))
-    distances = np.zeros((nb_steps,2))
-    traj[0] = x_0
+    x = x_0.copy()
+    for n in range(nb_steps):
+        d, _ = min_dist_closest_point(x, tree)
+        distances.append(d)
 
+        if n < nb_steps - 1:
+            x = solver(x, U, p, Dt, D)
+            traj.append(x)
 
+    traj = np.array(traj)
+    distances = np.array(distances)
 
-    for n in range(nb_steps-1) : 
-        traj[n+1] = solver(traj[n],U,p,Dt,D)
-        distances[n],_= min_dist_closest_point(traj[n],tree)
-    distances[-1],_ = min_dist_closest_point(traj[-1],tree)
-
-    return traj,distances
+    return traj, distances
 
 def plot_distances(nb_steps,t_init,t_end,nb_points_path,nb_sims):
     p_target = np.ones(2)

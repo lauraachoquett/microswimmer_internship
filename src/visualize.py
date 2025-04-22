@@ -1,13 +1,13 @@
-from evaluate_agent import evaluate_agent
+from .evaluate_agent import evaluate_agent
 import os
 import numpy as np
 import matplotlib.pyplot as plt
 colors = plt.cm.tab10.colors
-from generate_path import generate_curve,generate_demi_circle_path,generate_random_ondulating_path,generate_simple_line
+from .generate_path import generate_curve,generate_demi_circle_path,generate_random_ondulating_path,generate_simple_line
 from scipy.spatial import KDTree
-from plot import plot_background_velocity
-from env_swimmer import MicroSwimmer
-from plot import plot_trajectories
+from .plot import plot_background_velocity
+from .env_swimmer import MicroSwimmer
+from .plot import plot_trajectories
 import pickle
 from statistics import mean,stdev
 import copy  
@@ -163,7 +163,8 @@ def visualize_streamline(agent,config_eval,file_name_or,save_path_eval,type='',t
     trajectories = {}
     config_eval_v = copy.deepcopy(config_eval)
     if type == 'line':
-        p_target = config_eval_v['p_target']/4
+        config_eval_v['p_target'] = config_eval_v['p_target']/4
+        p_target = config_eval_v['p_target']
     else : 
         p_target = config_eval_v['p_target']
     p_0 = config_eval_v['p_0']
@@ -200,7 +201,6 @@ def visualize_streamline(agent,config_eval,file_name_or,save_path_eval,type='',t
     path_below_point = path_below_point[:-1]
     path_starting_point = np.concatenate((path_above_point,path_below_point),axis=0)
     file_name_or += title
-    path_save_fig = os.path.join(save_path_streamline, file_name_or)
     fig, ax = plt.subplots(figsize=(10, 8))
     ax.plot(path[:, 0], path[:, 1], label='path', color='black', linewidth=2,zorder=10)
     
@@ -223,7 +223,9 @@ def visualize_streamline(agent,config_eval,file_name_or,save_path_eval,type='',t
                                             )
         trajectories[f'{starting_point}'] = states_list_per_episode
         plot_trajectories(ax, states_list_per_episode, path, title='streamlines')
-    pkl_save_path = os.path.join(save_path_streamline, f"{file_name_or}_trajectories.pkl")
+    pkl_save_directory = os.path.join(save_path_streamline, type)
+    os.makedirs(pkl_save_directory,exist_ok=True)
+    pkl_save_path = os.path.join(pkl_save_directory,f"{file_name_or}_trajectories.pkl")
     with open(pkl_save_path, 'wb') as f:
         pickle.dump(trajectories, f)
        
@@ -250,6 +252,9 @@ def visualize_streamline(agent,config_eval,file_name_or,save_path_eval,type='',t
         center,a,cir = parameters
         type='rankine'
         plot_background_velocity(type,x_bound,y_bound,a=a,center=center,cir=cir)
+    directory_fig = os.path.join(save_path_streamline,type)
+    os.makedirs(directory_fig,exist_ok=True)
+    path_save_fig = os.path.join(directory_fig,file_name_or+'.png')
     fig.savefig(path_save_fig, dpi=200, bbox_inches='tight')
     plt.close(fig)
 
@@ -257,22 +262,26 @@ def visualize_streamline(agent,config_eval,file_name_or,save_path_eval,type='',t
 
 
 if __name__ == '__main__':
-    
-    agent_file_2 = 'agents/agent_TD3_2025-04-17_09-56'
-    agent_file_3 =  "agents/agent_TD3_2025-04-15_14-19"
-    agent_file_4 =  "agents/agent_TD3_2025-04-17_14-27"
-    agent_file_5 = "agents/agent_TD3_2025-04-17_13-28"
-    agent_file_6 = "agents/agent_TD3_2025-04-16_11-12"
-    # agent_file_13 = ''
-    agents_files = ['agents/retrained/agent_TD3_2025-04-10_11-26']
+    agent_file_1 = 'agents/agent_TD3_2025-04-22_11-28'
+    agent_file_3 = 'agents/agent_TD3_2025-04-22_11-36'
+    agent_file_4 = "agents/agent_TD3_2025-04-22_11-44"
+    agent_file_5 = "agents/agent_TD3_2025-04-22_11-54"
+    agent_file_6 =  "agents/agent_TD3_2025-04-22_12-04"
+    agent_file_7 =  "agents/agent_TD3_2025-04-22_12-12"
+    agent_file_7 =  "agents/agent_TD3_2025-04-22_12-23"
+    agent_file_7 =  "agents/agent_TD3_2025-04-22_12-31"
+    agent_file_7 =  "agents/agent_TD3_2025-04-22_12-41"
+    agent_file_7 =  "agents/agent_TD3_2025-04-22_12-50"
+
+    agents_file = [agent_file_1,agent_file_3,agent_file_4,agent_file_5,agent_file_6,agent_file_7]
     dict = {
         'free' : np.array([0,0]),
         'east_02': np.array([1,0]),
         'west_02': np.array([-1,0]),
-        # 'north_05': np.array([0,1]),
-        # 'south_05': np.array([0,-1]),
+        'north_05': np.array([0,1]),
+        'south_05': np.array([0,-1]),
     }
-    for agent_file in agents_files:
+    for agent_file in agents_file:
         fig, ax = plt.subplots(figsize=(8, 5))
         save_path_eval = os.path.join(agent_file, 'eval_bg/')
         for i, key in enumerate(dict.keys()):

@@ -6,7 +6,7 @@ The hyperparameters used in this project are as follows :
 
 ### 1. **Stochastic Dynamics** :
 <div align="center">
-<img src="fig/sde.jpeg" alt="Policy Streamlines" width="200"/>
+<img src="fig/readme_fig/sde.jpeg" alt="Policy Streamlines" width="200"/>
 </div>
 
 
@@ -20,7 +20,7 @@ The hyperparameters used in this project are as follows :
 ### 2. **Numerical Integration** : 
 We simulate the dynamics using an Euler–Maruyama scheme:
 <div align="center">
-<img src="fig/integration.jpeg" alt="Policy Streamlines" width="600"/>
+<img src="fig/readme_fig/integration.jpeg" alt="Policy Streamlines" width="600"/>
 </div>
 
 * The time between each action is chosen to be able to follow a certain curvature : $\Delta t_{a} = \frac{1}{\kappa \cdot U}$ and the simulation time step is derived as : $\Delta t_{sim} = 5 \cdot \Delta t_{a}$
@@ -36,7 +36,7 @@ We simulate the dynamics using an Euler–Maruyama scheme:
 * Policy update frequency : 5
 
 ## 🤖 Reinforcement Learning : 
-<img src="fig/Agent_state.drawio.svg" alt="Policy Streamlines" width="400"/>
+<img src="fig/readme_fig/Agent_state.drawio.svg" alt="Policy Streamlines" width="400"/>
 <p align="center"><i>Figure 1</i></p>
 
 ### State Space
@@ -74,7 +74,7 @@ To enhance robustness, training can include different types of background flows:
     $(r, \theta, z)$, 
     are given by :
     <div align="center">
-    <img src="fig/Rankine.jpeg" alt="Policy Streamlines" width="300"/>
+    <img src="fig/readme_fig/Rankine.jpeg" alt="Policy Streamlines" width="300"/>
     </div>
 
 
@@ -85,7 +85,7 @@ To enhance robustness, training can include different types of background flows:
 - Curves with varying curvature  
 <div align="center">
 
-<img src="fig/smooth_curve.png" width="600"/>
+<img src="fig/readme_fig/smooth_curve.png" width="600"/>
 
 <i>Figure 2 — Left : curvature of the curve along epsiode. Right : Example of curve between episode 100 and 120</i>
 </div>
@@ -95,7 +95,7 @@ The parameters of the background flow are randomly sampled at the beginning of e
 
 - **Uniform flow**:
   - Direction vector $\,\mathbf{d} \in \mathbb{R}^2\,$ is sampled uniformly:
-    $\mathbf{d} \sim \mathcal{U}([-1,1]^2), \quad \mathbf{d}$ and normalized
+    $\mathbf{d} \sim \mathcal{U}([-1,1]^2)$ and normalized
   - Norm of the velocity:
     $\|\mathbf{u}\| \sim \mathcal{U}(0, 0.6)$
 
@@ -195,7 +195,6 @@ Training on **varying curve** :
   <img src="fig/readme_fig/04-18_12-51_streamline_free_line.png" width="500"/>
   <img src="fig/readme_fig/04-17_14-27_streamline_free_line.png" width="500"/>
 </p>
-<p align="center"><i>Figure 3 — Left : 3. Right : 4.</i></p>
 
 **Comments on streamlines** : 
 Training with non-symmetrical paths introduces a bias in the policy's action, which can be observed when visualizing the streamline across differents starting points along a straight line. 

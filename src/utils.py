@@ -62,10 +62,23 @@ def courbures(path):
 
     return courbure
 
+def to_tensor(x, device='cpu', dtype=torch.float32):
+    if isinstance(x, np.ndarray):
+        x=x.copy()
+        return torch.from_numpy(x).to(device=device, dtype=dtype)
+    elif isinstance(x, (float, int)):
+        x=x.copy()
+        return torch.tensor(x, device=device, dtype=dtype)
+    elif isinstance(x, torch.Tensor):
+        return x.to(device=device, dtype=dtype)
+    else:
+        raise TypeError(f"Unsupported type {type(x)} for conversion to torch.Tensor.")
 
-def mirror(vec):
-	mirrored = vec.clone()
-	mirrored[0] = mirrored[0]  
-	mirrored[1] = -mirrored[1]  
-	return mirrored
 
+def to_numpy(x):
+    if isinstance(x, torch.Tensor):
+        return x.detach().cpu().numpy()
+    elif isinstance(x, (float, int, np.ndarray)):
+        return np.array(x)
+    else:
+        raise TypeError(f"Unsupported type {type(x)} for conversion to numpy.")

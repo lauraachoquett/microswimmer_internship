@@ -1,8 +1,8 @@
 import numpy as np
 import matplotlib.pyplot as plt
 colors = plt.cm.tab10.colors
-from generate_path import generate_curve,generate_demi_circle_path,generate_random_ondulating_path
-from simulation import rankine_vortex,uniform_velocity
+from .generate_path import generate_curve,generate_demi_circle_path,generate_random_ondulating_path
+from .simulation import rankine_vortex,uniform_velocity
 
 def plot_trajectories(ax,trajectories_list,path,title,a=0,center=np.zeros(2),cir=0,dir=np.zeros(2),norm=0,plot_background=False,type='',color_id=0):
     if isinstance(trajectories_list[0][0],np.ndarray): 

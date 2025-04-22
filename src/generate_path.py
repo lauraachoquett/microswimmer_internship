@@ -2,7 +2,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 from math import atan2,pi,exp,cos
 from scipy.interpolate import CubicSpline
-from utils import courbures
+from .utils import courbures
 
 
 def generate_simple_line(p_0,p_target,nb_points):
