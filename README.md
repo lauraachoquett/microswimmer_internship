@@ -101,8 +101,8 @@ The parameters of the background flow are randomly sampled at the beginning of e
 
 - **Rankine vortex**:
   - Center of the vortex $\,\mathbf{c} = (x_c, y_c)\,$ is sampled as:$x_c \sim \mathcal{U}(0, 2), \quad y_c \sim \mathcal{U}(0, 1)$
-  - Core radius:$a \sim \mathcal{U}(0, 1)$
-  - Circulation (positive or negative):$\Gamma \sim \mathcal{U}(-1, 1)$
+  - Core radius: $a \sim \mathcal{U}(0, 1)$
+  - Circulation (positive or negative): $\Gamma \sim \mathcal{U}(-1, 1)$
 
 The function `random_bg_parameters()` returns these five values:
 ```python
