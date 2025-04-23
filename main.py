@@ -358,5 +358,7 @@ if __name__ == "__main__":
         "velocity_bool": True,  # Add the velocity in the state or not
         "n_lookahead": 10,  # Number of points in the lookahead
     }
-    for i in range(1):
+    beta_values = np.linspace(0.5,5,10)
+    for beta in beta_values:
+        config['beta']=beta
         run_expe(config)

@@ -126,22 +126,23 @@ def evaluate_after_training(
             "velocity_bool": config_eval["velocity_bool"],
             "load_model": config_eval["load_model"],
             "n_lookahead": config_eval["n_lookahead"],
+            "beta":config_eval['beta']
         }
-        # if agent_name in results.keys():
-        #     results[agent_name]['training type'] = training_type
-        #     print(f"Agent {agent_name} already evaluated.")
-        #     continue
+        if agent_name in results.keys():
+            results[agent_name]['training type'] = training_type
+            print(f"Agent {agent_name} already evaluated.")
+            continue
         print("Agent name : ", agent_name)
         config_eval["uniform_bg"] = uniform_bg
         config_eval["rankine_bg"] = rankine_bg
         config_eval["random_curve"] = False
+        config_eval["beta"] = 0.25
 
         Dt_action = config_eval["Dt_action"]
         steps_per_action = config_eval["steps_per_action"]
         Dt_sim = Dt_action / steps_per_action
         threshold = config_eval["threshold"]
 
-        # print("Curvature max du chemin : ", format_sci(np.max(courbures(path))))
         config_eval["path"] = path
         config_eval["tree"] = tree
         env = MicroSwimmer(
@@ -437,11 +438,6 @@ def initialize_parameters(agent_file, p_target, p_0):
     path_config = os.path.join(agent_file, "config.pkl")
     with open(path_config, "rb") as f:
         config = pickle.load(f)
-    # print("Training with rankine bg : ", config['rankine_bg'])
-    # print("Training with uniform bg : ", config['uniform_bg'])
-    # print("Training with random curve :", config['random_curve'] if 'random_curve' in config else "False")
-    # print("Training with velocity in its state :", config['velocity_bool'] if 'velocity_bool' in config else "False")
-    # print("Retrained on : ",config['load_model'])
     config_eval = copy.deepcopy(config)
     config_eval["random_curve"] = (
         config["random_curve"] if "random_curve" in config else False
@@ -455,7 +451,6 @@ def initialize_parameters(agent_file, p_target, p_0):
     config_eval["velocity_bool"] = (
         config["velocity_bool"] if "velocity_bool" in config else False
     )
-    config_eval["beta"] = 0.25
     config_eval["Dt_action"] = (
         config_eval["Dt_action"] if "Dt_action" in config else 1 / 30
     )
@@ -480,41 +475,18 @@ if __name__ == "__main__":
     # offset=0.2
     # compare_p_line(agent_name,config_eval_comp,'comparison_north_02',save_path_eval,u_bg,'',offset)
 
-    agent_file_1 = "agents/agent_TD3_2025-04-22_11-28"
-    agent_file_3 = "agents/agent_TD3_2025-04-22_11-36"
-    agent_file_4 = "agents/agent_TD3_2025-04-22_11-44"
-    agent_file_5 = "agents/agent_TD3_2025-04-22_11-54"
-    agent_file_6 = "agents/agent_TD3_2025-04-22_12-04"
-    agent_file_7 = "agents/agent_TD3_2025-04-22_12-13"
-    agent_file_8 = "agents/agent_TD3_2025-04-22_12-23"
-    agent_file_9 = "agents/agent_TD3_2025-04-22_12-31"
-    agent_file_10 = "agents/agent_TD3_2025-04-22_12-41"
-    agent_file_11 = "agents/agent_TD3_2025-04-22_12-50"
 
-    agents_file = [
-        agent_file_1,
-        agent_file_3,
-        agent_file_4,
-        agent_file_5,
-        agent_file_6,
-        agent_file_7,
-        agent_file_8,
-        agent_file_9,
-        agent_file_10,
-        agent_file_11,
-    ]
+    agents_file = []
 
-    # directory_path = Path("agents/")
+    directory_path = Path("agents/")
 
-    # for item in directory_path.iterdir():
-    #     if item.is_dir() and "agent_TD3" in item.name :
-    #         #if '2025-04-17_14-27' not in item.name:
-    #         agents_file.append(os.path.join(directory_path, item.name))
+    for item in directory_path.iterdir():
+        if item.is_dir() and "agent_TD3" in item.name :
+            if '2025-04-23' in item.name or '2025-04-22' in item.name:
+                agents_file.append(os.path.join(directory_path, item.name))
 
     print("Agents files : ", agents_file)
-    # types = ['line','curve_minus','curve_plus','ondulating','circle']
-    # agents_file = ['agents/retrained/agent_TD3_2025-04-10_11-26']
-    types = ["ondulating"]
+    types = ["ondulating","line",'curve_minus','curve_plus']
     print("---------------------Evaluation with no bg---------------------")
     title_add = "free"
     for type in types:
@@ -528,18 +500,18 @@ if __name__ == "__main__":
         )
         rank_agents_by_rewards(results)
 
-    # norm=0.5
-    # dict = {
-    #     'east_05': np.array([1,0]),
-    #     'west_05': np.array([-1,0]),
-    #     'north_05': np.array([0,1]),
-    #     'south_05': np.array([0,-1]),
-    # }
-    # print("---------------------Evaluation with uniform bg---------------------")
-    # for type in types:
-    #     for title_add,dir in dict.items():
-    #         results = evaluate_after_training(agents_file,f'result_evaluation_{title_add}_{type}.json',type=type,p_target = [2,0],p_0 = [0,0],title_add=title_add,dir=dir,norm=norm)
-    #         rank_agents_by_rewards(results)
+    norm=0.5
+    dict = {
+        'east_05': np.array([1,0]),
+        'west_05': np.array([-1,0]),
+        'north_05': np.array([0,1]),
+        'south_05': np.array([0,-1]),
+    }
+    print("---------------------Evaluation with uniform bg---------------------")
+    for type in types:
+        for title_add,dir in dict.items():
+            results = evaluate_after_training(agents_file,f'result_evaluation_{title_add}_{type}.json',type=type,p_target = [2,0],p_0 = [0,0],title_add=title_add,dir=dir,norm=norm)
+            rank_agents_by_rewards(results)
 
     # title_add = 'rankine_a_05__cir_3_center_1_075'
     # print("---------------------Evaluation with rankine bg---------------------")

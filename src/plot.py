@@ -1,7 +1,7 @@
 import matplotlib.pyplot as plt
 import numpy as np
 
-colors = plt.cm.tab10.colors
+colors_default=plt.cm.tab10.colors
 from .generate_path import (generate_curve, generate_demi_circle_path,
                             generate_random_ondulating_path)
 from .simulation import rankine_vortex, uniform_velocity
@@ -20,7 +20,11 @@ def plot_trajectories(
     plot_background=False,
     type="",
     color_id=0,
+    colors=plt.cm.tab10.colors,
+    label=''
 ):
+    if colors is None:
+        colors= colors_default
     if isinstance(trajectories_list[0][0], np.ndarray):
         for idx, list_state in enumerate(trajectories_list):
             """indices = np.linspace(0, len(path) - 1, list_state[1]).astype(int)
@@ -30,13 +34,14 @@ def plot_trajectories(
             states = list_state[0]
 
             color_id_t = max(idx, color_id)
-            ax.plot(states[:, 0], states[:, 1], color=colors[color_id_t])
+            ax.plot(states[:, 0], states[:, 1], color=colors[color_id_t],linewidth = 0.9,label=label)
             ax.scatter(states[-1, 0], states[-1, 1], color=colors[color_id_t], s=5)
             ax.scatter(states[0, 0], states[0, 1], color=colors[color_id_t], s=5)
+            ax.set_aspect("equal")
     else:
         states = trajectories_list
         color_id_t = color_id
-        ax.plot(states[:, 0], states[:, 1], color=colors[color_id_t])
+        ax.plot(states[:, 0], states[:, 1], color=colors[color_id_t],linewidth = 0.9,label=label)
         ax.scatter(states[-1, 0], states[-1, 1], color=colors[color_id_t], s=5)
         ax.scatter(states[0, 0], states[0, 1], color=colors[color_id_t], s=5)
         ax.set_aspect("equal")
@@ -57,11 +62,11 @@ def plot_trajectories(
 
 
 def plot_action(path, x, p_0, id_cp, action, id):
-    plt.scatter(x[0], x[1], color=colors[id % 10])
+    plt.scatter(x[0], x[1], color=colors_default[id % 10])
     plt.annotate(
         f"{id}", xy=(x[0], x[1]), xytext=(x[0], x[1] + 1 / (64 * 20))  # texte en LaTeX
     )
-    plt.scatter(path[id_cp, 0], path[id_cp, 1], color=colors[id % 10], marker="*")
+    plt.scatter(path[id_cp, 0], path[id_cp, 1], color=colors_default[id % 10], marker="*")
     plt.quiver(x[0], x[1], action[0], action[1], scale=20, width=0.005, color="grey")
     plt.xlabel("x")
     plt.ylabel("y")

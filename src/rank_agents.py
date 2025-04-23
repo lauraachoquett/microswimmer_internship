@@ -62,7 +62,7 @@ def rank_agents_by_rewards(results, print_stats=True):
     return agent_stats
 
 
-def merge_agent_stats(agent_stats_lists):
+def merge_agent_stats(agent_stats_lists,agents_file):
     merged_stats = defaultdict(
         lambda: {"mean_reward": 0, "mean_reward_t": 0, "mean_reward_d": 0, "count": 0}
     )
@@ -70,23 +70,15 @@ def merge_agent_stats(agent_stats_lists):
     for agent_stats in agent_stats_lists:
         for agent in agent_stats:
             name = agent["agent_name"]
-            if agent["training type"]["random_curve"] == True:
-                if (
-                    "04-16" in agent["agent_name"]
-                    or "04-17" in agent["agent_name"]
-                    or "04-18" in agent["agent_name"]
-                ):
-                    merged_stats[name]["training type"] = agent["training type"]
-                    merged_stats[name]["mean_reward"] += agent["mean_reward"]
-                    merged_stats[name]["mean_reward_t"] += agent["mean_reward_t"]
-                    merged_stats[name]["mean_reward_d"] += agent["mean_reward_d"]
-                    merged_stats[name]["count"] += 1
-            else:
+            if (
+                agent['agent_name'] in agents_file
+            ):
                 merged_stats[name]["training type"] = agent["training type"]
                 merged_stats[name]["mean_reward"] += agent["mean_reward"]
                 merged_stats[name]["mean_reward_t"] += agent["mean_reward_t"]
                 merged_stats[name]["mean_reward_d"] += agent["mean_reward_d"]
                 merged_stats[name]["count"] += 1
+        
 
     final_stats = []
     for name, stats in merged_stats.items():
@@ -104,19 +96,19 @@ def merge_agent_stats(agent_stats_lists):
     return final_stats
 
 
-def rank_agents_all_criterion(files_results):
+def rank_agents_all_criterion(files_results,agents_file):
     agent_stats_lists = []
     for results in files_results:
         with open(results, "r") as f:
             data = json.load(f)
         agent_stats = rank_agents_by_rewards(data, False)
         agent_stats_lists.append(agent_stats)
-    merged_stats = merge_agent_stats(agent_stats_lists)
+    merged_stats = merge_agent_stats(agent_stats_lists,agents_file)
 
     filtered_stats = [
         agent
         for agent in merged_stats
-        if (agent["count"] >= 20 and agent["mean_reward"] > -50)
+        if (agent["count"] >= 0 and agent["mean_reward"] > -50)
     ]
 
     filtered_stats = sorted(
@@ -131,44 +123,8 @@ def rank_agents_all_criterion(files_results):
     return filtered_stats
 
 
-if __name__ == "__main__":
-    types = ["ondulating", "curve_minus", "curve_plus", "line", "circle"]
-    file = "results_evaluation"
-    files_results = []
-    for type in types:
-        files_results.extend(
-            [
-                f"results_evaluation/result_evaluation_east_05_{type}.json",
-                f"results_evaluation/result_evaluation_west_05_{type}.json",
-                f"results_evaluation/result_evaluation_north_05_{type}.json",
-                f"results_evaluation/result_evaluation_south_05_ondulating.json",
-            ]
-        )
-        files_results.extend(
-            [
-                f"results_evaluation/result_evaluation_rankine_a_05__cir_3_center_1_075_{type}.json"
-            ]
-        )
-        files_results.extend([f"results_evaluation/result_evaluation_free_{type}.json"])
-    print("Overall ranking of agents:")
-    stats = rank_agents_all_criterion(files_results)
-    timestamp = datetime.now().strftime("%Y-%m-%d_%H")
-    save_rank_file = os.path.join(file, f"results_rank_overall_{timestamp}.json")
-    with open(save_rank_file, "w") as f:
-        json.dump(stats, f, indent=4)
-
-    import json
-
-    import matplotlib.pyplot as plt
-    import numpy as np
-    import pandas as pd
-
-    file_path = "results_evaluation/results_rank_overall_2025-04-18_15.json"
-    with open(file_path, "r") as f:
-        data = json.load(f)
-
+def analyze_and_visualize_agent_data(data, output_dir="./results_evaluation", fig_dir="./fig"):
     df = pd.json_normalize(data)
-
     training_columns = [
         col
         for col in df.columns
@@ -181,30 +137,29 @@ if __name__ == "__main__":
         axis=1,
     )
 
-    # Filter agents with random_curve = True
     random_curve_agents = df[
         df["training_type_str"].str.contains("random_curve=True", na=False)
     ]
-    agent_counts_file = "./results_evaluation/agent_random_curve.json"
-    os.makedirs(os.path.dirname(agent_counts_file), exist_ok=True)
-    random_curve_agents.to_json(agent_counts_file, orient="records", indent=4)
+    random_curve_file = os.path.join(output_dir, "agent_random_curve.json")
+    os.makedirs(os.path.dirname(random_curve_file), exist_ok=True)
+    random_curve_agents.to_json(random_curve_file, orient="records", indent=4)
 
-    # Count the number of agents per training type
     agent_counts = df["training_type_str"].value_counts().reset_index()
     agent_counts.columns = ["training_type", "agent_count"]
     print("Number of agents per training type:")
     print(agent_counts)
 
-    # Filter training types with more than 5 agents
+    agent_counts_file = os.path.join(output_dir, "agent_counts.json")
+    agent_counts.to_json(agent_counts_file, orient="records", indent=4)
+    print(f"Agent counts saved to {agent_counts_file}")
+
     filtered_training_types = agent_counts[agent_counts["agent_count"] >= 5][
         "training_type"
     ]
     df = df[df["training_type_str"].isin(filtered_training_types)]
 
     def format_training_type_label(training_type):
-        # Split the training type string into key-value pairs and format them
         label = training_type.split(", ")
-        print(label)
         if "False" in label[0] or "False" in label[1]:
             label_bis = ["Free"]
         else:
@@ -214,18 +169,9 @@ if __name__ == "__main__":
         else:
             label_bis.append("Circle")
         n = int(label[-1].split("=")[1])
-        label_bis.append(f"Lookahed (n={n})")
+        label_bis.append(f"Lookahead (n={n})")
         return "\n".join(label_bis)
 
-    # Save the agent counts to a file
-    agent_counts_file = "./results_evaluation/agent_counts.json"
-    os.makedirs(os.path.dirname(agent_counts_file), exist_ok=True)
-    agent_counts.to_json(agent_counts_file, orient="records", indent=4)
-    print(f"Agent counts saved to {agent_counts_file}")
-
-    grouped = df.groupby("training_type_str")
-
-    # On récupère juste les colonnes nécessaires
     df_melted = df.melt(
         id_vars=["training_type_str"],
         value_vars=["mean_reward", "mean_reward_t", "mean_reward_d"],
@@ -233,10 +179,8 @@ if __name__ == "__main__":
         value_name="reward",
     )
 
-    # On filtre les training types avec suffisamment d'agents (déjà fait avant)
     df_melted = df_melted[df_melted["training_type_str"].isin(filtered_training_types)]
 
-    # On mappe les noms des métriques pour les rendre plus lisibles
     df_melted["metric"] = df_melted["metric"].map(
         {
             "mean_reward": "Overall mean return",
@@ -286,4 +230,66 @@ if __name__ == "__main__":
     )
 
     plt.tight_layout(rect=[0, 0, 0.85, 1])
-    plt.savefig("./fig/return_per_training.png", dpi=300, bbox_inches="tight")
+    os.makedirs(fig_dir, exist_ok=True)
+    fig_path = os.path.join(fig_dir, "return_per_training.png")
+    plt.savefig(fig_path, dpi=300, bbox_inches="tight")
+    print(f"Figure saved to {fig_path}")
+    
+if __name__ == "__main__":
+    types = ["ondulating", "curve_minus", "curve_plus", "line", "circle"]
+    file = "results_evaluation"
+    files_results = []
+    for type in types:
+        files_results.extend(
+            [
+                f"results_evaluation/result_evaluation_east_05_{type}.json",
+                f"results_evaluation/result_evaluation_west_05_{type}.json",
+                f"results_evaluation/result_evaluation_north_05_{type}.json",
+                f"results_evaluation/result_evaluation_south_05_ondulating.json",
+            ]
+        )
+        files_results.extend(
+            [
+                f"results_evaluation/result_evaluation_rankine_a_05__cir_3_center_1_075_{type}.json"
+            ]
+        )
+        files_results.extend([f"results_evaluation/result_evaluation_free_{type}.json"])
+    print("Overall ranking of agents:")
+    
+    agent_file_1 = "agents/agent_TD3_2025-04-22_11-28"
+    agent_file_3 = "agents/agent_TD3_2025-04-22_11-36"
+    agent_file_4 = "agents/agent_TD3_2025-04-22_11-44"
+    agent_file_5 = "agents/agent_TD3_2025-04-22_11-54"
+    agent_file_6 = "agents/agent_TD3_2025-04-22_12-04"
+    agent_file_7 = "agents/agent_TD3_2025-04-22_12-13"
+    agent_file_8 = "agents/agent_TD3_2025-04-22_12-23"
+    agent_file_9 = "agents/agent_TD3_2025-04-22_12-31"
+    agent_file_10 = "agents/agent_TD3_2025-04-22_12-41"
+    agent_file_11 = "agents/agent_TD3_2025-04-22_12-50"
+
+    agents_file = [
+        agent_file_1,
+        agent_file_3,
+        agent_file_4,
+        agent_file_5,
+        agent_file_6,
+        agent_file_7,
+        agent_file_8,
+        agent_file_9,
+        agent_file_10,
+        agent_file_11,
+    ]
+    
+    stats = rank_agents_all_criterion(files_results,agents_file)
+    timestamp = datetime.now().strftime("%Y-%m-%d_%H")
+    save_rank_file = os.path.join(file, f"results_rank_overall_beta_values.json")
+    with open(save_rank_file, "w") as f:
+        json.dump(stats, f, indent=4)
+
+
+
+    file_path = "results_evaluation/results_rank_overall_2025-04-18_15.json"
+    with open(file_path, "r") as f:
+        data = json.load(f)
+        
+    #analyze_and_visualize_agent_data(data)
