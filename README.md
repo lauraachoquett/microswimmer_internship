@@ -63,7 +63,7 @@ Where:
 
 
 ## 🏊‍♂️ Training Protocol
-### Epsiode ending conditions
+### Episode ending conditions
 - Agent reaches target within threshold $\delta$
 - Episode time exceeds $t_{\text{max}}$
 ### Background Flow Configurations
@@ -82,7 +82,7 @@ To enhance robustness, training can include different types of background flows:
 - Straight line  
 - Semi-circle  
 - Sinusoidal (undulating) path  
-- Curves with varying curvature  
+- Curves with varying curvature
 <div align="center">
 
 <img src="fig/readme_fig/smooth_curve.png" width="600"/>
