@@ -25,7 +25,9 @@ def make_env(
 
 
 class MicroSwimmer(gym.Env):
-    def __init__(self, x_0, C, Dt, velocity_bool, n_lookahead=5, seed=None,bounce_thr=None):
+    def __init__(
+        self, x_0, C, Dt, velocity_bool, n_lookahead=5, seed=None, bounce_thr=None
+    ):
         super(MicroSwimmer, self).__init__()
         self.n_lookahead = n_lookahead
         self.action_space = gym.spaces.Box(
@@ -110,7 +112,16 @@ class MicroSwimmer(gym.Env):
         return rew_t, rew_d, rew_target, rew
 
     def step(
-        self, action, tree, path, x_target, beta, D=0.1, u_bg=np.zeros(2), threshold=0.2,sdf=None
+        self,
+        action,
+        tree,
+        path,
+        x_target,
+        beta,
+        D=0.1,
+        u_bg=np.zeros(2),
+        threshold=0.2,
+        sdf=None,
     ):
         rew_t, rew_d, rew_tar, rew = self.reward(x_target, beta)
         self.previous_x = self.x
@@ -124,7 +135,7 @@ class MicroSwimmer(gym.Env):
             u_bg=u_bg,
             rng=self.rng,
             bounce_thr=self.bounce_thr,
-            sdf=sdf
+            sdf=sdf,
         )
         next_state = self.state(tree, path)
         done = False

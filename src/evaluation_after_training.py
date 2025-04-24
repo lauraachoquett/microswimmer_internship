@@ -36,7 +36,6 @@ def format_sci(x):
 
 def evaluate_after_training(
     agent_files,
-    file_name_or,
     p_target,
     p_0,
     seed=42,
@@ -104,12 +103,13 @@ def evaluate_after_training(
     else:
         parameters = []
 
+    file_name_or =f'_{title_add}_{type}'
     file_path_result = "results_evaluation/"
     os.makedirs(file_path_result, exist_ok=True)
-    file_name = os.path.join(file_path_result, file_name_or)
+    file_name_result = os.path.join(file_path_result, 'result_evaluation'+file_name_or+".json")
 
     try:
-        with open(file_name, "r") as f:
+        with open(file_name_result, "r") as f:
             results = json.load(f)
     except FileNotFoundError:
         results = {}
@@ -126,10 +126,10 @@ def evaluate_after_training(
             "velocity_bool": config_eval["velocity_bool"],
             "load_model": config_eval["load_model"],
             "n_lookahead": config_eval["n_lookahead"],
-            "beta":config_eval['beta']
+            "beta": config_eval["beta"],
         }
         if agent_name in results.keys():
-            results[agent_name]['training type'] = training_type
+            results[agent_name]["training type"] = training_type
             print(f"Agent {agent_name} already evaluated.")
             continue
         print("Agent name : ", agent_name)
@@ -176,7 +176,7 @@ def evaluate_after_training(
             config_eval["eval_episodes"],
             config_eval,
             save_path_eval,
-            f"eval_with_{title_add}_{type}",
+            f"eval_with"+file_name_or,
             False,
             title="",
             plot=True,
@@ -203,7 +203,7 @@ def evaluate_after_training(
             visualize_streamline(
                 agent,
                 config_eval,
-                f"streamline_{title_add}_{type}",
+                f"streamline"+file_name_or,
                 save_path_eval,
                 type=type,
                 title="",
@@ -216,7 +216,7 @@ def evaluate_after_training(
             visualize_streamline(
                 agent,
                 config_eval,
-                f"streamline_{title_add}_{type}",
+                f"streamline"+file_name_or,
                 save_path_eval,
                 type=type,
                 title="",
@@ -225,8 +225,8 @@ def evaluate_after_training(
                 offset=0.2,
             )
 
-    file_name = os.path.join(file_path_result, file_name_or)
-    with open(file_name, "w") as f:
+    file_name_result = os.path.join(file_path_result, file_name_or)
+    with open(file_name_result, "w") as f:
         json.dump(results, f, indent=4)
 
     threshold = [0.07]
@@ -475,24 +475,22 @@ if __name__ == "__main__":
     # offset=0.2
     # compare_p_line(agent_name,config_eval_comp,'comparison_north_02',save_path_eval,u_bg,'',offset)
 
-
     agents_file = []
 
     directory_path = Path("agents/")
 
     for item in directory_path.iterdir():
-        if item.is_dir() and "agent_TD3" in item.name :
-            if '2025-04-23' in item.name or '2025-04-22' in item.name:
+        if item.is_dir() and "agent_TD3" in item.name:
+            if "2025-04-23" in item.name or "2025-04-22" in item.name:
                 agents_file.append(os.path.join(directory_path, item.name))
 
     print("Agents files : ", agents_file)
-    types = ["ondulating","line",'curve_minus','curve_plus']
+    types = ["ondulating", "line", "curve_minus", "curve_plus"]
     print("---------------------Evaluation with no bg---------------------")
     title_add = "free"
     for type in types:
         results = evaluate_after_training(
             agents_file,
-            f"result_evaluation_{title_add}_{type}.json",
             type=type,
             p_target=[2, 0],
             p_0=[0, 0],
@@ -500,17 +498,25 @@ if __name__ == "__main__":
         )
         rank_agents_by_rewards(results)
 
-    norm=0.5
+    norm = 0.5
     dict = {
-        'east_05': np.array([1,0]),
-        'west_05': np.array([-1,0]),
-        'north_05': np.array([0,1]),
-        'south_05': np.array([0,-1]),
+        "east_05": np.array([1, 0]),
+        "west_05": np.array([-1, 0]),
+        "north_05": np.array([0, 1]),
+        "south_05": np.array([0, -1]),
     }
     print("---------------------Evaluation with uniform bg---------------------")
     for type in types:
-        for title_add,dir in dict.items():
-            results = evaluate_after_training(agents_file,f'result_evaluation_{title_add}_{type}.json',type=type,p_target = [2,0],p_0 = [0,0],title_add=title_add,dir=dir,norm=norm)
+        for title_add, dir in dict.items():
+            results = evaluate_after_training(
+                agents_file,
+                type=type,
+                p_target=[2, 0],
+                p_0=[0, 0],
+                title_add=title_add,
+                dir=dir,
+                norm=norm,
+            )
             rank_agents_by_rewards(results)
 
     # title_add = 'rankine_a_05__cir_3_center_1_075'

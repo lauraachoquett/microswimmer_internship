@@ -298,6 +298,11 @@ def run_expe(config, agent_file="agents"):
     with open(file_reward_eval, "w") as f:
         json.dump(eval_list, f, indent=4)
 
+def set_parameters_training(threshold,maximum_curv):
+    l = 1 / maximum_curv
+    Dt_action = 1 / maximum_curv
+    D = threshold**2 / (20 * Dt_action)
+    return Dt_action,D
 
 if __name__ == "__main__":
 
@@ -314,10 +319,9 @@ if __name__ == "__main__":
     t_max = 8
     t_init = 0
     maximum_curvature = 30
-    l = 1 / maximum_curvature
-    Dt_action = 1 / maximum_curvature
-    threshold = 0.07
-    D = threshold**2 / (20 * Dt_action)
+    threshold=0.07
+    Dt_action,D = set_parameters_training(threshold=threshold,maximum_curv=maximum_curvature)
+
     print("D:                         ", format_sci(D))
     print("Dt_action:                 ", format_sci(Dt_action))
     print("Threshold:                 ", format_sci(threshold))

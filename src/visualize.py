@@ -1,12 +1,12 @@
 import os
+from pathlib import Path
 
 import matplotlib.cm as cm
 import matplotlib.pyplot as plt
 import numpy as np
+import seaborn as sns
 
 from .evaluate_agent import evaluate_agent
-from pathlib import Path
-import seaborn as sns
 
 colors = plt.cm.tab10.colors
 import copy
@@ -395,20 +395,21 @@ def visualize_streamline(
     fig.savefig(path_save_fig, dpi=200, bbox_inches="tight")
     plt.close(fig)
 
+
 def plot_streamlines_beta(agents_file, dict):
-    viridis = cm.get_cmap('viridis', len(agents_file))
+    viridis = cm.get_cmap("viridis", len(agents_file))
     colors = sns.color_palette("Set2")
 
-    beta_values = np.array([0.05,0.25,0.4])
+    beta_values = np.array([0.05, 0.25, 0.4])
     save_path_eval = "fig/"
     fig, ax = plt.subplots(figsize=(8, 4))
     added_labels = set()  # Track labels already added to avoid duplicates
-    j=0
+    j = 0
     for id, agent_file in enumerate(agents_file):
-        path_config=os.path.join(agent_file,'config.pkl')
-        with open(path_config,"rb") as f:
+        path_config = os.path.join(agent_file, "config.pkl")
+        with open(path_config, "rb") as f:
             config = pickle.load(f)
-        if config['beta'] in beta_values:
+        if config["beta"] in beta_values:
             print(path_config)
             for i, key in enumerate(dict.keys()):
                 file_name_or = f"streamline_{key}_line_trajectories.pkl"
@@ -419,22 +420,37 @@ def plot_streamlines_beta(agents_file, dict):
                     trajectories = pickle.load(f)
                 path = trajectories["path"]
                 for idx, (traj_key, trajectory) in enumerate(trajectories.items()):
-                    if traj_key != "path" and idx % 4 == 0:  # Take every other trajectory
-                        label = f'{config['beta']}' if f'{config['beta']}' not in added_labels else None
+                    if (
+                        traj_key != "path" and idx % 4 == 0
+                    ):  # Take every other trajectory
+                        label = (
+                            f"{config['beta']}"
+                            if f"{config['beta']}" not in added_labels
+                            else None
+                        )
                         if label:
                             added_labels.add(label)
                         plot_trajectories(
-                            ax, trajectory, path, title="streamlines", color_id=j, colors=None, label=label
+                            ax,
+                            trajectory,
+                            path,
+                            title="streamlines",
+                            color_id=j,
+                            colors=None,
+                            label=label,
                         )
-            j+=1
+            j += 1
     ax.plot(path[:, 0], path[:, 1], color="black", linewidth=2)
     ax.set_ylim([-0.05, 0.05])
-        #ax.set_aspect("equal")
+    # ax.set_aspect("equal")
     # Place the legend outside the plot
-    ax.legend(loc='center left', bbox_to_anchor=(1, 0.5))
-    path_save_comparison = os.path.join(save_path_eval, f"comparison_streamlines_beta_2")
+    ax.legend(loc="center left", bbox_to_anchor=(1, 0.5))
+    path_save_comparison = os.path.join(
+        save_path_eval, f"comparison_streamlines_beta_2"
+    )
     fig.savefig(path_save_comparison, dpi=300, bbox_inches="tight")
     plt.close(fig)
+
 
 if __name__ == "__main__":
     agents_file = []
@@ -442,8 +458,8 @@ if __name__ == "__main__":
     directory_path = Path("agents/")
 
     for item in directory_path.iterdir():
-        if item.is_dir() and "agent_TD3" in item.name :
-            if '2025-04-23' in item.name or '2025-04-22' in item.name:
+        if item.is_dir() and "agent_TD3" in item.name:
+            if "2025-04-23" in item.name or "2025-04-22" in item.name:
                 agents_file.append(os.path.join(directory_path, item.name))
 
     print(agents_file)
@@ -454,6 +470,4 @@ if __name__ == "__main__":
         # "north_05": np.array([0, 1]),
         # "south_05": np.array([0, -1]),
     }
-    plot_streamlines_beta(agents_file,dict)
-    
-
+    plot_streamlines_beta(agents_file, dict)

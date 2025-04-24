@@ -1,6 +1,7 @@
 import os
 import sys
 from math import sqrt
+
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 import json
 import pickle
@@ -28,7 +29,7 @@ from .find_shortest_path import find_shortest_path_circle
 from .invariant_state import coordinate_in_global_ref
 from .plot import plot_action, plot_trajectories
 from .rank_agents import rank_agents_by_rewards
-from .sdf import get_contour_coordinates, sdf_circle,sdf_many_circle
+from .sdf import get_contour_coordinates, sdf_circle, sdf_many_circle
 from .simulation import solver
 from .visualize import (plot_robust_D, plot_robust_u_bg_rankine,
                         plot_robust_u_bg_uniform, visualize_streamline)
@@ -40,7 +41,6 @@ def format_sci(x):
 
 def evaluate_after_training(
     agent_files,
-    file_name_or,
     p_target,
     p_0,
     path,
@@ -57,7 +57,7 @@ def evaluate_after_training(
 ):
     np.random.seed(seed)
     random.seed(seed)
-    rng= np.random.default_rng(seed)
+    rng = np.random.default_rng(seed)
     tree = KDTree(path)
 
     results = {}
@@ -76,11 +76,12 @@ def evaluate_after_training(
         parameters = []
 
     file_path_result = "results_evaluation/"
+    file_name_or  =f"_{title_add}_obstacle_{obstacle_type}"
     os.makedirs(file_path_result, exist_ok=True)
-    file_name = os.path.join(file_path_result, file_name_or)
+    file_name_result = os.path.join(file_path_result, "result_evaluation"+file_name_or+".json")
 
     try:
-        with open(file_name, "r") as f:
+        with open(file_name_result, "r") as f:
             results = json.load(f)
     except FileNotFoundError:
         results = {}
@@ -88,7 +89,7 @@ def evaluate_after_training(
 
     for agent_name in agent_files:
 
-        config_eval = initialize_parameters(agent_name, p_target, p_0,0.01)
+        config_eval = initialize_parameters(agent_name, p_target, p_0, 0.01)
         config_eval = copy.deepcopy(config_eval)
         training_type = {
             "rankine_bg": config_eval["rankine_bg"],
@@ -97,7 +98,7 @@ def evaluate_after_training(
             "velocity_bool": config_eval["velocity_bool"],
             "load_model": config_eval["load_model"],
             "n_lookahead": config_eval["n_lookahead"],
-            "beta":config_eval['beta']
+            "beta": config_eval["beta"],
         }
         # if agent_name in results.keys():
         #     results[agent_name]['training type'] = training_type
@@ -123,7 +124,7 @@ def evaluate_after_training(
             config_eval["velocity_bool"],
             config_eval["n_lookahead"],
             seed,
-            config_eval['bounce_thr']
+            config_eval["bounce_thr"],
         )
 
         state_dim = env.observation_space.shape[0]
@@ -148,15 +149,15 @@ def evaluate_after_training(
             config_eval["eval_episodes"],
             config_eval,
             save_path_eval,
-            f"eval_with_{title_add}_obstacle_{obstacle_type}",
+            f"eval_with"+file_name_or,
             False,
             title="",
             plot=True,
             parameters=parameters,
             plot_background=True,
             rng=rng,
-            obstacle_contour = obstacle_contour,
-            sdf=sdf
+            obstacle_contour=obstacle_contour,
+            sdf=sdf,
         )
 
         results[agent_name] = {
@@ -174,9 +175,8 @@ def evaluate_after_training(
         print("Mean rewards d : ", format_sci(mean(rewards_d_per_episode)))
         print("-----------------------------------------------")
 
-
-    file_name = os.path.join(file_path_result, file_name_or)
-    with open(file_name, "w") as f:
+    file_name_result = os.path.join(file_path_result, file_name_or)
+    with open(file_name_result, "w") as f:
         json.dump(results, f, indent=4)
 
     threshold = [0.07]
@@ -384,7 +384,7 @@ def policy_direction(agent_name, config_eval):
     plt.savefig(save_path_eval_action, dpi=200, bbox_inches="tight")
 
 
-def initialize_parameters(agent_file, p_target, p_0,bounce_thr):
+def initialize_parameters(agent_file, p_target, p_0, bounce_thr):
     path_config = os.path.join(agent_file, "config.pkl")
     with open(path_config, "rb") as f:
         config = pickle.load(f)
@@ -411,26 +411,28 @@ def initialize_parameters(agent_file, p_target, p_0,bounce_thr):
     threshold = 0.07
     D = threshold**2 / (20 * Dt_action)
     config_eval["D"] = D
-    config_eval['bounce_thr'] = bounce_thr
+    config_eval["bounce_thr"] = bounce_thr
     return config_eval
 
 
-    
 def sdf_circle(point, center, radius):
     px, py = point
     cx, cy = center
     distance_to_center = sqrt((px - cx) ** 2 + (py - cy) ** 2)
     return distance_to_center - radius
 
+
 def obstacle_and_path(obstacle_type):
-    if obstacle_type == 'circle':
+    if obstacle_type == "circle":
+
         def sdf(point):
-            centers = [(-1, 1/2),(1, -1/2)]
-            radius = 3/4
+            centers = [(-1, 1 / 2), (1, -1 / 2)]
+            radius = 3 / 4
             return sdf_many_circle(point, centers, radius)
+
         x = np.linspace(-2, 2, 500)
         y = np.linspace(-2, 2, 500)
-        X, Y = np.meshgrid(x, y,indexing='ij')
+        X, Y = np.meshgrid(x, y, indexing="ij")
         Z = np.vectorize(lambda px, py: sdf((px, py)))(X, Y)
 
         start = [0, 250]
@@ -444,53 +446,66 @@ def obstacle_and_path(obstacle_type):
     Dt_action = 1 / maximum_curvature
     threshold = 0.07
     D = threshold**2 / (20 * Dt_action)
-    min_distance = 2* sqrt(2 * Dt_action * D)
+    min_distance = 2 * sqrt(2 * Dt_action * D)
 
     path_indices = find_shortest_path_circle(start, goal, min_distance, Z)
-    path_indices_short = shortcut_path(path_indices, X,Y,Z, min_distance)
-    path_coords_short = np.array([[X[idx[0], idx[1]], Y[idx[0], idx[1]]] for idx in path_indices_short])
+    path_indices_short = shortcut_path(path_indices, X, Y, Z, min_distance)
+    path_coords_short = np.array(
+        [[X[idx[0], idx[1]], Y[idx[0], idx[1]]] for idx in path_indices_short]
+    )
     path = resample_path(path_coords_short, n_points=500)
     return p_0, p_target, sdf, path, obstacle_contour
 
+
 if __name__ == "__main__":
-    obstacle_type='circle'
+    obstacle_type = "circle"
     agents_file = []
     directory_path = Path("agents/")
 
     for item in directory_path.iterdir():
-        if item.is_dir() and "agent_TD3" in item.name :
-            if '2025-04-23' in item.name or '2025-04-22' in item.name:
-                agents_file.append(os.path.join(directory_path, item.name)) 
-    agents_file=['agents/agent_TD3_2025-04-18_13-33']
+        if item.is_dir() and "agent_TD3" in item.name:
+            if "2025-04-23" in item.name or "2025-04-22" in item.name:
+                agents_file.append(os.path.join(directory_path, item.name))
+    agents_file = ["agents/agent_TD3_2025-04-18_13-33"]
     print("Agents files : ", agents_file)
 
     print("---------------------Evaluation with no bg---------------------")
     title_add = "free"
-    p_0,p_target,sdf,path,obstacle_contour = obstacle_and_path(obstacle_type)
-    
+    p_0, p_target, sdf, path, obstacle_contour = obstacle_and_path(obstacle_type)
+
     results = evaluate_after_training(
         agents_file,
-        f"result_evaluation_{title_add}_obstacle_{obstacle_type}.json",
         p_target=p_target,
         p_0=p_0,
         path=path,
         obstacle_contour=obstacle_contour,
-        sdf =sdf,
+        sdf=sdf,
         title_add=title_add,
-        obstacle_type=obstacle_type
+        obstacle_type=obstacle_type,
     )
     rank_agents_by_rewards(results)
 
-    norm=0.5
+    norm = 0.5
     dict = {
-        'east_05': np.array([1,0]),
-        'west_05': np.array([-1,0]),
-        'north_05': np.array([0,1]),
-        'south_05': np.array([0,-1]),
+        "east_05": np.array([1, 0]),
+        "west_05": np.array([-1, 0]),
+        "north_05": np.array([0, 1]),
+        "south_05": np.array([0, -1]),
     }
     print("---------------------Evaluation with uniform bg---------------------")
-    for title_add,dir in dict.items():
-        results = evaluate_after_training(agents_file,f'result_evaluation_{title_add}_obstacle_{obstacle_type}.json',p_target = p_target,p_0 = p_0,path=path,obstacle_contour=obstacle_contour,sdf=sdf,obstacle_type=obstacle_type, title_add=title_add,dir=dir,norm=norm)
+    for title_add, dir in dict.items():
+        results = evaluate_after_training(
+            agents_file,
+            p_target=p_target,
+            p_0=p_0,
+            path=path,
+            obstacle_contour=obstacle_contour,
+            sdf=sdf,
+            obstacle_type=obstacle_type,
+            title_add=title_add,
+            dir=dir,
+            norm=norm,
+        )
         rank_agents_by_rewards(results)
 
     # title_add = 'rankine_a_05__cir_3_center_1_075'

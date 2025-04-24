@@ -63,7 +63,7 @@ def rank_agents_by_rewards(results, print_stats=True):
     return agent_stats
 
 
-def merge_agent_stats(agent_stats_lists,agents_file):
+def merge_agent_stats(agent_stats_lists, agents_file):
     merged_stats = defaultdict(
         lambda: {"mean_reward": 0, "mean_reward_t": 0, "mean_reward_d": 0, "count": 0}
     )
@@ -71,15 +71,12 @@ def merge_agent_stats(agent_stats_lists,agents_file):
     for agent_stats in agent_stats_lists:
         for agent in agent_stats:
             name = agent["agent_name"]
-            if (
-                agent['agent_name'] in agents_file
-            ):
+            if agent["agent_name"] in agents_file:
                 merged_stats[name]["training type"] = agent["training type"]
                 merged_stats[name]["mean_reward"] += agent["mean_reward"]
                 merged_stats[name]["mean_reward_t"] += agent["mean_reward_t"]
                 merged_stats[name]["mean_reward_d"] += agent["mean_reward_d"]
                 merged_stats[name]["count"] += 1
-        
 
     final_stats = []
     for name, stats in merged_stats.items():
@@ -97,14 +94,14 @@ def merge_agent_stats(agent_stats_lists,agents_file):
     return final_stats
 
 
-def rank_agents_all_criterion(files_results,agents_file):
+def rank_agents_all_criterion(files_results, agents_file):
     agent_stats_lists = []
     for results in files_results:
         with open(results, "r") as f:
             data = json.load(f)
         agent_stats = rank_agents_by_rewards(data, False)
         agent_stats_lists.append(agent_stats)
-    merged_stats = merge_agent_stats(agent_stats_lists,agents_file)
+    merged_stats = merge_agent_stats(agent_stats_lists, agents_file)
 
     filtered_stats = [
         agent
@@ -124,7 +121,9 @@ def rank_agents_all_criterion(files_results,agents_file):
     return filtered_stats
 
 
-def analyze_and_visualize_agent_data(data, output_dir="./results_evaluation", fig_dir="./fig"):
+def analyze_and_visualize_agent_data(
+    data, output_dir="./results_evaluation", fig_dir="./fig"
+):
     df = pd.json_normalize(data)
     training_columns = [
         col
@@ -236,45 +235,62 @@ def analyze_and_visualize_agent_data(data, output_dir="./results_evaluation", fi
     plt.savefig(fig_path, dpi=300, bbox_inches="tight")
     print(f"Figure saved to {fig_path}")
 
+
 def plot_return_beta(file_path):
-    
-    with open(file_path, 'r') as file:
+
+    with open(file_path, "r") as file:
         data = json.load(file)
-    
+
     # Extraire les valeurs de beta et des récompenses
     betas = []
     mean_rewards = []
     mean_rewards_t = []
     mean_rewards_d = []
-    
+
     for entry in data:
         betas.append(entry["training type"]["beta"])
         mean_rewards.append(entry["mean_reward"])
         mean_rewards_t.append(entry["mean_reward_t"])
         mean_rewards_d.append(entry["mean_reward_d"])
-    
+
     # Tracer les récompenses en fonction de beta
     plt.figure(figsize=(10, 6))
     palette = sns.color_palette("Set2")
-    plt.scatter(betas, mean_rewards, label= "Overall mean return", marker='o', color=palette[0])
-    plt.scatter(betas, mean_rewards_t, label=r"Time return: $-C \sum \Delta t_{sim}$", marker='o', color=palette[1])
-    plt.scatter(betas, mean_rewards_d, label=r"Distance return: $-\beta \sum d$", marker='o', color=palette[2])
-    
+    plt.scatter(
+        betas, mean_rewards, label="Overall mean return", marker="o", color=palette[0]
+    )
+    plt.scatter(
+        betas,
+        mean_rewards_t,
+        label=r"Time return: $-C \sum \Delta t_{sim}$",
+        marker="o",
+        color=palette[1],
+    )
+    plt.scatter(
+        betas,
+        mean_rewards_d,
+        label=r"Distance return: $-\beta \sum d$",
+        marker="o",
+        color=palette[2],
+    )
+
     # Ajouter des labels et une légende
     plt.xlabel("Beta")
     plt.ylabel("Reward")
-    plt.legend(        
+    plt.legend(
         fontsize=10,
         loc="center left",
         bbox_to_anchor=(1.01, 0.5),
         borderaxespad=0.0,
-        )
+    )
     plt.tight_layout(rect=[0, 0, 0.9, 1])
 
     plt.grid(True)
-    
+
     # Afficher le graphique
-    plt.savefig("fig/rank_beta_return.png", dpi=200, bbox_inches='tight') 
+    plt.savefig("fig/rank_beta_return.png", dpi=200, bbox_inches="tight")
+
+
 if __name__ == "__main__":
     # types = ["ondulating", "curve_minus", "curve_plus", "line", "circle"]
     # file = "results_evaluation"
@@ -295,7 +311,7 @@ if __name__ == "__main__":
     #     )
     #     files_results.extend([f"results_evaluation/result_evaluation_free_{type}.json"])
     # print("Overall ranking of agents:")
-    
+
     # agents_file = []
 
     # directory_path = Path("agents/")
@@ -304,19 +320,17 @@ if __name__ == "__main__":
     #     if item.is_dir() and "agent_TD3" in item.name :
     #         if '2025-04-23' in item.name or '2025-04-22' in item.name:
     #             agents_file.append(os.path.join(directory_path, item.name))
-    
+
     # stats = rank_agents_all_criterion(files_results,agents_file)
     # timestamp = datetime.now().strftime("%Y-%m-%d_%H")
     # save_rank_file = os.path.join(file, f"results_rank_overall_beta_values.json")
     # with open(save_rank_file, "w") as f:
     #     json.dump(stats, f, indent=4)
 
-
-
     # file_path = "results_evaluation/results_rank_overall_2025-04-18_15.json"
     # with open(file_path, "r") as f:
     #     data = json.load(f)
-        
+
     # analyze_and_visualize_agent_data(data)
     file_path = "/Users/laura/Documents/MVA/Stage_Harvard/Project/results_evaluation/results_rank_overall_beta_values.json"
     plot_return_beta(file_path)

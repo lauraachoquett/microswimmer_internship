@@ -13,7 +13,7 @@ def solver(x, U, p, Dt, D, u_bg=np.zeros(2), rng=None, bounce_thr=0.01, sdf=None
         rng = np.random.default_rng()
     dW_t = dW(Dt, rng)
     next_x = x + u_bg * Dt + U * p * Dt + sqrt(D) * dW_t
-    
+
     if sdf is not None:
         if sdf(next_x) < bounce_thr:
             return x
@@ -43,16 +43,16 @@ def uniform_velocity(dir, norm):
     return dir * norm
 
 
-def run_sde(nb_steps,t_init,t_end,U=1,p = np.ones(2),x_0 = np.zeros(2)):
-    D=0.05
+def run_sde(nb_steps, t_init, t_end, U=1, p=np.ones(2), x_0=np.zeros(2)):
+    D = 0.05
 
-    Dt = (t_end-t_init)/nb_steps
+    Dt = (t_end - t_init) / nb_steps
 
-    traj = np.zeros((nb_steps,2))
+    traj = np.zeros((nb_steps, 2))
     traj[0] = x_0
 
     traj = np.zeros((nb_steps, 2))
-    traj[0] = np.array([-1,-1])
+    traj[0] = np.array([-1, -1])
 
     for n in range(nb_steps - 1):
         traj[n + 1] = solver(traj[n], U, p, Dt, D)
@@ -80,8 +80,8 @@ def brownian(nb_sim):
 
 
 if __name__ == "__main__":
-    num_sims=5
-    nb_steps=100
+    num_sims = 5
+    nb_steps = 100
     t_init = 0
-    t_end=2
-    plot_simulation(num_sims,nb_steps,t_init,t_end)
+    t_end = 2
+    plot_simulation(num_sims, nb_steps, t_init, t_end)
