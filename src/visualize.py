@@ -5,6 +5,8 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 from .evaluate_agent import evaluate_agent
+from pathlib import Path
+import seaborn as sns
 
 colors = plt.cm.tab10.colors
 import copy
@@ -395,55 +397,56 @@ def visualize_streamline(
 
 def plot_streamlines_beta(agents_file, dict):
     viridis = cm.get_cmap('viridis', len(agents_file))
-    colors = [viridis(i) for i in range(len(agents_file))]
-    beta_values = np.array([0.05, 0.25,0.4])
+    colors = sns.color_palette("Set2")
+
+    beta_values = np.array([0.05,0.25,0.4])
     save_path_eval = "fig/"
     fig, ax = plt.subplots(figsize=(8, 4))
     added_labels = set()  # Track labels already added to avoid duplicates
+    j=0
     for id, agent_file in enumerate(agents_file):
-        for i, key in enumerate(dict.keys()):
-            file_name_or = f"streamline_{key}_line_trajectories.pkl"
-            path_trajectories = os.path.join(
-                agent_file, "eval_bg/streamlines/line/", file_name_or
-            )
-            with open(path_trajectories, "rb") as f:
-                trajectories = pickle.load(f)
-            path = trajectories["path"]
-            for idx, (traj_key, trajectory) in enumerate(trajectories.items()):
-                if traj_key != "path" and idx % 4 == 0:  # Take every other trajectory
-                    label = f'{beta_values[id]}' if f'{beta_values[id]}' not in added_labels else None
-                    if label:
-                        added_labels.add(label)
-                    plot_trajectories(
-                        ax, trajectory, path, title="streamlines", color_id=id, colors=colors, label=label
-                    )
-        ax.plot(path[:, 0], path[:, 1], color="black", linewidth=2)
-        ax.set_ylim([-0.05, 0.05])
+        path_config=os.path.join(agent_file,'config.pkl')
+        with open(path_config,"rb") as f:
+            config = pickle.load(f)
+        if config['beta'] in beta_values:
+            print(path_config)
+            for i, key in enumerate(dict.keys()):
+                file_name_or = f"streamline_{key}_line_trajectories.pkl"
+                path_trajectories = os.path.join(
+                    agent_file, "eval_bg/streamlines/line/", file_name_or
+                )
+                with open(path_trajectories, "rb") as f:
+                    trajectories = pickle.load(f)
+                path = trajectories["path"]
+                for idx, (traj_key, trajectory) in enumerate(trajectories.items()):
+                    if traj_key != "path" and idx % 4 == 0:  # Take every other trajectory
+                        label = f'{config['beta']}' if f'{config['beta']}' not in added_labels else None
+                        if label:
+                            added_labels.add(label)
+                        plot_trajectories(
+                            ax, trajectory, path, title="streamlines", color_id=j, colors=None, label=label
+                        )
+            j+=1
+    ax.plot(path[:, 0], path[:, 1], color="black", linewidth=2)
+    ax.set_ylim([-0.05, 0.05])
         #ax.set_aspect("equal")
     # Place the legend outside the plot
     ax.legend(loc='center left', bbox_to_anchor=(1, 0.5))
-    path_save_comparison = os.path.join(save_path_eval, f"comparison_streamlines_beta")
+    path_save_comparison = os.path.join(save_path_eval, f"comparison_streamlines_beta_2")
     fig.savefig(path_save_comparison, dpi=300, bbox_inches="tight")
     plt.close(fig)
 
 if __name__ == "__main__":
-    agent_file_1 = "agents/agent_TD3_2025-04-22_11-28"
-    agent_file_3 = "agents/agent_TD3_2025-04-22_11-36"
-    agent_file_4 = "agents/agent_TD3_2025-04-22_11-44"
-    agent_file_5 = "agents/agent_TD3_2025-04-22_11-54"
-    agent_file_6 = "agents/agent_TD3_2025-04-22_12-04"
-    agent_file_7 = "agents/agent_TD3_2025-04-22_12-13"
-    agent_file_8 = "agents/agent_TD3_2025-04-22_12-23"
-    agent_file_9 = "agents/agent_TD3_2025-04-22_12-31"
-    agent_file_10 = "agents/agent_TD3_2025-04-22_12-41"
-    agent_file_11 = "agents/agent_TD3_2025-04-22_12-50"
+    agents_file = []
 
-    agents_file = [
-        agent_file_1,
-        agent_file_6,
-        agent_file_9
-    ]
+    directory_path = Path("agents/")
 
+    for item in directory_path.iterdir():
+        if item.is_dir() and "agent_TD3" in item.name :
+            if '2025-04-23' in item.name or '2025-04-22' in item.name:
+                agents_file.append(os.path.join(directory_path, item.name))
+
+    print(agents_file)
     dict = {
         "free": np.array([0, 0]),
         # "east_02": np.array([1, 0]),

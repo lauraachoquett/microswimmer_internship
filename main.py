@@ -274,7 +274,7 @@ def run_expe(config, agent_file="agents"):
                 plt.yscale("log")
                 plt.legend()
                 plt.savefig(path_save_fig, dpi=100, bbox_inches="tight")
-
+                plt.close()
                 if agent_to_load:
                     print("Beta increased : ", beta)
 

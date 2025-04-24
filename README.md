@@ -163,11 +163,15 @@ rank_agents_by_rewards(results)
 **Comments on the inclusion of velocity in the state** :
 Adding velocity to state representation increase the robustness to varying background flow as shown in the illustrating example of the Figure 3. 
 
+---
+
 ### Comparison of training types
 With velocity includes in the state : 
 <div align="center">
 <img src="fig/return_per_training.png" alt="reward per training" width="800"/>
 </div>
+
+---
 
 ### Best agent 
 | Reward                 | Varying Background | Path          | Lookahed (n)| Name         |
@@ -179,6 +183,9 @@ With velocity includes in the state :
 
 **Comments on returns** : 
 The best agents have very similar returns acorss the different scenarios presented in the evaluation. Increasing the lookahead points and introducing varying background flow appear to stabilize the agents' performance . Using the same path across all episodes does not decrease the performance during the evaluation. 
+
+---
+
 ### Streamlines 
 
 
@@ -198,6 +205,19 @@ Training on **varying curve** :
 
 **Comments on streamlines** : 
 Training with non-symmetrical paths introduces a bias in the policy's action, which can be observed when visualizing the streamline across differents starting points along a straight line. 
+
+---
+
+### Increasing $\beta$
+Increasing $\beta$ in the reward penalizes actions that lead to larger distances between the agent and the path more heavily. Agents were trained with different values of $\beta$, ranging from 0.05 to 4.
+
+<p align="center">
+  <img src="fig/rank_beta_return.png" width="600"/>
+  <img src="fig/comparison_streamlines_beta_2.png" width="700"/>
+</p>
+
+**Comments** : 
+The overall return is relatively constant whereas $\beta$. Except for a very low value the agent is not following the path,as a result the return regarding the cumulative distance between the agent and the path explodes. As expected the streamlines converge faster toward the path as $\beta$ increase.
 
 ## ⚙️ Main configuration parameters
 

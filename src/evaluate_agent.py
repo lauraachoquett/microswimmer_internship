@@ -28,6 +28,8 @@ def evaluate_agent(
     parameters=[],
     plot_background=False,
     rng=None,
+    obstacle_contour=None,
+    sdf=None
 ):
     config = copy.deepcopy(config)
     parameters = copy.deepcopy(parameters)
@@ -87,6 +89,8 @@ def evaluate_agent(
         path, tree = list_of_path_tree[0]
         nb_of_path = 1
 
+
+    #### EVALUATION ####
     state, done = env.reset(tree, path), False
     while episode_num < eval_episodes:
         states_episode.append(x)
@@ -101,7 +105,7 @@ def evaluate_agent(
             u_bg = rankine_vortex(x, a, center, cir)
 
         next_state, reward, done, info = env.step(
-            action, tree, path, p_target, beta, D, u_bg, threshold
+            action = action, tree = tree, path= path, x_target= p_target, beta= beta,D= D, u_bg=u_bg,threshold= threshold,sdf =sdf
         )
 
         x = info["x"]
@@ -130,6 +134,8 @@ def evaluate_agent(
     if plot:
         path_save_fig = os.path.join(save_path_result_fig, file_name)
         fig, ax = plt.subplots(figsize=(10, 8))
+        if obstacle_contour is not None:
+            ax.scatter(obstacle_contour[:, 0], obstacle_contour[:, 1], color="blue", s=5)
         for elt in list_of_path_tree:
             path, _ = elt
             ax.plot(
@@ -156,6 +162,7 @@ def evaluate_agent(
             plot_background,
             type=type,
         )
+
         ax.set_aspect("equal")
         fig.savefig(path_save_fig, dpi=100, bbox_inches="tight")
 

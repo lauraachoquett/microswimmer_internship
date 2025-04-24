@@ -2,6 +2,7 @@ import json
 import os
 from collections import OrderedDict, defaultdict
 from datetime import datetime
+from pathlib import Path
 from statistics import mean
 
 import matplotlib.pyplot as plt
@@ -234,62 +235,88 @@ def analyze_and_visualize_agent_data(data, output_dir="./results_evaluation", fi
     fig_path = os.path.join(fig_dir, "return_per_training.png")
     plt.savefig(fig_path, dpi=300, bbox_inches="tight")
     print(f"Figure saved to {fig_path}")
+
+def plot_return_beta(file_path):
     
+    with open(file_path, 'r') as file:
+        data = json.load(file)
+    
+    # Extraire les valeurs de beta et des récompenses
+    betas = []
+    mean_rewards = []
+    mean_rewards_t = []
+    mean_rewards_d = []
+    
+    for entry in data:
+        betas.append(entry["training type"]["beta"])
+        mean_rewards.append(entry["mean_reward"])
+        mean_rewards_t.append(entry["mean_reward_t"])
+        mean_rewards_d.append(entry["mean_reward_d"])
+    
+    # Tracer les récompenses en fonction de beta
+    plt.figure(figsize=(10, 6))
+    palette = sns.color_palette("Set2")
+    plt.scatter(betas, mean_rewards, label= "Overall mean return", marker='o', color=palette[0])
+    plt.scatter(betas, mean_rewards_t, label=r"Time return: $-C \sum \Delta t_{sim}$", marker='o', color=palette[1])
+    plt.scatter(betas, mean_rewards_d, label=r"Distance return: $-\beta \sum d$", marker='o', color=palette[2])
+    
+    # Ajouter des labels et une légende
+    plt.xlabel("Beta")
+    plt.ylabel("Reward")
+    plt.legend(        
+        fontsize=10,
+        loc="center left",
+        bbox_to_anchor=(1.01, 0.5),
+        borderaxespad=0.0,
+        )
+    plt.tight_layout(rect=[0, 0, 0.9, 1])
+
+    plt.grid(True)
+    
+    # Afficher le graphique
+    plt.savefig("fig/rank_beta_return.png", dpi=200, bbox_inches='tight') 
 if __name__ == "__main__":
-    types = ["ondulating", "curve_minus", "curve_plus", "line", "circle"]
-    file = "results_evaluation"
-    files_results = []
-    for type in types:
-        files_results.extend(
-            [
-                f"results_evaluation/result_evaluation_east_05_{type}.json",
-                f"results_evaluation/result_evaluation_west_05_{type}.json",
-                f"results_evaluation/result_evaluation_north_05_{type}.json",
-                f"results_evaluation/result_evaluation_south_05_ondulating.json",
-            ]
-        )
-        files_results.extend(
-            [
-                f"results_evaluation/result_evaluation_rankine_a_05__cir_3_center_1_075_{type}.json"
-            ]
-        )
-        files_results.extend([f"results_evaluation/result_evaluation_free_{type}.json"])
-    print("Overall ranking of agents:")
+    # types = ["ondulating", "curve_minus", "curve_plus", "line", "circle"]
+    # file = "results_evaluation"
+    # files_results = []
+    # for type in types:
+    #     files_results.extend(
+    #         [
+    #             f"results_evaluation/result_evaluation_east_05_{type}.json",
+    #             f"results_evaluation/result_evaluation_west_05_{type}.json",
+    #             f"results_evaluation/result_evaluation_north_05_{type}.json",
+    #             f"results_evaluation/result_evaluation_south_05_ondulating.json",
+    #         ]
+    #     )
+    #     files_results.extend(
+    #         [
+    #             f"results_evaluation/result_evaluation_rankine_a_05__cir_3_center_1_075_{type}.json"
+    #         ]
+    #     )
+    #     files_results.extend([f"results_evaluation/result_evaluation_free_{type}.json"])
+    # print("Overall ranking of agents:")
     
-    agent_file_1 = "agents/agent_TD3_2025-04-22_11-28"
-    agent_file_3 = "agents/agent_TD3_2025-04-22_11-36"
-    agent_file_4 = "agents/agent_TD3_2025-04-22_11-44"
-    agent_file_5 = "agents/agent_TD3_2025-04-22_11-54"
-    agent_file_6 = "agents/agent_TD3_2025-04-22_12-04"
-    agent_file_7 = "agents/agent_TD3_2025-04-22_12-13"
-    agent_file_8 = "agents/agent_TD3_2025-04-22_12-23"
-    agent_file_9 = "agents/agent_TD3_2025-04-22_12-31"
-    agent_file_10 = "agents/agent_TD3_2025-04-22_12-41"
-    agent_file_11 = "agents/agent_TD3_2025-04-22_12-50"
+    # agents_file = []
 
-    agents_file = [
-        agent_file_1,
-        agent_file_3,
-        agent_file_4,
-        agent_file_5,
-        agent_file_6,
-        agent_file_7,
-        agent_file_8,
-        agent_file_9,
-        agent_file_10,
-        agent_file_11,
-    ]
+    # directory_path = Path("agents/")
+
+    # for item in directory_path.iterdir():
+    #     if item.is_dir() and "agent_TD3" in item.name :
+    #         if '2025-04-23' in item.name or '2025-04-22' in item.name:
+    #             agents_file.append(os.path.join(directory_path, item.name))
     
-    stats = rank_agents_all_criterion(files_results,agents_file)
-    timestamp = datetime.now().strftime("%Y-%m-%d_%H")
-    save_rank_file = os.path.join(file, f"results_rank_overall_beta_values.json")
-    with open(save_rank_file, "w") as f:
-        json.dump(stats, f, indent=4)
+    # stats = rank_agents_all_criterion(files_results,agents_file)
+    # timestamp = datetime.now().strftime("%Y-%m-%d_%H")
+    # save_rank_file = os.path.join(file, f"results_rank_overall_beta_values.json")
+    # with open(save_rank_file, "w") as f:
+    #     json.dump(stats, f, indent=4)
 
 
 
-    file_path = "results_evaluation/results_rank_overall_2025-04-18_15.json"
-    with open(file_path, "r") as f:
-        data = json.load(f)
+    # file_path = "results_evaluation/results_rank_overall_2025-04-18_15.json"
+    # with open(file_path, "r") as f:
+    #     data = json.load(f)
         
-    #analyze_and_visualize_agent_data(data)
+    # analyze_and_visualize_agent_data(data)
+    file_path = "/Users/laura/Documents/MVA/Stage_Harvard/Project/results_evaluation/results_rank_overall_beta_values.json"
+    plot_return_beta(file_path)
