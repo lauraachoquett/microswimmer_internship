@@ -59,7 +59,7 @@ Where:
 
 - $x_{\text{target}}$ : Target position  
 - $d$ : Distance to closest point on the path  
-- $C, \beta$ : Constant weights
+- $C \ (m.s^{-1}), \beta$ : Constant weights
 
 
 ## 🏊‍♂️ Training Protocol
@@ -169,8 +169,20 @@ Adding velocity to state representation increase the robustness to varying backg
 With velocity includes in the state : 
 <div align="center">
 <img src="fig/return_per_training.png" alt="reward per training" width="800"/>
+<i>Figure 4</i>
 </div>
 
+Figure 4 shows the mean return across all configurations depicted above (30 different scenarios). Each point corresponds to the mean return of an agent trained with training parameters on the x-axis. 
+  
+  * First parameter :
+    * Varying background : Uniform background flow or rankine vortex.
+    * Free : No background flow
+  * Second parameter : 
+    * Varying curve : One of the path variant (see figure 2)
+    * Circle : Agent trained on a fixed circle
+  * Third parameter :
+    * Number of points in the state corresponding to the number of points in the lookahead.
+ 
 ---
 
 ### Best agent 
@@ -217,7 +229,7 @@ Increasing $\beta$ in the reward penalizes actions that lead to larger distances
 </p>
 
 **Comments** : 
-The overall return is relatively constant whereas $\beta$. Except for a very low value the agent is not following the path,as a result the return regarding the cumulative distance between the agent and the path explodes. As expected the streamlines converge faster toward the path as $\beta$ increase.
+The overall return remains relatively constant with respect to $\beta$. Except for a very low value where the agent fails to follow the path, as a result the return based on the cumulative distance between the agent and the path increases drastically. As expected, the streamlines converge faster toward the path as $\beta$ increases.
 
 ## ⚙️ Main configuration parameters
 

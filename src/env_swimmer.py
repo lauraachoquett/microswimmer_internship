@@ -26,7 +26,7 @@ def make_env(
 
 class MicroSwimmer(gym.Env):
     def __init__(
-        self, x_0, C, Dt, velocity_bool, n_lookahead=5, seed=None, bounce_thr=None
+        self, x_0, C, Dt, velocity_bool, n_lookahead=5, seed=None, bounce_thr=0
     ):
         super(MicroSwimmer, self).__init__()
         self.n_lookahead = n_lookahead

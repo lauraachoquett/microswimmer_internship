@@ -5,6 +5,7 @@ import numpy as np
 from scipy.interpolate import interp1d
 
 
+## Euclidian distance : 
 def heuristic(a, b):
     return math.sqrt((a[0] - b[0]) ** 2 + (a[1] - b[1]) ** 2)
 
@@ -43,7 +44,7 @@ def astar(start, goal, grid, min_distance):
 
 def get_neighbors(point):
     x, y = point
-    return [(x + 1, y), (x - 1, y), (x, y + 1), (x, y - 1)]
+    return [(x + 1, y), (x - 1, y), (x, y + 1), (x, y - 1),(x + 1, y+1),(x - 1, y-1),(x - 1, y+1),(x + 1, y - 1)]
 
 
 def is_valid_move(point, grid, min_distance):

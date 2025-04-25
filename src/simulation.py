@@ -8,7 +8,7 @@ def dW(delta_t, rng=None):
     return rng.normal(loc=0.0, scale=np.sqrt(delta_t), size=(2))
 
 
-def solver(x, U, p, Dt, D, u_bg=np.zeros(2), rng=None, bounce_thr=0.01, sdf=None):
+def solver(x, U, p, Dt, D, u_bg=np.zeros(2), rng=None, bounce_thr=0.0, sdf=None):
     if rng is None:
         rng = np.random.default_rng()
     dW_t = dW(Dt, rng)
