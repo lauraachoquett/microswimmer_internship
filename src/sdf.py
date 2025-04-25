@@ -5,7 +5,6 @@ import numpy as np
 
 from .Astar import (astar, plot_valid_invalid_points, resample_path,
                     shortcut_path)
-from .fmm import fmm_path_indices
 
 
 def sdf_circle(point, center, radius):
@@ -34,17 +33,13 @@ def get_contour_coordinates(X, Y, Z, level=0):
     return np.squeeze(np.array(coordinates))
 
 
-def plot_sdf_path(X, Y, Z, path, path_indice_shortcut):
+def plot_sdf_path(X, Y, Z, path):
     plt.figure(figsize=(6, 6))
 
     plot_sdf(X, Y, Z)
     if path is not None:
         plt.plot(X[path[:, 0], path[:, 1]], Y[path[:, 0], path[:, 1]], color="black")
-        plt.plot(
-            X[path_indice_shortcut[:, 0], path_indice_shortcut[:, 1]],
-            Y[path_indice_shortcut[:, 0], path_indice_shortcut[:, 1]],
-            color="green",
-        )
+
     else:
         print("No path found!")
 
@@ -52,7 +47,7 @@ def plot_sdf_path(X, Y, Z, path, path_indice_shortcut):
     plt.xlabel("X")
     plt.ylabel("Y")
     plt.axis("equal")
-    plt.legend()
+    # plt.legend()
     plt.savefig("fig/sdf_circle_path_plot.png", dpi=100, bbox_inches="tight")
 
 
@@ -64,8 +59,8 @@ def plot_sdf(X, Y, Z):
 
 if __name__ == "__main__":
     type = "circle"
-    x = np.linspace(-2, 2, 500)
-    y = np.linspace(-2, 2, 500)
+    x = np.linspace(-2, 2, 1000)
+    y = np.linspace(-2, 2, 1000)
     X, Y = np.meshgrid(x, y, indexing="ij")
     print(X[0, 250])
     print(Y[0, 250])
@@ -76,17 +71,13 @@ if __name__ == "__main__":
         Z = np.vectorize(lambda px, py: sdf_many_circle((px, py), centers, radius))(
             X, Y
         )
-    start = [0, 250]
-    goal = [490, 250]
+    start = [0, 500]
+    goal = [999, 500]
     start_coords = (X[start[0], start[1]], Y[start[0], start[1]])
     goal_coords = (X[goal[0], goal[1]], Y[goal[0], goal[1]])
     print("Start coordinates:", start_coords)
     print("Goal coordinates:", goal_coords)
     path_indices = np.array(astar(start, goal, Z, min_distance))
 
-    path_indice_shortcut = shortcut_path(path_indices, X, Y, Z, min_distance)
-    path_coords_short = np.array(
-        [[X[idx[1], idx[0]], Y[idx[1], idx[0]]] for idx in path_indice_shortcut]
-    )
 
-    plot_sdf_path(X, Y, Z, path_indices, path_indice_shortcut)
+    plot_sdf_path(X, Y, Z, path_indices)

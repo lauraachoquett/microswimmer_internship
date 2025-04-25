@@ -1,135 +1,215 @@
-import matplotlib.pyplot as plt
 import numpy as np
+import matplotlib.pyplot as plt
+import skfmm
 from scipy.interpolate import RegularGridInterpolator
-from scipy.ndimage import distance_transform_edt
-from skimage.segmentation import find_boundaries
-
-
-def fmm_path_indices(start, goal, sdf, min_distance=0.1):
+from scipy.ndimage import gaussian_filter
+from .sdf import sdf_circle
+import seaborn as sns
+def compute_fmm_path(start_point, goal_point, sdf_function, B=0.05,flow_field=None, grid_size=(200, 200), domain_size=(1.0, 1.0)):
     """
-    Utilise la méthode Fast Marching Method (FMM) pour trouver un chemin entre start et goal
-    en suivant le gradient de la carte de temps calculée par FMM.
-
-    Args:
-        start: Indices [x, y] du point de départ dans la grille
-        goal: Indices [x, y] du point d'arrivée dans la grille
-        sdf: Carte de distance signée 2D
-        min_distance: Distance minimale à maintenir par rapport aux obstacles
-
+    Calcule un chemin optimal en utilisant Fast Marching Method
+    
+    Arguments:
+        start_point: Tuple (x, y) du point de départ
+        goal_point: Tuple (x, y) du point d'arrivée
+        sdf_function: Fonction qui retourne la SDF en chaque point (x, y)
+        flow_field: Fonction qui retourne le vecteur d'écoulement (vx, vy) en chaque point, None si pas d'écoulement
+        grid_size: Dimensions de la grille discrétisée
+        domain_size: Dimensions physiques du domaine
+        
     Returns:
-        Une liste des indices [x, y] formant le chemin
+        path: Liste de points [(x, y)] représentant le chemin optimal
     """
-    # Dimensions de la grille
-    ny, nx = sdf.shape
-
-    # Créer une carte de vitesse basée sur la SDF
-    # Plus on est proche d'un obstacle, plus on va lentement
-    speed = np.ones_like(sdf)
-    obstacles = sdf < min_distance
-    speed[obstacles] = 0.0001  # Vitesse très faible près des obstacles
-
-    # Zones loin des obstacles ont une vitesse plus élevée
-    # On normalise pour avoir des vitesses entre 0.0001 et 1
-    safe_regions = ~obstacles
-    if np.any(safe_regions):
-        normalized_sdf = np.clip(sdf, min_distance, None)
-        max_sdf = np.max(normalized_sdf[safe_regions])
-        if max_sdf > min_distance:
-            # Vitesse croissante avec la distance aux obstacles
-            speed[safe_regions] = 0.2 + 0.8 * (
-                normalized_sdf[safe_regions] - min_distance
-            ) / (max_sdf - min_distance)
-
-    # Création de la carte de temps par Fast Marching Method
-    # On utilise distance_transform_edt comme approximation de la FMM
-    # En partant du but et en propageant vers le départ
-    goal_map = np.zeros_like(speed, dtype=bool)
-    goal_map[goal[1], goal[0]] = True
-
-    # Calculer la carte de temps (plus grande valeur = plus loin du but)
-    time_map = distance_transform_edt(~goal_map, sampling=[1 / s for s in speed])
-
-    # Tracer le chemin en remontant le gradient négatif de la carte de temps
-    # On commence au point de départ
+    x = np.linspace(0, domain_size[0], grid_size[0])
+    y = np.linspace(0, domain_size[1], grid_size[1])
+    X, Y = np.meshgrid(x, y)
+    
+    phi = np.zeros(grid_size)
+    for i in range(grid_size[0]):
+        for j in range(grid_size[1]):
+            phi[j, i] = sdf_function((x[i], y[j]))
+    
+    speed = 1.0 / (1.0 + np.exp(-B * phi))  
+    speed = np.clip(speed, 0.001, 1.0) 
+    
+    if flow_field is not None:
+        flow_strength = np.zeros(grid_size)
+        flow_direction_x = np.zeros(grid_size)
+        flow_direction_y = np.zeros(grid_size)
+        
+        for i in range(grid_size[0]):
+            for j in range(grid_size[1]):
+                vx, vy = flow_field((x[i], y[j]))
+                magnitude = np.sqrt(vx**2 + vy**2)
+                if magnitude > 0:
+                    flow_strength[j, i] = magnitude
+                    flow_direction_x[j, i] = vx / magnitude
+                    flow_direction_y[j, i] = vy / magnitude
+        
+        flow_factor = 0.5  
+        speed = speed * (1.0 + flow_factor * flow_strength)
+    
+    mask = np.ones_like(phi, dtype=bool)
+    i_goal = np.argmin(np.abs(x - goal_point[0]))
+    j_goal = np.argmin(np.abs(y - goal_point[1]))
+    mask[j_goal, i_goal] = False
+    
+    travel_time = skfmm.travel_time(mask, speed, dx=domain_size[0]/grid_size[0])
+    
+    travel_time = gaussian_filter(travel_time, sigma=1.0)
+    
     path = []
-    current = list(start)  # Copie de start pour éviter de le modifier
-    path.append(current.copy())
-
-    # Taille des pas pour le suivi de gradient (plus petit = plus précis)
-    step_size = 1.0
-    max_iterations = 10000  # Limite pour éviter les boucles infinies
-
-    # Gradient de la carte de temps aux points x et y
-    y_indices, x_indices = np.meshgrid(np.arange(ny), np.arange(nx), indexing="ij")
-
-    # Fonction pour calculer le gradient à un point donné
-    def compute_gradient(point):
-        x, y = point
-        # Assurez-vous que les indices sont dans les limites
-        if x < 1 or x >= nx - 1 or y < 1 or y >= ny - 1:
-            return np.array([0, 0])
-
-        # Calculer le gradient par différences finies centrées
-        dx = (time_map[y, x + 1] - time_map[y, x - 1]) / 2.0
-        dy = (time_map[y + 1, x] - time_map[y - 1, x]) / 2.0
-
-        # Retourner le gradient négatif (direction de descente)
-        return -np.array([dx, dy])
-
-    i = 0
-    while i < max_iterations:
-        # Calculer le gradient au point courant
-        gradient = compute_gradient([current[0], current[1]])
-
+    current = start_point
+    path.append(current)
+    
+    travel_time_interp = RegularGridInterpolator((y, x), travel_time, bounds_error=False, fill_value=None)
+    
+    step_size = min(domain_size) / 100
+    max_iterations = 1000
+    convergence_threshold = step_size / 2
+    
+    for _ in range(max_iterations):
+        eps = min(domain_size) / 1000
+        dx_points = [(current[0] + eps, current[1]), (current[0] - eps, current[1])]
+        dy_points = [(current[0], current[1] + eps), (current[0], current[1] - eps)]
+        
+        dx_values = [travel_time_interp(p[::-1]) for p in dx_points]  # Note: inversé car travel_time_interp attend (y, x)
+        dy_values = [travel_time_interp(p[::-1]) for p in dy_points]
+        
+        gradient_x = (dx_values[0] - dx_values[1]) / (2 * eps)
+        gradient_y = (dy_values[0] - dy_values[1]) / (2 * eps)
+        
         # Normaliser le gradient
-        norm = np.linalg.norm(gradient)
-        if norm < 1e-10:  # Si le gradient est presque nul
+        gradient_norm = np.sqrt(gradient_x**2 + gradient_y**2)
+        if gradient_norm < 1e-10:
             break
-
-        gradient = gradient / norm
-
-        # Mettre à jour la position courante
-        next_x = current[0] + step_size * gradient[0]
-        next_y = current[1] + step_size * gradient[1]
-
-        # Arrondir pour obtenir les indices de la grille
-        next_idx = [int(round(next_x)), int(round(next_y))]
-
-        # Vérifier si nous sommes arrivés au but
-        if abs(next_idx[0] - goal[0]) <= 1 and abs(next_idx[1] - goal[1]) <= 1:
-            path.append(goal)
+            
+        gradient_x /= gradient_norm
+        gradient_y /= gradient_norm
+        
+        next_x = current[0] - step_size * gradient_x
+        next_y = current[1] - step_size * gradient_y
+        next_point = (next_x, next_y)
+        
+        distance_to_goal = np.sqrt((next_point[0] - goal_point[0])**2 + (next_point[1] - goal_point[1])**2)
+        if distance_to_goal < convergence_threshold:
+            path.append(goal_point)
             break
+            
+        path.append(next_point)
+        current = next_point
+    
+    return path, travel_time, (x, y)
 
-        # Vérifier si nous sommes toujours dans la grille
-        if next_idx[0] < 0 or next_idx[0] >= nx or next_idx[1] < 0 or next_idx[1] >= ny:
-            break
+def visualize_results(path, travel_time, grid_info, sdf_function, flow_field=None, grid_size=(200, 200), domain_size=(1.0, 1.0)):
+    """
+    Visualise le chemin trouvé, la carte de temps, la SDF et l'écoulement
+    """
+    x, y = grid_info
+    X, Y = np.meshgrid(x, y)
+    
+    phi = np.zeros((len(y), len(x)))
+    for i in range(len(x)):
+        for j in range(len(y)):
+            phi[j, i] = sdf_function((x[i], y[j]))
+    
+    fig, ax = plt.subplots(1, 2, figsize=(15, 7))
+    
+    contour = ax[0].contourf(X, Y, travel_time, 50, cmap='viridis')
+    fig.colorbar(contour, ax=ax[0], label='Travel time')
+    
+    path_x = [p[0] for p in path]
+    path_y = [p[1] for p in path]
+    ax[0].plot(path_x, path_y, 'r-', linewidth=2)
+    ax[0].set_aspect('equal')
+    ax[0].set_title('Map of travel time')
+    
+    contour_sdf = ax[1].contourf(X, Y, phi, levels=100, cmap="coolwarm")
+    plt.colorbar(contour_sdf, label="Signed Distance")
+    ax[1].contour(X, Y, phi, levels=[0], colors='k', linewidths=2)
 
-        # Vérifier si nous sommes trop près d'un obstacle
-        if sdf[next_idx[1], next_idx[0]] < min_distance:
-            # Trouver une direction alternative
-            break
+    ax[1].plot(path_x, path_y, 'r-', linewidth=2)
+    ax[1].set_aspect('equal')
+    ax[1].set_title('SDF with path')
+    
+    if flow_field is not None:
+        flow_x = np.zeros((len(y), len(x)))
+        flow_y = np.zeros((len(y), len(x)))
+        
+        for i in range(len(x)):
+            for j in range(len(y)):
+                if phi[j, i] > 0:  
+                    vx, vy = flow_field((x[i], y[j]))
+                    flow_x[j, i] = vx
+                    flow_y[j, i] = vy
+        
+        step = 5
+        ax[1].quiver(X[::step, ::step], Y[::step, ::step], 
+                   flow_x[::step, ::step], flow_y[::step, ::step], 
+                   color='b', scale=50, alpha=0.7)
+    
+    ax[0].plot(path_x[0], path_y[0], 'ro', markersize=8)
+    ax[0].plot(path_x[-1], path_y[-1], 'ro', markersize=8)
+    ax[1].plot(path_x[0], path_y[0], 'ro', markersize=8)
+    ax[1].plot(path_x[-1], path_y[-1], 'ro', markersize=8)
+    
+    ax[1].legend()
+    
+    plt.tight_layout()
+    plt.show()
+    
+    return fig
 
-        # Ajouter le point au chemin et continuer
-        current = next_idx
-        path.append(current.copy())
+def main():
 
-        # Si on ne bouge plus, on arrête
-        if len(path) > 1 and path[-1] == path[-2]:
-            break
+    
+    def sdf_many_circle(point):
+        centers = [(1/3, 1/3), (3/4, 3/4)]
+        radius = 1/5
+        min_distance = 0.1
+        distances = np.zeros(len(centers))
+        for i, center in enumerate(centers):
+            distances[i] = np.linalg.norm(np.array(center) - np.array(point))
 
-        i += 1
+        id = np.argmin(distances)
+        center = centers[id]
+        return sdf_circle(point, center, radius)
 
-    # Simplifier le chemin pour retirer les points redondants
-    simplified_path = [path[0]]
-    for i in range(1, len(path)):
-        if path[i] != simplified_path[-1]:
-            simplified_path.append(path[i])
+    def simple_flow(point):
+        return (1.0, 1.0)  
+    
 
-    # Vérifier si le chemin a été trouvé
-    if len(simplified_path) <= 1 or not (
-        abs(simplified_path[-1][0] - goal[0]) <= 1
-        and abs(simplified_path[-1][1] - goal[1]) <= 1
-    ):
-        print("Attention: Chemin incomplet, l'algorithme n'a pas atteint le but")
+    fig, ax = plt.subplots(figsize=(15, 7))
+    
+    start_point = (0.05, 0.5)
+    goal_point = (0.95, 0.5)
+    B_values = np.linspace(3,10,3,dtype='int')
+    palette = sns.color_palette()
 
-    return simplified_path
+    for id,B in enumerate(B_values):
+        path, travel_time, grid_info = compute_fmm_path(start_point, goal_point, sdf_many_circle,B,None)
+    
+        path_x = [p[0] for p in path]
+        path_y = [p[1] for p in path]
+        ax.plot(path_x, path_y, '-', linewidth=2,color=palette[id+2],label=f'B : {B}')
+    ax.set_aspect('equal')
+    ax.legend(loc='upper left', bbox_to_anchor=(1, 1))
+    x, y = grid_info
+    X, Y = np.meshgrid(x, y)
+    phi = np.zeros((len(y), len(x)))
+    for i in range(len(x)):
+        for j in range(len(y)):
+            phi[j, i] = sdf_many_circle((x[i], y[j]))
+    contour_sdf = ax.contourf(X, Y, phi, levels=100, cmap="coolwarm")
+    cbar = plt.colorbar(contour_sdf, ax=ax, pad=0.1, label="Signed Distance")
+    cbar.ax.tick_params(labelsize=10)
+    ax.contour(X, Y, phi, levels=[0], colors='k', linewidths=2)
+    ax.set_title('SDF with path')
+    plt.savefig('fig/fmm_B.png',dpi=200,bbox_inches='tight')
+    
+        
+    
+    # fig = visualize_results(path, travel_time, grid_info, sdf_many_circle, None)
+
+if __name__ == "__main__":
+    main()
