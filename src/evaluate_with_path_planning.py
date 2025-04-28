@@ -33,7 +33,9 @@ from .sdf import get_contour_coordinates, sdf_circle, sdf_many_circle
 from .simulation import solver
 from .visualize import (plot_robust_D, plot_robust_u_bg_rankine,
                         plot_robust_u_bg_uniform, visualize_streamline)
-
+from .data_load import load_sdf_from_csv,vel_read
+from .fmm import compute_fmm_path
+from scipy.interpolate import RegularGridInterpolator
 
 def format_sci(x):
     return "{:.3e}".format(x)
@@ -48,6 +50,8 @@ def evaluate_after_training(
     sdf,
     seed=42,
     obstacle_type=None,
+    velocity_func =None,
+    plot_velocity_field=None,
     dir=None,
     norm=None,
     a=None,
@@ -158,8 +162,11 @@ def evaluate_after_training(
             rng=rng,
             obstacle_contour=obstacle_contour,
             sdf=sdf,
+            velocity_func=velocity_func
         )
 
+            
+        plt.close()
         results[agent_name] = {
             "rewards": rewards_per_episode,
             "rewards_time": rewards_t_per_episode,
@@ -396,8 +403,8 @@ def initialize_parameters(agent_file, p_target, p_0, bounce_thr):
     config_eval["p_0"] = p_0
     config_eval["x_0"] = p_0
     config_eval["nb_points_path"] = 500
-    config_eval["t_max"] = 12
-    config_eval["eval_episodes"] = 5
+    config_eval["t_max"] = 20
+    config_eval["eval_episodes"] = 100
     config_eval["velocity_bool"] = (
         config["velocity_bool"] if "velocity_bool" in config else False
     )
@@ -422,7 +429,7 @@ def sdf_circle(point, center, radius):
     return distance_to_center - radius
 
 
-def obstacle_and_path(obstacle_type):
+def obstacle_and_path_a_star(obstacle_type):
     if obstacle_type == "circle":
 
         def sdf(point):
@@ -456,9 +463,55 @@ def obstacle_and_path(obstacle_type):
     path = resample_path(path_coords_short, n_points=500)
     return p_0, p_target, sdf, path, obstacle_contour
 
+def obstacle_and_path_fmm(obstacle_type):
+    scale = 8
+    domain_size =(1*scale,1*scale)
+ 
+    x,y,N,h,sdf = load_sdf_from_csv(domain_size)
+    grid_size = (N[0],N[1])
+    # np.save(f"data/sdf_retina2D_scale_{scale}.npy", sdf, allow_pickle=False)
+    X, Y = np.meshgrid(x, y)
+
+    start_point = (0.98*scale, 0.3*scale)
+    goal_point = (0.44*scale, 0.55*scale)
+    sdf_interpolator = RegularGridInterpolator((y, x), sdf, bounds_error=False, fill_value=None)
+    
+    def sdf_function(point):
+        return sdf_interpolator(point[::-1]) 
+            
+    path_vel = 'data/vel.sdf'
+    N, h, vel = vel_read(path_vel)
+    v = vel[N[2]//2,:,:,0:2]
+    vx = v[:,:,0]
+    vy = v[:,:,1]
+    velocity_interpolator_x = RegularGridInterpolator((y, x), vx, bounds_error=False, fill_value=None)
+    velocity_interpolator_y = RegularGridInterpolator((y, x), vy, bounds_error=False, fill_value=None)
+    v = np.sqrt(vx**2 + vy**2)
+    def velocity_retina(point):
+        return 2.5*np.array([velocity_interpolator_x(point[::-1]),velocity_interpolator_y(point[::-1])])/(np.max(v))
+ 
+        
+    if os.path.exists(f"data/retina2D_path_scale_{scale}.npy"):
+        path = np.load(f"data/retina2D_path_scale_{scale}.npy", allow_pickle=False)
+        print("Path loaded")
+    else : 
+        path, travel_time, grid_info = compute_fmm_path(start_point, goal_point, sdf_function, x, y, B=20,flow_field=velocity_retina,grid_size=grid_size,domain_size=domain_size)
+        path=np.array(path)
+        np.save(f"data/retina2D_path_scale_{scale}.npy", path, allow_pickle=False)
+    if os.path.exists(f"data/retina2D_contour_scale{scale}.npy"):
+        obstacle_contour = np.load(f"data/retina2D_contour_scale{scale}.npy", allow_pickle=False)
+        print("Contour loaded")
+    else : 
+        Z = np.vectorize(lambda px, py: sdf_function((px, py)))(X, Y)
+        obstacle_contour = get_contour_coordinates(X, Y, Z, level=0)
+        np.save(f"data/retina2D_contour_scale{scale}.npy",obstacle_contour,allow_pickle=False)
+        
+
+    
+    return np.array(start_point),np.array(goal_point),sdf_function,path,obstacle_contour,velocity_retina
 
 if __name__ == "__main__":
-    obstacle_type = "circle"
+    obstacle_type = "retina"
     agents_file = []
     directory_path = Path("agents/")
 
@@ -470,9 +523,10 @@ if __name__ == "__main__":
     print("Agents files : ", agents_file)
 
     print("---------------------Evaluation with no bg---------------------")
-    title_add = "free"
-    p_0, p_target, sdf, path, obstacle_contour = obstacle_and_path(obstacle_type)
-
+    title_add = 'velocity_25_'
+    p_0, p_target, sdf, path, obstacle_contour,velocity_retina = obstacle_and_path_fmm(obstacle_type)
+    path=np.array(path)
+    print("Path generated")
     results = evaluate_after_training(
         agents_file,
         p_target=p_target,
@@ -482,31 +536,32 @@ if __name__ == "__main__":
         sdf=sdf,
         title_add=title_add,
         obstacle_type=obstacle_type,
+        velocity_func = velocity_retina,
     )
     rank_agents_by_rewards(results)
 
-    norm = 0.5
-    dict = {
-        "east_05": np.array([1, 0]),
-        "west_05": np.array([-1, 0]),
-        "north_05": np.array([0, 1]),
-        "south_05": np.array([0, -1]),
-    }
-    print("---------------------Evaluation with uniform bg---------------------")
-    for title_add, dir in dict.items():
-        results = evaluate_after_training(
-            agents_file,
-            p_target=p_target,
-            p_0=p_0,
-            path=path,
-            obstacle_contour=obstacle_contour,
-            sdf=sdf,
-            obstacle_type=obstacle_type,
-            title_add=title_add,
-            dir=dir,
-            norm=norm,
-        )
-        rank_agents_by_rewards(results)
+    # norm = 0.5
+    # dict = {
+    #     "east_05": np.array([1, 0]),
+    #     "west_05": np.array([-1, 0]),
+    #     "north_05": np.array([0, 1]),
+    #     "south_05": np.array([0, -1]),
+    # }
+    # print("---------------------Evaluation with uniform bg---------------------")
+    # for title_add, dir in dict.items():
+    #     results = evaluate_after_training(
+    #         agents_file,
+    #         p_target=p_target,
+    #         p_0=p_0,
+    #         path=path,
+    #         obstacle_contour=obstacle_contour,
+    #         sdf=sdf,
+    #         obstacle_type=obstacle_type,
+    #         title_add=title_add,
+    #         dir=dir,
+    #         norm=norm,
+    #     )
+    #     rank_agents_by_rewards(results)
 
     # title_add = 'rankine_a_05__cir_3_center_1_075'
     # print("---------------------Evaluation with rankine bg---------------------")

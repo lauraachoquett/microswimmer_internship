@@ -5,3 +5,4 @@ agents/
 results_evaluation/
 .vscode/
 change_config.py
+data/
