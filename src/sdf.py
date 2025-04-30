@@ -79,5 +79,4 @@ if __name__ == "__main__":
     print("Goal coordinates:", goal_coords)
     path_indices = np.array(astar(start, goal, Z, min_distance))
 
-
     plot_sdf_path(X, Y, Z, path_indices)

@@ -103,10 +103,12 @@ def evaluate_after_training(
     else:
         parameters = []
 
-    file_name_or =f'_{title_add}_{type}'
+    file_name_or = f"_{title_add}_{type}"
     file_path_result = "results_evaluation/"
     os.makedirs(file_path_result, exist_ok=True)
-    file_name_result = os.path.join(file_path_result, 'result_evaluation'+file_name_or+".json")
+    file_name_result = os.path.join(
+        file_path_result, "result_evaluation" + file_name_or + ".json"
+    )
 
     try:
         with open(file_name_result, "r") as f:
@@ -176,7 +178,7 @@ def evaluate_after_training(
             config_eval["eval_episodes"],
             config_eval,
             save_path_eval,
-            f"eval_with"+file_name_or,
+            f"eval_with" + file_name_or,
             False,
             title="",
             plot=True,
@@ -203,7 +205,7 @@ def evaluate_after_training(
             visualize_streamline(
                 agent,
                 config_eval,
-                f"streamline"+file_name_or,
+                f"streamline" + file_name_or,
                 save_path_eval,
                 type=type,
                 title="",
@@ -216,7 +218,7 @@ def evaluate_after_training(
             visualize_streamline(
                 agent,
                 config_eval,
-                f"streamline"+file_name_or,
+                f"streamline" + file_name_or,
                 save_path_eval,
                 type=type,
                 title="",

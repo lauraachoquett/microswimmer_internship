@@ -5,21 +5,24 @@ import numpy as np
 from scipy.interpolate import interp1d
 
 
-## Euclidian distance : 
-def euclidian_distance(a,b):
+## Euclidian distance :
+def euclidian_distance(a, b):
     return math.sqrt((a[0] - b[0]) ** 2 + (a[1] - b[1]) ** 2)
 
-def heuristic(current, goal,grid):
-    dist =euclidian_distance(current,goal)
-    sdf_value = grid[current[0],current[1]]
-    return dist  * (1 + 0.05/ max(sdf_value, 0.001))
-    
-def visibility_heuristic(current, goal, grid,min_distance):
+
+def heuristic(current, goal, grid):
+    dist = euclidian_distance(current, goal)
+    sdf_value = grid[current[0], current[1]]
+    return dist * (1 + 0.05 / max(sdf_value, 0.001))
+
+
+def visibility_heuristic(current, goal, grid, min_distance):
     euclidean_dist = euclidian_distance(current, goal)
-    penalty_factor=2
-    if line_of_sight(current, goal, grid,min_distance):
+    penalty_factor = 2
+    if line_of_sight(current, goal, grid, min_distance):
         return euclidean_dist * penalty_factor
     return euclidean_dist
+
 
 def astar(start, goal, grid, min_distance):
     start = (int(start[0]), int(start[1]))
@@ -28,7 +31,7 @@ def astar(start, goal, grid, min_distance):
     heapq.heappush(open_set, (0, start))
     came_from = {}
     g_score = {start: 0}
-    f_score = {start: heuristic(start, goal,grid)}
+    f_score = {start: heuristic(start, goal, grid)}
 
     while open_set:
         _, current = heapq.heappop(open_set)
@@ -43,11 +46,15 @@ def astar(start, goal, grid, min_distance):
 
         for neighbor in get_neighbors(current):
             if is_valid_move(neighbor, grid, min_distance):
-                tentative_g_score = g_score[current] + euclidian_distance(current, neighbor)
+                tentative_g_score = g_score[current] + euclidian_distance(
+                    current, neighbor
+                )
                 if neighbor not in g_score or tentative_g_score < g_score[neighbor]:
                     came_from[neighbor] = current
                     g_score[neighbor] = tentative_g_score
-                    f_score[neighbor] = tentative_g_score + heuristic(neighbor, goal,grid)
+                    f_score[neighbor] = tentative_g_score + heuristic(
+                        neighbor, goal, grid
+                    )
                     heapq.heappush(open_set, (f_score[neighbor], neighbor))
 
     return None
@@ -55,7 +62,16 @@ def astar(start, goal, grid, min_distance):
 
 def get_neighbors(point):
     x, y = point
-    return [(x + 1, y), (x - 1, y), (x, y + 1), (x, y - 1),(x + 1, y+1),(x - 1, y-1),(x - 1, y+1),(x + 1, y - 1)]
+    return [
+        (x + 1, y),
+        (x - 1, y),
+        (x, y + 1),
+        (x, y - 1),
+        (x + 1, y + 1),
+        (x - 1, y - 1),
+        (x - 1, y + 1),
+        (x + 1, y - 1),
+    ]
 
 
 def is_valid_move(point, grid, min_distance):
@@ -134,7 +150,7 @@ def shortcut_path(path_indices, X, Y, Z, min_distance):
     while i < len(path_indices) - 1:
         j = len(path_indices) - 1
         while j > i + 1:
-            if line_of_sight(path_indices[i], path_indices[j],Z, min_distance):
+            if line_of_sight(path_indices[i], path_indices[j], Z, min_distance):
                 break
             j -= 1
         path_indices[j]

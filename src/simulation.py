@@ -15,7 +15,7 @@ def solver(x, U, p, Dt, D, u_bg=np.zeros(2), rng=None, bounce_thr=0.0, sdf=None)
     next_x = x + u_bg * Dt + U * p * Dt + sqrt(D) * dW_t
 
     if sdf is not None:
-        if sdf(next_x) < bounce_thr:
+        if sdf(next_x) > bounce_thr:
             return x
     return next_x
 

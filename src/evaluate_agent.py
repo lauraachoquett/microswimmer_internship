@@ -30,8 +30,7 @@ def evaluate_agent(
     rng=None,
     obstacle_contour=None,
     sdf=None,
-    velocity_func =None,
-    
+    velocity_func=None,
 ):
     config = copy.deepcopy(config)
     parameters = copy.deepcopy(parameters)
@@ -60,7 +59,7 @@ def evaluate_agent(
     threshold = config["threshold"]
     x = config["x_0"]
     count_succes = 0
-    v_hist=[]
+    v_hist = []
     if random_parameters:
         dir, norm, center, a, cir = random_bg_parameters()
     else:
@@ -82,8 +81,8 @@ def evaluate_agent(
         norm = np.linalg.norm(u_bg)
         dir = np.array(u_bg / norm)
         plot_background = True
-    
-    if velocity_func is not None : 
+
+    if velocity_func is not None:
         plot_background = False
 
     if list_of_path_tree is not None:
@@ -108,12 +107,12 @@ def evaluate_agent(
         if config["rankine_bg"]:
             u_bg = rankine_vortex(x, a, center, cir)
 
-        if velocity_func is not None : 
+        if velocity_func is not None:
             u_bg = velocity_func(x)
             u_bg = u_bg.squeeze()
-            v= np.linalg.norm(u_bg)
+            v = np.linalg.norm(u_bg)
             v_hist.append(v)
-            
+
         next_state, reward, done, info = env.step(
             action=action,
             tree=tree,
@@ -184,17 +183,19 @@ def evaluate_agent(
         )
 
         ax.set_aspect("equal")
-        ax.set_axis_off() 
+        ax.set_axis_off()
 
         fig.savefig(path_save_fig, dpi=400, bbox_inches="tight")
         plt.close(fig)
-    path_save_fig = os.path.join(save_path_result_fig,file_name+ '_hist_v.png')
-    plt.hist(v_hist, bins=50, color='blue', alpha=0.7)
-    plt.axvline(mean(v_hist), color='green', linestyle='dashed', linewidth=1.5, label='Mean')
-    plt.xlabel(r'$u_{bg} / \|U\|$')
-    plt.legend()
-    plt.savefig(path_save_fig, dpi=100, bbox_inches='tight')
-    plt.close()
+    # path_save_fig = os.path.join(save_path_result_fig, file_name + "_hist_v.png")
+    # plt.hist(v_hist, bins=50, color="blue", alpha=0.7)
+    # plt.axvline(
+    #     mean(v_hist), color="green", linestyle="dashed", linewidth=1.5, label="Mean"
+    # )
+    # plt.xlabel(r"$u_{bg} / \|U\|$")
+    # plt.legend()
+    # plt.savefig(path_save_fig, dpi=100, bbox_inches="tight")
+    # plt.close()
     return (
         rewards_per_episode,
         rewards_t_per_episode,

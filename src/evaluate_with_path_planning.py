@@ -1,3 +1,4 @@
+
 import os
 import sys
 from math import sqrt
@@ -19,13 +20,20 @@ from .TD3 import TD3
 colors = plt.cm.tab10.colors
 import copy
 import random
+from datetime import datetime
 from pathlib import Path
 from statistics import mean
+from itertools import chain
+
+from scipy.interpolate import RegularGridInterpolator
+from scipy.ndimage import gaussian_filter1d
 
 from .analytic_solution_line import find_next_v
+from .Astar_ani import astar_anisotropic, compute_v
+from .data_loader import load_sdf_from_csv, vel_read
 from .distance_to_path import min_dist_closest_point
 from .evaluate_agent import evaluate_agent
-from .find_shortest_path import find_shortest_path_circle
+from .fmm import compute_fmm_path
 from .invariant_state import coordinate_in_global_ref
 from .plot import plot_action, plot_trajectories
 from .rank_agents import rank_agents_by_rewards
@@ -33,9 +41,7 @@ from .sdf import get_contour_coordinates, sdf_circle, sdf_many_circle
 from .simulation import solver
 from .visualize import (plot_robust_D, plot_robust_u_bg_rankine,
                         plot_robust_u_bg_uniform, visualize_streamline)
-from .data_load import load_sdf_from_csv,vel_read
-from .fmm import compute_fmm_path
-from scipy.interpolate import RegularGridInterpolator
+
 
 def format_sci(x):
     return "{:.3e}".format(x)
@@ -43,14 +49,10 @@ def format_sci(x):
 
 def evaluate_after_training(
     agent_files,
-    p_target,
-    p_0,
-    path,
     obstacle_contour,
-    sdf,
     seed=42,
     obstacle_type=None,
-    velocity_func =None,
+    velocity_func=None,
     plot_velocity_field=None,
     dir=None,
     norm=None,
@@ -58,11 +60,11 @@ def evaluate_after_training(
     center=None,
     cir=None,
     title_add="",
+    list_config_paths=[]
 ):
     np.random.seed(seed)
     random.seed(seed)
     rng = np.random.default_rng(seed)
-    tree = KDTree(path)
 
     results = {}
 
@@ -79,22 +81,10 @@ def evaluate_after_training(
     else:
         parameters = []
 
-    file_path_result = "results_evaluation/"
-    file_name_or  =f"_{title_add}_obstacle_{obstacle_type}"
-    os.makedirs(file_path_result, exist_ok=True)
-    file_name_result = os.path.join(file_path_result, "result_evaluation"+file_name_or+".json")
-
-    try:
-        with open(file_name_result, "r") as f:
-            results = json.load(f)
-    except FileNotFoundError:
-        results = {}
-    results["type"] = [obstacle_type]
-
     for agent_name in agent_files:
-
-        config_eval = initialize_parameters(agent_name, p_target, p_0, 0.01)
+        config_eval = initialize_parameters(agent_name, 0.00)
         config_eval = copy.deepcopy(config_eval)
+
         training_type = {
             "rankine_bg": config_eval["rankine_bg"],
             "uniform_bg": config_eval["uniform_bg"],
@@ -118,71 +108,97 @@ def evaluate_after_training(
         steps_per_action = config_eval["steps_per_action"]
         Dt_sim = Dt_action / steps_per_action
         threshold = config_eval["threshold"]
-
-        config_eval["path"] = path
-        config_eval["tree"] = tree
-        env = MicroSwimmer(
-            config_eval["x_0"],
-            config_eval["C"],
-            Dt_sim,
-            config_eval["velocity_bool"],
-            config_eval["n_lookahead"],
-            seed,
-            config_eval["bounce_thr"],
+        success_rate_list = []
+        file_path_result = "results_evaluation/"
+        os.makedirs(file_path_result, exist_ok=True)
+        file_name_result = os.path.join(
+            file_path_result, "result_evaluation_" + f"{obstacle_type}" + ".json"
         )
+        try:
+            with open(file_name_result, "r") as f:
+                results = json.load(f)
+        except FileNotFoundError:
+            results = {}
+        results["type"] = [obstacle_type]
 
-        state_dim = env.observation_space.shape[0]
-        action_dim = env.action_space.shape[0]
-        max_action = float(env.action_space.high[0])
-        agent = TD3(state_dim, action_dim, max_action)
-        save_path_eval = os.path.join(agent_name, "eval_bg/")
+        for path_to_config in list_config_paths:
+            results_per_config={}
+            path,start_point,goal_point,sdf,velocity_retina,X_new, Y_new,time = load_config_path(path_to_config)  
+            tree = KDTree(path)
+            config_eval['path']=path
+            config_eval['tree']=tree
+            config_eval["p_target"] = np.array(goal_point)
+            config_eval["p_0"] = np.array(start_point)
+            config_eval["x_0"] = np.array(start_point)
+            print("Evaluation - Path ready")
+            title_add = f"{time}"
+            file_name_or = f"_{title_add}_obstacle_{obstacle_type}"
 
-        os.makedirs(save_path_eval, exist_ok=True)
 
-        policy_file = os.path.join(agent_name, "models/agent")
-        agent.load(policy_file)
-        (
-            rewards_per_episode,
-            rewards_t_per_episode,
-            rewards_d_per_episode,
-            success_rate,
-            _,
-        ) = evaluate_agent(
-            agent,
-            env,
-            config_eval["eval_episodes"],
-            config_eval,
-            save_path_eval,
-            f"eval_with"+file_name_or,
-            False,
-            title="",
-            plot=True,
-            parameters=parameters,
-            plot_background=True,
-            rng=rng,
-            obstacle_contour=obstacle_contour,
-            sdf=sdf,
-            velocity_func=velocity_func
-        )
+            env = MicroSwimmer(
+                config_eval["x_0"],
+                config_eval["C"],
+                Dt_sim,
+                config_eval["velocity_bool"],
+                config_eval["n_lookahead"],
+                seed,
+                config_eval["bounce_thr"],
+            )
 
+            state_dim = env.observation_space.shape[0]
+            action_dim = env.action_space.shape[0]
+            max_action = float(env.action_space.high[0])
+            agent = TD3(state_dim, action_dim, max_action)
+            save_path_eval = os.path.join(agent_name, "eval_bg/")
+
+            os.makedirs(save_path_eval, exist_ok=True)
+
+            policy_file = os.path.join(agent_name, "models/agent")
+            agent.load(policy_file)
+            (
+                rewards_per_episode,
+                rewards_t_per_episode,
+                rewards_d_per_episode,
+                success_rate,
+                _,
+            ) = evaluate_agent(
+                agent,
+                env,
+                config_eval["eval_episodes"],
+                config_eval,
+                save_path_eval,
+                f"eval_with" + file_name_or,
+                False,
+                title="",
+                plot=True,
+                parameters=parameters,
+                plot_background=True,
+                rng=rng,
+                obstacle_contour=obstacle_contour,
+                sdf=sdf,
+                velocity_func=velocity_func,
+            )
+
+            plt.close()
+            results_per_config[path_to_config]={
+                "rewards": rewards_per_episode,
+                "rewards_time": rewards_t_per_episode,
+                "rewards_distance": rewards_d_per_episode,
+                "success_rate": success_rate,
+            }
+
+            success_rate_list.append(success_rate)
             
-        plt.close()
         results[agent_name] = {
-            "rewards": rewards_per_episode,
-            "rewards_time": rewards_t_per_episode,
-            "rewards_distance": rewards_d_per_episode,
-            "success_rate": success_rate,
+            "mean_success_rate": mean(success_rate_list),
             "n_eval_episodes": config_eval["eval_episodes"],
             "training type": training_type,
+            "results_per_config":results_per_config
         }
         print("-----------------------------------------------")
-        print("Success rate : ", success_rate)
-        print("Mean rewards : ", format_sci(mean(rewards_per_episode)))
-        print("Mean rewards t : ", format_sci(mean(rewards_t_per_episode)))
-        print("Mean rewards d : ", format_sci(mean(rewards_d_per_episode)))
+        print("Success rate : ", mean(success_rate_list))
         print("-----------------------------------------------")
-
-    file_name_result = os.path.join(file_path_result, file_name_or)
+        
     with open(file_name_result, "w") as f:
         json.dump(results, f, indent=4)
 
@@ -195,203 +211,7 @@ def evaluate_after_training(
     plt.close()
     return results
 
-
-def compare_p_line(
-    agent_name,
-    config_eval,
-    file_name_or,
-    save_path_eval,
-    u_bg=np.zeros(2),
-    title="",
-    offset=0.2,
-):
-    config_eval = copy.deepcopy(config_eval)
-    save_path_comparison = os.path.join(save_path_eval, "comparison_graph/")
-    if not os.path.exists(save_path_comparison):
-        os.makedirs(save_path_comparison)
-    trajectories = {}
-    p_target = config_eval["p_target"]
-    p_0 = config_eval["p_0"]
-    nb_points_path = config_eval["nb_points_path"]
-    nb_starting_point = 4
-    p_0_above = p_0 + np.array([0.2, offset])
-    p_target_above = p_target + np.array([0, offset])
-    p_0_below = p_0 + np.array([0.2, -offset])
-    p_target_below = p_target + np.array([0, -offset])
-
-    path, _ = generate_simple_line(p_0, p_target, nb_points_path)
-    path_above_point, _ = generate_simple_line(
-        p_0_above, p_target_above, nb_starting_point
-    )
-    path_below_point, _ = generate_simple_line(
-        p_0_below, p_target_below, nb_starting_point
-    )
-
-    config_eval["path"] = path
-    tree = KDTree(path)
-    config_eval["tree"] = tree
-
-    path_above_point = path_above_point[:-1]
-    path_below_point = path_below_point[:-1]
-    path_starting_point = np.concatenate((path_above_point, path_below_point), axis=0)
-    L = len(path_starting_point)
-    print("path_starting_point : ", path_starting_point)
-    file_name_or += title
-    path_save_fig = os.path.join(save_path_comparison, file_name_or)
-
-    config_eval["D"] = 0
-    steps_per_action = config_eval["steps_per_action"] - 2
-    t_max = config_eval["t_max"]
-    Dt_action = config_eval["Dt_action"]
-    Dt_sim = Dt_action / steps_per_action
-
-    id = 0
-    starting_point = path_starting_point[id]
-    dot_product = []
-    config_eval["x_0"] = starting_point
-    x = starting_point
-    env = MicroSwimmer(
-        config_eval["x_0"],
-        config_eval["C"],
-        Dt_sim,
-        config_eval["velocity_bool"],
-        config_eval["n_lookahead"],
-    )
-    state, done = env.reset(config_eval["tree"], config_eval["path"]), False
-    iter = 0
-
-    policy_file = os.path.join(agent_name, "models/agent")
-    state_dim = env.observation_space.shape[0]
-    action_dim = env.action_space.shape[0]
-    max_action = float(env.action_space.high[0])
-    agent = TD3.TD3(state_dim, action_dim, max_action)
-    agent.load(policy_file)
-    states_list = [x]
-
-    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(16, 8))
-
-    ax1.plot(
-        path[:, 0], path[:, 1], label="path", color="black", linewidth=2, zorder=10
-    )
-
-    while id < len(path_starting_point):
-        iter += 1
-        if iter % steps_per_action == 0 or iter == 1:
-            action = agent.select_action(state)
-            v, p_dir = find_next_v(
-                x, config_eval["p_target"], config_eval["beta"], Dt_sim, num_angles=90
-            )
-            x_previous = x
-        next_state, reward, done, info = env.step(
-            action,
-            tree,
-            path,
-            p_target,
-            config_eval["beta"],
-            config_eval["D"],
-            u_bg,
-            config_eval["threshold"],
-        )
-        x = info["x"]
-        states_list.append(x)
-        state = next_state
-
-        if iter % steps_per_action == 1:
-            dir_act = (x - x_previous) / np.linalg.norm(x - x_previous)
-            product = dir_act @ p_dir
-            dot_product.append(product)
-
-        if done or iter * Dt_sim > t_max:
-            trajectories[f"{path_starting_point[id]}"] = dot_product
-            color = plot_trajectories(
-                ax1, np.array(states_list), path, title="streamlines", color_id=id
-            )
-
-            p_1 = path_starting_point[id]
-            x_values = np.linspace(p_1[0], p_target[0], len(dot_product))
-            ax2.plot(x_values, dot_product, color=color, label=f"Traj {id}")
-
-            iter = 0
-            id += 1
-            if id < L:
-                x_0 = path_starting_point[id]
-                config_eval["x_0"] = x_0
-                dot_product = []
-                states_list = [x_0]
-                x = x_0
-                env = MicroSwimmer(
-                    config_eval["x_0"],
-                    config_eval["C"],
-                    Dt_sim,
-                    config_eval["velocity_bool"],
-                    config_eval["n_lookahead"],
-                )
-                state, done = env.reset(config_eval["tree"], config_eval["path"]), False
-            if ax1.get_ylim()[1] - ax1.get_ylim()[0] < 0.5:
-                ax1.set_ylim(-0.3, 0.3)
-
-    ax1.set_aspect("equal")
-    ax1.set_title("Trajectories")
-    ax1.legend()
-
-    ax2.set_aspect("equal")
-    ax2.set_title("Dot Product Evolution")
-    ax2.set_ylim(0, 1)
-    ax2.legend()
-
-    plt.tight_layout()
-    plt.savefig(path_save_fig, dpi=200, bbox_inches="tight")
-
-
-def policy_direction(agent_name, config_eval):
-    p_0 = np.zeros(2)
-    p_target = np.array([1 / 8, 1 / 64])
-    k = -0.4
-    nb_points = 100
-    path = generate_curve(p_0, p_target, k, nb_points)
-    tree = KDTree(path)
-    x_0 = np.array([0.02, -0.01])
-    x = x_0
-    config_eval["x_0"] = x_0
-    env = MicroSwimmer(
-        config_eval["x_0"],
-        config_eval["C"],
-        config_eval["Dt_action"] / config_eval["steps_per_action"],
-    )
-    beta = config_eval["beta"]
-    u_bg = np.zeros(2)
-    D = config_eval["D"]
-    threshold = config_eval["threshold"]
-
-    policy_file = os.path.join(agent_name, "models/agent")
-    state_dim = env.observation_space.shape[0]
-    action_dim = env.action_space.shape[0]
-    max_action = float(env.action_space.high[0])
-    agent = TD3.TD3(state_dim, action_dim, max_action)
-    agent.load(policy_file)
-
-    nb_steps = 5
-    state, done = env.reset(tree, path), False
-
-    plt.plot(path[:, 0], path[:, 1], label="path", color="black", linewidth=2)
-    plt.scatter(p_0[0], p_0[1], color="black")
-    for i in range(nb_steps):
-        action = agent.select_action(state)
-        d, id_cp = min_dist_closest_point(x, tree)
-        dir_path = path[id_cp + 1] - path[id_cp]
-        action_global = coordinate_in_global_ref(path[id_cp], dir_path, action)
-        plot_action(path, x, p_0, id_cp, action_global, i)
-        next_state, x, reward, done, _ = env.step(
-            action, tree, path, p_target, beta, D, u_bg, threshold
-        )
-        state = next_state
-    save_path_eval_action = os.path.join(agent_name, "eval_bg/action_choice")
-
-    plt.legend()
-    plt.savefig(save_path_eval_action, dpi=200, bbox_inches="tight")
-
-
-def initialize_parameters(agent_file, p_target, p_0, bounce_thr):
+def initialize_parameters(agent_file,bounce_thr):
     path_config = os.path.join(agent_file, "config.pkl")
     with open(path_config, "rb") as f:
         config = pickle.load(f)
@@ -399,12 +219,9 @@ def initialize_parameters(agent_file, p_target, p_0, bounce_thr):
     config_eval["random_curve"] = (
         config["random_curve"] if "random_curve" in config else False
     )
-    config_eval["p_target"] = p_target
-    config_eval["p_0"] = p_0
-    config_eval["x_0"] = p_0
     config_eval["nb_points_path"] = 500
     config_eval["t_max"] = 20
-    config_eval["eval_episodes"] = 100
+    config_eval["eval_episodes"] = 50
     config_eval["velocity_bool"] = (
         config["velocity_bool"] if "velocity_bool" in config else False
     )
@@ -421,124 +238,255 @@ def initialize_parameters(agent_file, p_target, p_0, bounce_thr):
     config_eval["bounce_thr"] = bounce_thr
     return config_eval
 
-
 def sdf_circle(point, center, radius):
     px, py = point
     cx, cy = center
     distance_to_center = sqrt((px - cx) ** 2 + (py - cy) ** 2)
     return distance_to_center - radius
 
-
-def obstacle_and_path_a_star(obstacle_type):
-    if obstacle_type == "circle":
-
-        def sdf(point):
-            centers = [(-1, 1 / 2), (1, -1 / 2)]
-            radius = 3 / 4
-            return sdf_many_circle(point, centers, radius)
-
-        x = np.linspace(-2, 2, 500)
-        y = np.linspace(-2, 2, 500)
-        X, Y = np.meshgrid(x, y, indexing="ij")
-        Z = np.vectorize(lambda px, py: sdf((px, py)))(X, Y)
-
-        start = [0, 250]
-        goal = [490, 250]
-        obstacle_contour = get_contour_coordinates(X, Y, Z, level=0)
-
-    p_0 = np.array([x[start[0]], y[start[1]]])
-    p_target = np.array([x[goal[0]], y[goal[1]]])
-
-    maximum_curvature = 30
-    Dt_action = 1 / maximum_curvature
-    threshold = 0.07
-    D = threshold**2 / (20 * Dt_action)
-    min_distance = 2 * sqrt(2 * Dt_action * D)
-
-    path_indices = find_shortest_path_circle(start, goal, min_distance, Z)
-    path_indices_short = shortcut_path(path_indices, X, Y, Z, min_distance)
-    path_coords_short = np.array(
-        [[X[idx[0], idx[1]], Y[idx[0], idx[1]]] for idx in path_indices_short]
+def sdf_func_and_velocity_func(domain_size, ratio):
+    x, y, N, h, sdf = load_sdf_from_csv(domain_size)
+    sdf_interpolator = RegularGridInterpolator(
+        (y, x), sdf, bounds_error=False, fill_value=None
     )
-    path = resample_path(path_coords_short, n_points=500)
-    return p_0, p_target, sdf, path, obstacle_contour
 
-def obstacle_and_path_fmm(obstacle_type):
-    scale = 8
-    domain_size =(1*scale,1*scale)
- 
-    x,y,N,h,sdf = load_sdf_from_csv(domain_size)
-    grid_size = (N[0],N[1])
-    # np.save(f"data/sdf_retina2D_scale_{scale}.npy", sdf, allow_pickle=False)
-    X, Y = np.meshgrid(x, y)
-
-    start_point = (0.98*scale, 0.3*scale)
-    goal_point = (0.44*scale, 0.55*scale)
-    sdf_interpolator = RegularGridInterpolator((y, x), sdf, bounds_error=False, fill_value=None)
-    
     def sdf_function(point):
-        return sdf_interpolator(point[::-1]) 
-            
-    path_vel = 'data/vel.sdf'
-    N, h, vel = vel_read(path_vel)
-    v = vel[N[2]//2,:,:,0:2]
-    vx = v[:,:,0]
-    vy = v[:,:,1]
-    velocity_interpolator_x = RegularGridInterpolator((y, x), vx, bounds_error=False, fill_value=None)
-    velocity_interpolator_y = RegularGridInterpolator((y, x), vy, bounds_error=False, fill_value=None)
-    v = np.sqrt(vx**2 + vy**2)
-    def velocity_retina(point):
-        return 2.5*np.array([velocity_interpolator_x(point[::-1]),velocity_interpolator_y(point[::-1])])/(np.max(v))
- 
-        
-    if os.path.exists(f"data/retina2D_path_scale_{scale}.npy"):
-        path = np.load(f"data/retina2D_path_scale_{scale}.npy", allow_pickle=False)
-        print("Path loaded")
-    else : 
-        path, travel_time, grid_info = compute_fmm_path(start_point, goal_point, sdf_function, x, y, B=20,flow_field=velocity_retina,grid_size=grid_size,domain_size=domain_size)
-        path=np.array(path)
-        np.save(f"data/retina2D_path_scale_{scale}.npy", path, allow_pickle=False)
-    if os.path.exists(f"data/retina2D_contour_scale{scale}.npy"):
-        obstacle_contour = np.load(f"data/retina2D_contour_scale{scale}.npy", allow_pickle=False)
-        print("Contour loaded")
-    else : 
-        Z = np.vectorize(lambda px, py: sdf_function((px, py)))(X, Y)
-        obstacle_contour = get_contour_coordinates(X, Y, Z, level=0)
-        np.save(f"data/retina2D_contour_scale{scale}.npy",obstacle_contour,allow_pickle=False)
-        
+        return sdf_interpolator(point[::-1])
 
+    path_vel = "data/vel.sdf"
+    N, h, vel = vel_read(path_vel)
+    v = vel[N[2] // 2, :, :, 0:2]
+    vx, vy = v[:, :, 0], v[:, :, 1]
+    velocity_interpolator_x = RegularGridInterpolator(
+        (y, x), vx, bounds_error=False, fill_value=None
+    )
+    velocity_interpolator_y = RegularGridInterpolator(
+        (y, x), vy, bounds_error=False, fill_value=None
+    )
+    v_magnitude = np.sqrt(vx**2 + vy**2)
+
+    def velocity_retina(point):
+        return (
+            ratio
+            * np.array(
+                [
+                    velocity_interpolator_x(point[::-1]),
+                    velocity_interpolator_y(point[::-1]),
+                ]
+            )
+            / np.max(v_magnitude)
+        )
+
+    return sdf_function, velocity_retina
+
+def contour_2D(sdf_function,X_new,Y_new):
+    if os.path.exists(f"data/retina2D_contour_scale_{scale}.npy"):
+        obstacle_contour = np.load(
+            f"data/retina2D_contour_scale_{scale}.npy", allow_pickle=False
+        )
+        print("Contour loaded")
+    else:
+        Z = np.vectorize(lambda px, py: sdf_function((px, py)))(X_new, Y_new)
+        obstacle_contour = get_contour_coordinates(X_new, Y_new, Z, level=0)
+        np.save(
+            f"data/retina2D_contour_scale_{scale}.npy",
+            obstacle_contour,
+            allow_pickle=False,
+        )
+        
+    return obstacle_contour
+      
+def load_config_path(path_to_config_path):
+    # If config_path_fmm is provided, other parameters can be None
+    with open(path_to_config_path, "r") as f:
+        config_path_fmm = json.load(f)
+
+    parameters = config_path_fmm["parameters"]
+    start_point = parameters["start_point"]
+    goal_point = parameters["goal_point"]
+    domain_size = parameters["domain_size"]
+    grid_size = parameters["grid_size"]
+    ratio = parameters["ratio"]
+    B = parameters["B"]
+    flow_factor = parameters["flow_factor"]
+    time = parameters['current_time']
+    path = np.load(config_path_fmm["path_path"], allow_pickle=False)
+    save_path_phi = config_path_fmm["path_phi"]
+    save_path_flow = config_path_fmm["path_flow"]
+
+    sdf_function, velocity_retina = sdf_func_and_velocity_func(domain_size, ratio)
+    x_new = np.linspace(0, domain_size[0], parameters["grid_size"][0])
+    y_new = np.linspace(0, domain_size[1], parameters["grid_size"][1])
+    X_new, Y_new = np.meshgrid(x_new, y_new)
+    return path,start_point,goal_point,sdf_function,velocity_retina,X_new, Y_new,time
+
+def obstacle_and_path(
+    scale=None,
+    ratio=None,
+    B=None,
+    flow_factor=None,
+    res_factor=None,
+    start_point=None,
+    goal_point=None,
+    path_method=None,
+    path_to_config_path=None,
+):
+    current_time = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+    if path_to_config_path is not None:
+        path,_,_,sdf_function,_,X_new,Y_new = load_config_path(path_to_config_path)
+    else:
+        # If config_path_fmm is None, all other parameters must be provided
+        print("Creation of config file...")
+        if None in [scale, ratio, B, flow_factor, res_factor, start_point, goal_point]:
+            raise ValueError(
+                "If config_path_fmm is None, all other parameters (scale, ratio, B, flow_factor, res_factor, start_point, goal_point) must be provided."
+            )
+
+        config_path_fmm = {}
+        domain_size = (1 * scale, 1 * scale)
+        
+        x, y, N, h, sdf = load_sdf_from_csv(domain_size)
+
+        start_point = (start_point[0] * scale, start_point[1] * scale)
+        goal_point = (goal_point[0] * scale, goal_point[1] * scale)
+        grid_size =  (N[0] * res_factor, N[1] * res_factor)
+        parameters = {
+            "start_point": start_point,
+            "goal_point": goal_point,
+            "grid_size": grid_size,
+            "domain_size": domain_size,
+            "ratio": ratio,
+            "B": B,
+            "flow_factor": flow_factor,
+            "method":path_method,
+            "current_time":current_time
+        }
+        config_path_fmm["parameters"] = parameters
+
+        sdf_interpolator = RegularGridInterpolator(
+            (y, x), sdf, bounds_error=False, fill_value=None
+        )
+        x_new = np.linspace(0, domain_size[0], parameters["grid_size"][0])
+        y_new = np.linspace(0, domain_size[1], parameters["grid_size"][1])
+        X_new, Y_new = np.meshgrid(x_new, y_new)
+        sdf = sdf_interpolator((Y_new, X_new))
+
+        sdf_function, velocity_retina = sdf_func_and_velocity_func(domain_size, ratio)
+
+        save_path_path = f"data/retina2D_path_time_{current_time}.npy"
+        if path_method == 'fmm':
+            path, travel_time, grid_info, save_path_phi, save_path_flow = compute_fmm_path(
+                start_point,
+                goal_point,
+                sdf_function,
+                x_new,
+                y_new,
+                B=B,
+                flow_field=velocity_retina,
+                grid_size=parameters["grid_size"],
+                domain_size=domain_size,
+                ratio=ratio,
+                flow_factor=flow_factor,
+            )
+        elif path_method == 'astar':
+             
+            v0,vx,vy,save_path_phi,save_path_flow  = compute_v(x,y,velocity_retina,B,grid_size,ratio)
+            v0 = np.ones_like(v0)*1/4
+            path, travel_time= astar_anisotropic(x_new, y_new, v0, vx, vy, start_point, goal_point, sdf_function,
+                                      heuristic_weight=1.3, directions=16)
+        
+            path = np.array(path)  # de forme (N, 2)
+            smoothed_x = gaussian_filter1d(path[:, 0], sigma=3)
+            smoothed_y = gaussian_filter1d(path[:, 1], sigma=3)
+            path = np.stack([smoothed_x, smoothed_y], axis=1)
+        config_path_fmm["path_path"] = save_path_path
+        config_path_fmm["path_phi"] = save_path_phi
+        config_path_fmm["path_flow"] = save_path_flow
+
+        path = np.array(path)
+        np.save(save_path_path, path, allow_pickle=False)
+        path_to_config_path = f"config_path/config_path__{path_method}_{current_time}.json"
+
+        with open(path_to_config_path, "w") as f:
+            json.dump(config_path_fmm, f, indent=4)
+            print("Config saved ")
+            
+
+    obstacle_contour=contour_2D(sdf_function,X_new,Y_new)
     
-    return np.array(start_point),np.array(goal_point),sdf_function,path,obstacle_contour,velocity_retina
+    return (
+        np.array(start_point),
+        np.array(goal_point),
+        sdf_function,
+        path,
+        obstacle_contour,
+        velocity_retina,
+        current_time
+    )
+
+def create_list_of_goal_point(n):
+    point_list = np.random.rand(n, 2)
+    sdf_function, _ = sdf_func_and_velocity_func((1,1), ratio)
+    goal_points = [point for point in point_list if (sdf_function(point) < -0.15 and point[0]<0.95)] 
+    return goal_points
 
 if __name__ == "__main__":
     obstacle_type = "retina"
     agents_file = []
     directory_path = Path("agents/")
 
-    for item in directory_path.iterdir():
-        if item.is_dir() and "agent_TD3" in item.name:
-            if "2025-04-23" in item.name or "2025-04-22" in item.name:
-                agents_file.append(os.path.join(directory_path, item.name))
-    agents_file = ["agents/agent_TD3_2025-04-18_13-33"]
+    # for item in directory_path.iterdir():
+    #     if item.is_dir() and "agent_TD3" in item.name:
+    #         if "2025-04-23" in item.name or "2025-04-22" in item.name:
+    #             agents_file.append(os.path.join(directory_path, item.name))
+    # agents_file = ["agents/agent_TD3_2025-04-18_13-33"]
+    
     print("Agents files : ", agents_file)
 
-    print("---------------------Evaluation with no bg---------------------")
-    title_add = 'velocity_25_'
-    p_0, p_target, sdf, path, obstacle_contour,velocity_retina = obstacle_and_path_fmm(obstacle_type)
-    path=np.array(path)
+    scale = 8
+    ratio = 5
+    N = (576,528)
+    start_point = (0.98, 0.3)
+    goal_point = (0.615, 0.625)
+    res_factor = 1
+    grid_size =  (N[0] * res_factor, N[1] * res_factor)
+    domain_size = (1 * scale, 1 * scale)
+    x_new = np.linspace(0, domain_size[0],grid_size[0])
+    y_new = np.linspace(0, domain_size[1], grid_size[1])
+    X_new, Y_new = np.meshgrid(x_new, y_new)
+    goal_points = create_list_of_goal_point(40)
+    for goal_point in goal_points:
+        goal_point=tuple(goal_point)
+        p_0, p_target, sdf_func, path, obstacle_contour, velocity_retina,current_time = obstacle_and_path(
+            scale=scale,
+            ratio=ratio,
+            flow_factor=2,
+            B=15,
+            res_factor=res_factor,
+            start_point=start_point,
+            goal_point=goal_point,
+            path_method='astar',
+            path_to_config_path=None,
+        )
+        
+    list_config_paths = []
+    dir_config_path = Path('config_path/')
+
+    for item in dir_config_path.rglob("*.json"):  # Recherche récursive de tous les fichiers .json
+        list_config_paths.append(os.path.join(dir_config_path,item.name))  # Ajoute le chemin absolu des fichiers à la liste
+
+    sdf_func, velocity_retina = sdf_func_and_velocity_func(domain_size, ratio)
+    obstacle_contour =  contour_2D(sdf_func,X_new,Y_new)
+    print(list_config_paths)
     print("Path generated")
     results = evaluate_after_training(
         agents_file,
-        p_target=p_target,
-        p_0=p_0,
-        path=path,
         obstacle_contour=obstacle_contour,
-        sdf=sdf,
-        title_add=title_add,
         obstacle_type=obstacle_type,
-        velocity_func = velocity_retina,
+        list_config_paths=list_config_paths
+        
     )
-    rank_agents_by_rewards(results)
+    # rank_agents_by_rewards(results)
 
     # norm = 0.5
     # dict = {
@@ -569,3 +517,4 @@ if __name__ == "__main__":
     # cir = 2
     # center = np.array([1,3/4])
     # results = evaluate_after_training(agents_file,f'result_evaluation_{title_add}_{type}.json',p_target = p_target,p_0 = p_0,path=path,obstacle_contour=obstacle_contour,title_add=title_add,a=a,center=center,cir=cir)
+
