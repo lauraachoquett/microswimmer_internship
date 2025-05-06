@@ -6,7 +6,6 @@ results_evaluation/
 results_evaluation_without_path/
 .vscode/
 change_config.py
-data/
 Part2.md
 Part1.md
 sdf_path.md
