@@ -36,14 +36,13 @@ if __name__ == "__main__":
     domain_size = (1, 1)
 
     x, y, N, _, sdf = load_sdf_from_csv(domain_size)
-
+    print(np.min(sdf))
     print("SDF shape after slice :", sdf.shape)
     fig, ax = plt.subplots(figsize=(15, 7))
     grid_size = (N[0], N[1])
-
+    
 
     start_point = (0.98, 0.3)
-    goal_point = (0.615, 0.625)
     
     sdf_interpolator = RegularGridInterpolator(
         (y, x), sdf, bounds_error=False, fill_value=None
@@ -57,8 +56,8 @@ if __name__ == "__main__":
     point_list = np.random.rand(20, 2)
 
     goal_points = [point for point in point_list if (sdf_function(point) < -0.15 and point[0]<0.95)]
+    goal_points = [(0.53, 0.6)]
     
-    print(len(goal_points))
 
     x_new = np.linspace(0, domain_size[0], N[0] * 5)
     y_new = np.linspace(0, domain_size[1], N[1] * 5)
@@ -80,7 +79,7 @@ if __name__ == "__main__":
     plt.legend()
     plt.savefig("fig/retina_example_test.png", dpi=400, bbox_inches="tight")
     plt.close()
-    np.save("data/retina2D.npy", sdf_new, allow_pickle=False)
+    # np.save("data/retina2D.npy", sdf_new, allow_pickle=False)
 
     # path_vel = "data/vel.sdf"
     # n, h, vel = vel_read(path_vel)

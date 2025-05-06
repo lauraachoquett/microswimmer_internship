@@ -1,6 +1,5 @@
 import os
 from statistics import mean
-
 import matplotlib.pyplot as plt
 import numpy as np
 
@@ -187,6 +186,7 @@ def evaluate_agent(
 
         fig.savefig(path_save_fig, dpi=400, bbox_inches="tight")
         plt.close(fig)
+    # print(mean(v_hist))
     # path_save_fig = os.path.join(save_path_result_fig, file_name + "_hist_v.png")
     # plt.hist(v_hist, bins=50, color="blue", alpha=0.7)
     # plt.axvline(

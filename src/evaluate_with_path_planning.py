@@ -1,12 +1,11 @@
-
 import os
 import sys
 from math import sqrt
-
+import time
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 import json
 import pickle
-from math import cos, sin, sqrt
+from math import cos, sin, sqrt,ceil
 
 import numpy as np
 from scipy.spatial import KDTree
@@ -29,7 +28,7 @@ from scipy.interpolate import RegularGridInterpolator
 from scipy.ndimage import gaussian_filter1d
 
 from .analytic_solution_line import find_next_v
-from .Astar_ani import astar_anisotropic, compute_v
+from .Astar_ani import astar_anisotropic, compute_v,contour_2D
 from .data_loader import load_sdf_from_csv, vel_read
 from .distance_to_path import min_dist_closest_point
 from .evaluate_agent import evaluate_agent
@@ -80,7 +79,20 @@ def evaluate_after_training(
         rankine_bg = True
     else:
         parameters = []
-
+        
+        
+    file_path_result = "results_evaluation/"
+    os.makedirs(file_path_result, exist_ok=True)
+    file_name_result = os.path.join(
+        file_path_result, "result_evaluation_" + f"{obstacle_type}" + ".json"
+    )
+    try:
+        with open(file_name_result, "r") as f:
+            results = json.load(f)
+    except FileNotFoundError:
+        results = {}
+        
+        
     for agent_name in agent_files:
         config_eval = initialize_parameters(agent_name, 0.00)
         config_eval = copy.deepcopy(config_eval)
@@ -94,10 +106,7 @@ def evaluate_after_training(
             "n_lookahead": config_eval["n_lookahead"],
             "beta": config_eval["beta"],
         }
-        # if agent_name in results.keys():
-        #     results[agent_name]['training type'] = training_type
-        #     print(f"Agent {agent_name} already evaluated.")
-        #     continue
+
         print("Agent name : ", agent_name)
         config_eval["uniform_bg"] = uniform_bg
         config_eval["rankine_bg"] = rankine_bg
@@ -109,21 +118,20 @@ def evaluate_after_training(
         Dt_sim = Dt_action / steps_per_action
         threshold = config_eval["threshold"]
         success_rate_list = []
-        file_path_result = "results_evaluation/"
-        os.makedirs(file_path_result, exist_ok=True)
-        file_name_result = os.path.join(
-            file_path_result, "result_evaluation_" + f"{obstacle_type}" + ".json"
-        )
-        try:
-            with open(file_name_result, "r") as f:
-                results = json.load(f)
-        except FileNotFoundError:
-            results = {}
+
         results["type"] = [obstacle_type]
 
         for path_to_config in list_config_paths:
-            results_per_config={}
-            path,start_point,goal_point,sdf,velocity_retina,X_new, Y_new,time = load_config_path(path_to_config)  
+            if agent_name in results.keys():
+                results_per_config = results[agent_name]['results_per_config']
+                print("Path to config :", path_to_config)
+                if path_to_config in results[agent_name]['results_per_config']:
+                    print(f"Agent {agent_name} already evaluated with this config.")
+                    continue
+            else : 
+                results_per_config={}
+            path,start_point,goal_point,sdf,velocity_retina,X_new, Y_new,time,ratio = load_config_path(path_to_config)  
+
             tree = KDTree(path)
             config_eval['path']=path
             config_eval['tree']=tree
@@ -149,7 +157,7 @@ def evaluate_after_training(
             action_dim = env.action_space.shape[0]
             max_action = float(env.action_space.high[0])
             agent = TD3(state_dim, action_dim, max_action)
-            save_path_eval = os.path.join(agent_name, "eval_bg/")
+            save_path_eval = os.path.join(agent_name, f"eval_bg/velocity_ratio_{ratio}")
 
             os.makedirs(save_path_eval, exist_ok=True)
 
@@ -195,12 +203,12 @@ def evaluate_after_training(
             "training type": training_type,
             "results_per_config":results_per_config
         }
+        with open(file_name_result, "w") as f:
+            json.dump(results, f, indent=4)
         print("-----------------------------------------------")
         print("Success rate : ", mean(success_rate_list))
         print("-----------------------------------------------")
         
-    with open(file_name_result, "w") as f:
-        json.dump(results, f, indent=4)
 
     threshold = [0.07]
     D = config_eval["D"]
@@ -220,7 +228,7 @@ def initialize_parameters(agent_file,bounce_thr):
         config["random_curve"] if "random_curve" in config else False
     )
     config_eval["nb_points_path"] = 500
-    config_eval["t_max"] = 20
+    config_eval["t_max"] = 30
     config_eval["eval_episodes"] = 50
     config_eval["velocity_bool"] = (
         config["velocity_bool"] if "velocity_bool" in config else False
@@ -234,6 +242,7 @@ def initialize_parameters(agent_file,bounce_thr):
     Dt_action = 1 / maximum_curvature
     threshold = 0.07
     D = threshold**2 / (20 * Dt_action)
+    threshold = 5/576*24
     config_eval["D"] = D
     config_eval["bounce_thr"] = bounce_thr
     return config_eval
@@ -278,23 +287,6 @@ def sdf_func_and_velocity_func(domain_size, ratio):
         )
 
     return sdf_function, velocity_retina
-
-def contour_2D(sdf_function,X_new,Y_new):
-    if os.path.exists(f"data/retina2D_contour_scale_{scale}.npy"):
-        obstacle_contour = np.load(
-            f"data/retina2D_contour_scale_{scale}.npy", allow_pickle=False
-        )
-        print("Contour loaded")
-    else:
-        Z = np.vectorize(lambda px, py: sdf_function((px, py)))(X_new, Y_new)
-        obstacle_contour = get_contour_coordinates(X_new, Y_new, Z, level=0)
-        np.save(
-            f"data/retina2D_contour_scale_{scale}.npy",
-            obstacle_contour,
-            allow_pickle=False,
-        )
-        
-    return obstacle_contour
       
 def load_config_path(path_to_config_path):
     # If config_path_fmm is provided, other parameters can be None
@@ -318,7 +310,7 @@ def load_config_path(path_to_config_path):
     x_new = np.linspace(0, domain_size[0], parameters["grid_size"][0])
     y_new = np.linspace(0, domain_size[1], parameters["grid_size"][1])
     X_new, Y_new = np.meshgrid(x_new, y_new)
-    return path,start_point,goal_point,sdf_function,velocity_retina,X_new, Y_new,time
+    return path,start_point,goal_point,sdf_function,velocity_retina,X_new, Y_new,time,ratio
 
 def obstacle_and_path(
     scale=None,
@@ -329,6 +321,8 @@ def obstacle_and_path(
     start_point=None,
     goal_point=None,
     path_method=None,
+    heuristic_weight=None,
+    weight_sdf = None,
     path_to_config_path=None,
 ):
     current_time = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
@@ -343,13 +337,26 @@ def obstacle_and_path(
             )
 
         config_path_fmm = {}
+        
         domain_size = (1 * scale, 1 * scale)
         
+        #Determine the size of the domain. It maps each point of the domain to each point on the grid.
         x, y, N, h, sdf = load_sdf_from_csv(domain_size)
+        #Compute sdf and velocity interpolator regarding the size of the domain. x,y and sdf must have the same shape
+        sdf_function, velocity_retina = sdf_func_and_velocity_func(domain_size, ratio)
 
+
+        #sdf_function :  Calculate the sdf in any point of the domain py interpolation
+        #velocity_retina :  Calculate the velocity in any point of the domain py interpolation
+        
         start_point = (start_point[0] * scale, start_point[1] * scale)
         goal_point = (goal_point[0] * scale, goal_point[1] * scale)
+
+        #Reduce the cell size by a factor : res_factor
+
         grid_size =  (N[0] * res_factor, N[1] * res_factor)
+        x_new = np.linspace(0, domain_size[0], grid_size[0])
+        y_new = np.linspace(0, domain_size[1], grid_size[1])
         parameters = {
             "start_point": start_point,
             "goal_point": goal_point,
@@ -358,20 +365,12 @@ def obstacle_and_path(
             "ratio": ratio,
             "B": B,
             "flow_factor": flow_factor,
+            "heuristic_weight":heuristic_weight,
+            "weight_sdf":weight_sdf,
             "method":path_method,
             "current_time":current_time
         }
         config_path_fmm["parameters"] = parameters
-
-        sdf_interpolator = RegularGridInterpolator(
-            (y, x), sdf, bounds_error=False, fill_value=None
-        )
-        x_new = np.linspace(0, domain_size[0], parameters["grid_size"][0])
-        y_new = np.linspace(0, domain_size[1], parameters["grid_size"][1])
-        X_new, Y_new = np.meshgrid(x_new, y_new)
-        sdf = sdf_interpolator((Y_new, X_new))
-
-        sdf_function, velocity_retina = sdf_func_and_velocity_func(domain_size, ratio)
 
         save_path_path = f"data/retina2D_path_time_{current_time}.npy"
         if path_method == 'fmm':
@@ -389,30 +388,36 @@ def obstacle_and_path(
                 flow_factor=flow_factor,
             )
         elif path_method == 'astar':
-             
-            v0,vx,vy,save_path_phi,save_path_flow  = compute_v(x,y,velocity_retina,B,grid_size,ratio)
-            v0 = np.ones_like(v0)*1/4
+            #Compute v0,vx and vy on this new domain with a certain size of cell
+            v0,vx,vy,save_path_phi,save_path_flow  = compute_v(x_new,y_new,velocity_retina,B,grid_size,ratio,sdf_function)
+
             path, travel_time= astar_anisotropic(x_new, y_new, v0, vx, vy, start_point, goal_point, sdf_function,
-                                      heuristic_weight=1.3, directions=16)
+                                      heuristic_weight=heuristic_weight)
         
             path = np.array(path)  # de forme (N, 2)
-            smoothed_x = gaussian_filter1d(path[:, 0], sigma=3)
-            smoothed_y = gaussian_filter1d(path[:, 1], sigma=3)
+            dist = np.array([abs(path[i+1]-path[i]) for i in range(len(path)-1)])
+            n = ceil(np.max(dist)/(5*1e-3))
+            if n>1:
+                print(n)
+                path=resample_path(path,len(path)*n)
+            smoothed_x = gaussian_filter1d(path[:, 0], sigma=10)
+            smoothed_y = gaussian_filter1d(path[:, 1], sigma=10)
             path = np.stack([smoothed_x, smoothed_y], axis=1)
+            print("maximum distance :",np.max(dist))
         config_path_fmm["path_path"] = save_path_path
         config_path_fmm["path_phi"] = save_path_phi
         config_path_fmm["path_flow"] = save_path_flow
 
-        path = np.array(path)
         np.save(save_path_path, path, allow_pickle=False)
-        path_to_config_path = f"config_path/config_path__{path_method}_{current_time}.json"
-
+        file_to_config_path = f"config_path/velocity_ratio_{ratio}"
+        os.makedirs(file_to_config_path,exist_ok=True)
+        path_to_config_path = os.path.join(file_to_config_path,f"config_path__{path_method}_{current_time}.json")
         with open(path_to_config_path, "w") as f:
             json.dump(config_path_fmm, f, indent=4)
             print("Config saved ")
             
-
-    obstacle_contour=contour_2D(sdf_function,X_new,Y_new)
+    X_new,Y_new = np.meshgrid(x_new,y_new)
+    obstacle_contour=contour_2D(sdf_function,X_new,Y_new,scale)
     
     return (
         np.array(start_point),
@@ -424,10 +429,10 @@ def obstacle_and_path(
         current_time
     )
 
-def create_list_of_goal_point(n):
+def create_list_of_goal_point(n,start_point):
     point_list = np.random.rand(n, 2)
     sdf_function, _ = sdf_func_and_velocity_func((1,1), ratio)
-    goal_points = [point for point in point_list if (sdf_function(point) < -0.15 and point[0]<0.95)] 
+    goal_points = [point for point in point_list if (sdf_function(point) < -0.15 and point[0]<0.9 and np.linalg.norm(point-start_point)>0.05)] 
     return goal_points
 
 if __name__ == "__main__":
@@ -439,82 +444,67 @@ if __name__ == "__main__":
     #     if item.is_dir() and "agent_TD3" in item.name:
     #         if "2025-04-23" in item.name or "2025-04-22" in item.name:
     #             agents_file.append(os.path.join(directory_path, item.name))
-    # agents_file = ["agents/agent_TD3_2025-04-18_13-33"]
+    agents_file = ["agents/agent_TD3_2025-04-18_13-33"]
     
     print("Agents files : ", agents_file)
 
-    scale = 8
+    scale = 20
     ratio = 5
     N = (576,528)
     start_point = (0.98, 0.3)
-    goal_point = (0.615, 0.625)
     res_factor = 1
     grid_size =  (N[0] * res_factor, N[1] * res_factor)
     domain_size = (1 * scale, 1 * scale)
     x_new = np.linspace(0, domain_size[0],grid_size[0])
     y_new = np.linspace(0, domain_size[1], grid_size[1])
     X_new, Y_new = np.meshgrid(x_new, y_new)
-    goal_points = create_list_of_goal_point(40)
-    for goal_point in goal_points:
-        goal_point=tuple(goal_point)
-        p_0, p_target, sdf_func, path, obstacle_contour, velocity_retina,current_time = obstacle_and_path(
-            scale=scale,
-            ratio=ratio,
-            flow_factor=2,
-            B=15,
-            res_factor=res_factor,
-            start_point=start_point,
-            goal_point=goal_point,
-            path_method='astar',
-            path_to_config_path=None,
-        )
-        
+    heuristic_weight=0.1
+    weight_sdf = 2
+    compute_goal_points = True
+    
+    if compute_goal_points : 
+        goal_points = create_list_of_goal_point(20,start_point)
+        for goal_point in goal_points:
+            goal_point=tuple(goal_point)
+            p_0, p_target, sdf_func, path, obstacle_contour, velocity_retina,current_time = obstacle_and_path(
+                scale=scale,
+                ratio=ratio,
+                flow_factor=2,
+                B=1,
+                res_factor=res_factor,
+                start_point=start_point,
+                goal_point=goal_point,
+                path_method='astar',
+                heuristic_weight=heuristic_weight,
+                path_to_config_path=None,
+            )
+        np.save('data/random_target_points',np.array(goal_points))
+    else : 
+        goal_points= np.load('data/random_target_points')
+    
+    start_time_eva = time.time()
     list_config_paths = []
-    dir_config_path = Path('config_path/')
+    dir_config_path = Path(f'config_path/velocity_ratio_{ratio}/')
 
-    for item in dir_config_path.rglob("*.json"):  # Recherche récursive de tous les fichiers .json
-        list_config_paths.append(os.path.join(dir_config_path,item.name))  # Ajoute le chemin absolu des fichiers à la liste
+    for item in dir_config_path.rglob("*.json"):  
+        if '2025-05-06' in item.name:
+            list_config_paths.append(os.path.join(dir_config_path,item.name))  
 
     sdf_func, velocity_retina = sdf_func_and_velocity_func(domain_size, ratio)
-    obstacle_contour =  contour_2D(sdf_func,X_new,Y_new)
+    obstacle_contour =  contour_2D(sdf_func,X_new,Y_new,scale)
     print(list_config_paths)
     print("Path generated")
     results = evaluate_after_training(
         agents_file,
         obstacle_contour=obstacle_contour,
         obstacle_type=obstacle_type,
+        velocity_func=velocity_retina,
         list_config_paths=list_config_paths
         
     )
+    end_time_eva = time.time()
+    elapsed_time = (end_time_eva-start_time_eva)/60
+    print('Execution time:', elapsed_time, 'minutes')
     # rank_agents_by_rewards(results)
 
-    # norm = 0.5
-    # dict = {
-    #     "east_05": np.array([1, 0]),
-    #     "west_05": np.array([-1, 0]),
-    #     "north_05": np.array([0, 1]),
-    #     "south_05": np.array([0, -1]),
-    # }
-    # print("---------------------Evaluation with uniform bg---------------------")
-    # for title_add, dir in dict.items():
-    #     results = evaluate_after_training(
-    #         agents_file,
-    #         p_target=p_target,
-    #         p_0=p_0,
-    #         path=path,
-    #         obstacle_contour=obstacle_contour,
-    #         sdf=sdf,
-    #         obstacle_type=obstacle_type,
-    #         title_add=title_add,
-    #         dir=dir,
-    #         norm=norm,
-    #     )
-    #     rank_agents_by_rewards(results)
-
-    # title_add = 'rankine_a_05__cir_3_center_1_075'
-    # print("---------------------Evaluation with rankine bg---------------------")
-    # a= 0.5
-    # cir = 2
-    # center = np.array([1,3/4])
-    # results = evaluate_after_training(agents_file,f'result_evaluation_{title_add}_{type}.json',p_target = p_target,p_0 = p_0,path=path,obstacle_contour=obstacle_contour,title_add=title_add,a=a,center=center,cir=cir)
-
+    
