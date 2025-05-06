@@ -127,7 +127,7 @@ def evaluate_after_training(
                 print("Path to config :", path_to_config)
                 if path_to_config in results[agent_name]['results_per_config']:
                     print(f"Agent {agent_name} already evaluated with this config.")
-                    continue
+                    # continue
             else : 
                 results_per_config={}
             path,start_point,goal_point,sdf,velocity_retina,X_new, Y_new,time,ratio = load_config_path(path_to_config)  
@@ -229,7 +229,7 @@ def initialize_parameters(agent_file,bounce_thr):
     )
     config_eval["nb_points_path"] = 500
     config_eval["t_max"] = 30
-    config_eval["eval_episodes"] = 50
+    config_eval["eval_episodes"] = 200
     config_eval["velocity_bool"] = (
         config["velocity_bool"] if "velocity_bool" in config else False
     )
@@ -459,35 +459,47 @@ if __name__ == "__main__":
     y_new = np.linspace(0, domain_size[1], grid_size[1])
     X_new, Y_new = np.meshgrid(x_new, y_new)
     heuristic_weight=0.1
-    weight_sdf = 2
+    weight_sdf = 5
     compute_goal_points = True
     
-    if compute_goal_points : 
-        goal_points = create_list_of_goal_point(20,start_point)
-        for goal_point in goal_points:
-            goal_point=tuple(goal_point)
-            p_0, p_target, sdf_func, path, obstacle_contour, velocity_retina,current_time = obstacle_and_path(
-                scale=scale,
-                ratio=ratio,
-                flow_factor=2,
-                B=1,
-                res_factor=res_factor,
-                start_point=start_point,
-                goal_point=goal_point,
-                path_method='astar',
-                heuristic_weight=heuristic_weight,
-                path_to_config_path=None,
-            )
-        np.save('data/random_target_points',np.array(goal_points))
-    else : 
-        goal_points= np.load('data/random_target_points')
+    # if compute_goal_points : 
+    #     goal_points = create_list_of_goal_point(20,start_point)
+    #     for goal_point in goal_points:
+    #         goal_point=tuple(goal_point)
+    #         p_0, p_target, sdf_func, path, obstacle_contour, velocity_retina,current_time = obstacle_and_path(
+    #             scale=scale,
+    #             ratio=ratio,
+    #             flow_factor=2,
+    #             B=1,
+    #             res_factor=res_factor,
+    #             start_point=start_point,
+    #             goal_point=goal_point,
+    #             path_method='astar',
+    #             heuristic_weight=heuristic_weight,
+    #             path_to_config_path=None,
+    #         )
+    #     np.save('data/random_target_points',np.array(goal_points))
+    # else : 
+    #     goal_points= np.load('data/random_target_points')
     
+    p_0, p_target, sdf_func, path, obstacle_contour, velocity_retina,current_time = obstacle_and_path(
+        scale=scale,
+        ratio=ratio,
+        flow_factor=2,
+        B=1/4,
+        res_factor=res_factor,
+        start_point=start_point,
+        goal_point=(0.53, 0.6),
+        path_method='astar',
+        heuristic_weight=heuristic_weight,
+        path_to_config_path=None,
+    )
     start_time_eva = time.time()
     list_config_paths = []
     dir_config_path = Path(f'config_path/velocity_ratio_{ratio}/')
-
+    
     for item in dir_config_path.rglob("*.json"):  
-        if '2025-05-06' in item.name:
+        if '2025-05-06_11-42' in item.name:
             list_config_paths.append(os.path.join(dir_config_path,item.name))  
 
     sdf_func, velocity_retina = sdf_func_and_velocity_func(domain_size, ratio)

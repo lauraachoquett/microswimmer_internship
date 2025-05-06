@@ -132,6 +132,7 @@ def precalculate_move_costs(v0, vx, vy, dir_offsets, dx, dy):
     n_directions = len(dir_offsets)
     move_costs = np.full((ny, nx, n_directions), np.inf) 
  
+    U=1
     
     for j in range(ny):
         for i in range(nx):
@@ -141,9 +142,11 @@ def precalculate_move_costs(v0, vx, vy, dir_offsets, dx, dy):
                 if distance > 0:
                     dir_x = di*dx / distance
                     dir_y = dj*dy / distance
-                    norm = max(np.sqrt((vx[j, i]**2+vy[j, i]**2)),0.001)
-                    flow_component = (vx[j, i]/norm* dir_x) + (vy[j, i]/norm* dir_y)
-                    effective_speed = v0[j, i] * flow_component 
+                    d = np.array([dir_x,dir_y])
+                    v = np.array([vx[j, i],vy[j, i]]) + U*d
+                    
+                    flow_component = v@d 
+                    effective_speed = v0[j, i] * flow_component
                     
                     if effective_speed > 0:
                         move_costs[j, i, d_idx] = distance / effective_speed
@@ -159,9 +162,7 @@ def heuristic(i1, j1, i2, j2, dx, dy):
     v_max = 1.0  
     return distance / v_max
 
-
-
-def visualize_results_a_star(x, y,sdf_function, path,vx,vy):
+def visualize_results_a_star(x, y,sdf_function, path,vx,vy,scale):
     """
     Visualise les résultats de l'algorithme A*.
     """
@@ -177,7 +178,7 @@ def visualize_results_a_star(x, y,sdf_function, path,vx,vy):
     plt.figure(figsize=(12, 10))
     X, Y = np.meshgrid(x, y)
     
-    obstacle_contour = contour_2D(sdf_function,X,Y)
+    obstacle_contour = contour_2D(sdf_function,X,Y,scale)
 
     plt.scatter(
         obstacle_contour[:, 0], obstacle_contour[:, 1], color="black", s=0.5
@@ -217,8 +218,7 @@ def visualize_results_a_star(x, y,sdf_function, path,vx,vy):
     plt.axis('off')
     plt.title("SDF with path")
     plt.tight_layout()
-    plt.show()
-    # plt.savefig('fig/Astar_ani.png',dpi=300, bbox_inches='tight')
+    plt.savefig('fig/Astar_ani_test.png',dpi=300, bbox_inches='tight')
 
 def compute_v(x,y,velocity_retina,B,grid_size,ratio,sdf_function):
 
@@ -335,11 +335,11 @@ if __name__ == "__main__":
     x_new = np.linspace(0, domain_size[0], grid_size[0])
     y_new = np.linspace(0, domain_size[1], grid_size[1])
 
-    B=1
+    B=2
     
     #Compute v0,vx and vy on this new domain.
     v0,vx,vy,_,_ = compute_v(x_new,y_new,velocity_retina,B,grid_size,ratio,sdf_function)
-    weight_sdf = 2
+    weight_sdf = 5
     start_point = (start_point[0] * scale, start_point[1] * scale)
     goal_point = (goal_point[0] * scale, goal_point[1] * scale)
     
@@ -352,9 +352,9 @@ if __name__ == "__main__":
     # print("Before resampling :",len(path))
     # path=resample_path(path,1000)
     print(len(path))
-    # smoothed_x = gaussian_filter1d(path[:, 0], sigma=6)
-    # smoothed_y = gaussian_filter1d(path[:, 1], sigma=6)
-    # path = np.stack([smoothed_x, smoothed_y], axis=1)
+    smoothed_x = gaussian_filter1d(path[:, 0], sigma=6)
+    smoothed_y = gaussian_filter1d(path[:, 1], sigma=6)
+    path = np.stack([smoothed_x, smoothed_y], axis=1)
     print("smoooooth")
     # x = path[:, 0]
     # y = path[:, 1]
@@ -368,7 +368,7 @@ if __name__ == "__main__":
     print('Execution time:', elapsed_time, 'minutes')
 
 
-    visualize_results_a_star(x_new, y_new, sdf_function,path,vx,vy)
+    visualize_results_a_star(x_new, y_new, sdf_function,path,vx,vy,scale)
 
 
     
