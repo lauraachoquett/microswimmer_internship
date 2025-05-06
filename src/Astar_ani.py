@@ -335,7 +335,7 @@ if __name__ == "__main__":
     x_new = np.linspace(0, domain_size[0], grid_size[0])
     y_new = np.linspace(0, domain_size[1], grid_size[1])
 
-    B=2
+    B=1/10
     
     #Compute v0,vx and vy on this new domain.
     v0,vx,vy,_,_ = compute_v(x_new,y_new,velocity_retina,B,grid_size,ratio,sdf_function)
