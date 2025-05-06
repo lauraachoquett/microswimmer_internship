@@ -40,10 +40,9 @@ if __name__ == "__main__":
     print("SDF shape after slice :", sdf.shape)
     fig, ax = plt.subplots(figsize=(15, 7))
     grid_size = (N[0], N[1])
-    
 
     start_point = (0.98, 0.3)
-    
+
     sdf_interpolator = RegularGridInterpolator(
         (y, x), sdf, bounds_error=False, fill_value=None
     )
@@ -55,9 +54,12 @@ if __name__ == "__main__":
 
     point_list = np.random.rand(20, 2)
 
-    goal_points = [point for point in point_list if (sdf_function(point) < -0.15 and point[0]<0.95)]
+    goal_points = [
+        point
+        for point in point_list
+        if (sdf_function(point) < -0.15 and point[0] < 0.95)
+    ]
     goal_points = [(0.53, 0.6)]
-    
 
     x_new = np.linspace(0, domain_size[0], N[0] * 5)
     y_new = np.linspace(0, domain_size[1], N[1] * 5)
@@ -102,7 +104,7 @@ if __name__ == "__main__":
     #     )
 
     # fig, axes = plt.subplots(ncols=2, figsize=(14, 6))
-    
+
     # X, Y = np.meshgrid(x, y)  # Ensure X and Y match the dimensions of sdf
 
     # # Add contours for the signed distance function (SDF) on both subplots
@@ -119,16 +121,15 @@ if __name__ == "__main__":
 
     # contourx = axes[0].contourf(X, Y, vx, levels=100, cmap="RdBu",norm=normx)
     # contoury = axes[1].contourf(X, Y, vy, levels=100, cmap="RdBu",norm=normy)
-    
+
     # # Add colorbars for the velocity components
     # cbarx = fig.colorbar(contourx, ax=axes[0], orientation="vertical")
     # cbary = fig.colorbar(contoury, ax=axes[1], orientation="vertical")
     # axes[0].set_title("Velocity X", fontsize=14)
     # axes[1].set_title("Velocity Y", fontsize=14)
-    
+
     # # Remove axes
     # axes[0].axis("off")
     # axes[1].axis("off")
     # plt.tight_layout()
     # plt.savefig("fig/retina_example_velocity.png", dpi=400, bbox_inches="tight")
- 

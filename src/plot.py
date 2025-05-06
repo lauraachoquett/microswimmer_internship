@@ -2,8 +2,11 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 colors_default = plt.cm.tab10.colors
-from .generate_path import (generate_curve, generate_demi_circle_path,
-                            generate_random_ondulating_path)
+from .generate_path import (
+    generate_curve,
+    generate_demi_circle_path,
+    generate_random_ondulating_path,
+)
 from .simulation import rankine_vortex, uniform_velocity
 
 

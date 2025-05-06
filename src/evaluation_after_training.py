@@ -26,8 +26,12 @@ from .invariant_state import coordinate_in_global_ref
 from .plot import plot_action, plot_trajectories
 from .rank_agents import rank_agents_by_rewards
 from .simulation import solver
-from .visualize import (plot_robust_D, plot_robust_u_bg_rankine,
-                        plot_robust_u_bg_uniform, visualize_streamline)
+from .visualize import (
+    plot_robust_D,
+    plot_robust_u_bg_rankine,
+    plot_robust_u_bg_uniform,
+    visualize_streamline,
+)
 
 
 def format_sci(x):

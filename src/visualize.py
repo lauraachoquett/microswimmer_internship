@@ -16,9 +16,12 @@ from statistics import mean, stdev
 from scipy.spatial import KDTree
 
 from .env_swimmer import MicroSwimmer
-from .generate_path import (generate_curve, generate_demi_circle_path,
-                            generate_random_ondulating_path,
-                            generate_simple_line)
+from .generate_path import (
+    generate_curve,
+    generate_demi_circle_path,
+    generate_random_ondulating_path,
+    generate_simple_line,
+)
 from .plot import plot_background_velocity, plot_trajectories
 
 

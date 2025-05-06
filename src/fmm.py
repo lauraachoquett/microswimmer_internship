@@ -4,7 +4,6 @@ import os
 import matplotlib.pyplot as plt
 import numpy as np
 import seaborn as sns
-import skfmm
 from numba import njit, prange
 from scipy.interpolate import RegularGridInterpolator
 from scipy.ndimage import gaussian_filter
@@ -17,34 +16,34 @@ from .sdf import sdf_circle
 def ordered_upwind_method_fast(x, y, v0, vx, vy, goal_point, narrow_band_width=5):
     """
     Version optimisée de l'Ordered Upwind Method pour grandes grilles.
-    
+
     Paramètres additionnels:
     - narrow_band_width: Largeur de la bande étroite pour le Fast Marching Method
-    
+
     Retourne:
     - travel_time: Champ des temps de trajet
     """
     nx, ny = len(x), len(y)
     dx = x[1] - x[0]
     dy = y[1] - y[0]
-    
+
     # Initialisation
     travel_time = np.full((ny, nx), np.inf)
     status = np.full((ny, nx), 0, dtype=np.int8)  # 0: far, 1: narrow, 2: accepted
-    
+
     # Trouver l'indice du point d'arrivée
     i_goal = np.argmin(np.abs(x - goal_point[0]))
     j_goal = np.argmin(np.abs(y - goal_point[1]))
-    
+
     travel_time[j_goal, i_goal] = 0.0
     status[j_goal, i_goal] = 2  # accepted
-    
+
     # File de priorité pour les points 'narrow'
     heap = []
-    
+
     # Directions (4-connexité)
     directions = [(-1, 0), (1, 0), (0, -1), (0, 1)]
-    
+
     # Pré-calcul des vitesses effectives
     effective_speed = compute_effective_speeds(nx, ny, v0, vx, vy, dx, dy)
     print("Effective Speed")
@@ -55,23 +54,23 @@ def ordered_upwind_method_fast(x, y, v0, vx, vy, goal_point, narrow_band_width=5
             # Vérifier si la vitesse effective est positive
             speed_idx = get_direction_index(di, dj)
             if effective_speed[nj, ni, speed_idx] > 0:
-                dist = np.sqrt((di*dx)**2 + (dj*dy)**2)
+                dist = np.sqrt((di * dx) ** 2 + (dj * dy) ** 2)
                 t = dist / effective_speed[nj, ni, speed_idx]
                 travel_time[nj, ni] = t
                 status[nj, ni] = 1  # narrow
                 heapq.heappush(heap, (t, ni, nj))
-    
+
     # Boucle principale - Fast Marching
     while heap:
         time, i, j = heapq.heappop(heap)
-        
+
         # Si le point est déjà accepté, continuer
         if status[j, i] == 2:  # accepted
             continue
-        
+
         # Marquer comme accepté
         status[j, i] = 2  # accepted
-        
+
         # Mettre à jour les voisins
         for di, dj in directions:
             ni, nj = i + di, j + dj
@@ -79,36 +78,50 @@ def ordered_upwind_method_fast(x, y, v0, vx, vy, goal_point, narrow_band_width=5
                 speed_idx = get_direction_index(di, dj)
                 if effective_speed[nj, ni, speed_idx] > 0:
                     # Calculer le nouveau temps depuis ce point
-                    dist = np.sqrt((di*dx)**2 + (dj*dy)**2)
-                    new_time = travel_time[j, i] + dist / effective_speed[nj, ni, speed_idx]
-                    
+                    dist = np.sqrt((di * dx) ** 2 + (dj * dy) ** 2)
+                    new_time = (
+                        travel_time[j, i] + dist / effective_speed[nj, ni, speed_idx]
+                    )
+
                     # Calculer aussi depuis les voisins acceptés du point (i,j)
                     for di2, dj2 in directions:
                         i2, j2 = i + di2, j + dj2
-                        if (i2 != ni or j2 != nj) and 0 <= i2 < nx and 0 <= j2 < ny and status[j2, i2] == 2:
+                        if (
+                            (i2 != ni or j2 != nj)
+                            and 0 <= i2 < nx
+                            and 0 <= j2 < ny
+                            and status[j2, i2] == 2
+                        ):
                             # Interpoler le temps entre (i,j) et (i2,j2)
                             alpha = 0.5  # Simplification - utiliser un point médian
                             interp_i = i + di2 * alpha
                             interp_j = j + dj2 * alpha
-                            
+
                             # Distance du point interpolé au point cible
                             di_target = ni - interp_i
                             dj_target = nj - interp_j
-                            dist_target = np.sqrt((di_target*dx)**2 + (dj_target*dy)**2)
-                            
+                            dist_target = np.sqrt(
+                                (di_target * dx) ** 2 + (dj_target * dy) ** 2
+                            )
+
                             # Direction vers la cible
-                            dir_idx = get_direction_index(int(np.sign(di_target)), int(np.sign(dj_target)))
-                            
+                            dir_idx = get_direction_index(
+                                int(np.sign(di_target)), int(np.sign(dj_target))
+                            )
+
                             # Vitesse effective le long de cette direction
                             interp_speed = effective_speed[nj, ni, dir_idx]
                             if interp_speed > 0:
                                 # Temps depuis le début jusqu'au point interpolé
-                                interp_time = travel_time[j, i] * (1-alpha) + travel_time[j2, i2] * alpha
-                                
+                                interp_time = (
+                                    travel_time[j, i] * (1 - alpha)
+                                    + travel_time[j2, i2] * alpha
+                                )
+
                                 # Temps total
                                 t = interp_time + dist_target / interp_speed
                                 new_time = min(new_time, t)
-                    
+
                     if new_time < travel_time[nj, ni]:
                         travel_time[nj, ni] = new_time
                         if status[nj, ni] == 0:  # far
@@ -117,8 +130,9 @@ def ordered_upwind_method_fast(x, y, v0, vx, vy, goal_point, narrow_band_width=5
                         else:  # status == 1 (narrow)
                             # Réinsérer avec le temps mis à jour
                             heapq.heappush(heap, (new_time, ni, nj))
-    
+
     return travel_time
+
 
 @njit
 def get_direction_index(di, dj):
@@ -138,25 +152,27 @@ def get_direction_index(di, dj):
         else:
             return 2 if dj < 0 else 3
 
+
 @njit(parallel=True)
 def compute_effective_speeds(nx, ny, v0, vx, vy, dx, dy):
     """Pré-calcule les vitesses effectives dans les 4 directions principales."""
     # [gauche, droite, bas, haut]
     directions = [(-1, 0), (1, 0), (0, -1), (0, 1)]
     effective_speed = np.zeros((ny, nx, 4))
-    
+
     for j in prange(ny):
         for i in range(nx):
             for k, (di, dj) in enumerate(directions):
                 # Calculer la vitesse effective dans cette direction
-                dir_norm = np.sqrt((di*dx)**2 + (dj*dy)**2)
+                dir_norm = np.sqrt((di * dx) ** 2 + (dj * dy) ** 2)
                 if dir_norm > 0:
-                    dir_x = di*dx / dir_norm
-                    dir_y = dj*dy / dir_norm
+                    dir_x = di * dx / dir_norm
+                    dir_y = dj * dy / dir_norm
                     flow_component = vx[j, i] * dir_x + vy[j, i] * dir_y
-                    effective_speed[j, i, k] = v0[j, i]/4 + flow_component
-    
+                    effective_speed[j, i, k] = v0[j, i] / 4 + flow_component
+
     return effective_speed
+
 
 def compute_fmm_path(
     start_point,
@@ -186,13 +202,17 @@ def compute_fmm_path(
         path: Liste de points [(x, y)] représentant le chemin optimal
     """
     if sdf_function(start_point) > 0 or sdf_function(goal_point) > 0:
-        print("Invalid starting point or target point :", sdf_function(start_point) ,sdf_function(goal_point) )
+        print(
+            "Invalid starting point or target point :",
+            sdf_function(start_point),
+            sdf_function(goal_point),
+        )
 
     X, Y = np.meshgrid(x, y)
     save_path_phi = f"data/phi/grid_size_{grid_size[0]}_{grid_size[1]}_phi.npy"
     if os.path.exists(save_path_phi):
         phi = np.load(save_path_phi)
-        print('Phi loaded')
+        print("Phi loaded")
     else:
         phi = np.zeros((len(y), len(x)))
         for i in range(len(x)):
@@ -217,7 +237,7 @@ def compute_fmm_path(
             flow_direction_y = np.load(
                 os.path.join(save_path_flow, "flow_direction_y.npy")
             )
-            print('Flow loaded')
+            print("Flow loaded")
 
         else:
             flow_strength = np.zeros((len(y), len(x)))
@@ -241,7 +261,6 @@ def compute_fmm_path(
                 os.path.join(save_path_flow, "flow_direction_y.npy"), flow_direction_y
             )
 
-        
         print("Flow computed")
         vx = flow_direction_x * flow_strength
         vy = flow_direction_y * flow_strength
@@ -326,7 +345,7 @@ def visualize_results(
     phi = phi / np.max(np.abs(phi))
 
     fig, ax = plt.subplots(1, 2, figsize=(15, 7))
-    travel_time =  travel_time/np.std(travel_time)
+    travel_time = travel_time / np.std(travel_time)
     contour = ax[0].contourf(X, Y, travel_time, 50, cmap="viridis")
     fig.colorbar(contour, ax=ax[0], label="Travel time")
 
@@ -469,6 +488,7 @@ def circle_path():
     plt.savefig("fig/fmm/fmm_two_circles.png", dpi=200, bbox_inches="tight")
     plt.close()
 
+
 def sdf_func_and_velocity_func(domain_size, ratio):
     x, y, N, h, sdf = load_sdf_from_csv(domain_size)
     sdf_interpolator = RegularGridInterpolator(
@@ -504,15 +524,16 @@ def sdf_func_and_velocity_func(domain_size, ratio):
 
     return sdf_function, velocity_retina
 
+
 def retina_path():
     scale = 8
     ratio = 1.5
-    
+
     start_point = (0.98, 0.3)
     goal_point = (0.33, 0.5)
     domain_size = (1 * scale, 1 * scale)
     x, y, N, h, sdf = load_sdf_from_csv(domain_size)
-    res_factor=2
+    res_factor = 2
     grid_size = (N[0] * res_factor, N[1] * res_factor)
     start_point = (start_point[0] * scale, start_point[1] * scale)
     goal_point = (goal_point[0] * scale, goal_point[1] * scale)
@@ -526,29 +547,27 @@ def retina_path():
     sdf = sdf_interpolator((Y_new, X_new))
 
     sdf_function, velocity_retina = sdf_func_and_velocity_func(domain_size, ratio)
-    B=20
-    flow_factor=2
+    B = 20
+    flow_factor = 2
     path, travel_time, grid_info, save_path_phi, save_path_flow = compute_fmm_path(
-            start_point,
-            goal_point,
-            sdf_function,
-            x_new,
-            y_new,
-            B=B,
-            flow_field=velocity_retina,
-            grid_size=grid_size,
-            domain_size=domain_size,
-            ratio=ratio,
-            flow_factor=flow_factor,
-        )
-    
+        start_point,
+        goal_point,
+        sdf_function,
+        x_new,
+        y_new,
+        B=B,
+        flow_field=velocity_retina,
+        grid_size=grid_size,
+        domain_size=domain_size,
+        ratio=ratio,
+        flow_factor=flow_factor,
+    )
+
     fig = visualize_results(
         path, travel_time, (x_new, y_new), sdf_function, flow_field=velocity_retina
     )
     plt.savefig("fig/fmm/fmm_retina_velocity_3_5.png", dpi=200, bbox_inches="tight")
     plt.close(fig)
-
-
 
 
 def main():
