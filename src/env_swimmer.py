@@ -7,21 +7,7 @@ from .invariant_state import *
 from .simulation import solver
 
 
-def make_env(
-    x_0, C, Dt, velocity_bool, tree, path, x_target, beta, n_lookahead=5, seed=None
-):
-    def _init():
-        env = MicroSwimmer(
-            x_0=x_0,
-            C=C,
-            Dt=Dt,
-            velocity_bool=velocity_bool,
-            n_lookahead=n_lookahead,
-            seed=seed,
-        )
-        return env
 
-    return _init
 
 
 class MicroSwimmer(gym.Env):

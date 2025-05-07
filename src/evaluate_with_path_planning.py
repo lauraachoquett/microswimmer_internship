@@ -2,6 +2,7 @@ import os
 import sys
 import time
 from math import sqrt
+from tqdm import tqdm
 
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 import json
@@ -116,7 +117,7 @@ def evaluate_after_training(
 
         results["type"] = [obstacle_type]
 
-        for path_to_config in list_config_paths:
+        for path_to_config in tqdm(list_config_paths, desc="Processing configs"):
             if agent_name in results.keys():
                 results_per_config = results[agent_name]["results_per_config"]
                 if path_to_config in results[agent_name]["results_per_config"]:
@@ -151,7 +152,6 @@ def evaluate_after_training(
             config_eval["p_target"] = np.array(goal_point)
             config_eval["p_0"] = np.array(start_point)
             config_eval["x_0"] = np.array(start_point)
-            print("Evaluation - Path ready")
             time_t = f"{time}"
             file_name_or = f"_{time_t}_obstacle_{obstacle_type}_{title_add}"
 
@@ -349,6 +349,7 @@ def obstacle_and_path(
     path_method=None,
     heuristic_weight=None,
     weight_sdf=None,
+    c=None,
     path_to_config_path=None,
     ):
     current_time = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
@@ -359,7 +360,7 @@ def obstacle_and_path(
     else:
         # If config_path_fmm is None, all other parameters must be provided
         print("Creation of config file...")
-        if None in [scale, ratio, B, flow_factor, res_factor, start_point, goal_point,weight_sdf,heuristic_weight]:
+        if None in [scale, ratio, B, flow_factor, res_factor, start_point, goal_point,weight_sdf,heuristic_weight,c]:
             raise ValueError(
                 "If config_path_fmm is None, all other parameters (scale, ratio, B, flow_factor, res_factor, start_point, goal_point) must be provided."
             )
@@ -394,6 +395,7 @@ def obstacle_and_path(
             "flow_factor": flow_factor,
             "heuristic_weight": heuristic_weight,
             "weight_sdf": weight_sdf,
+            "c" : c,
             "method": path_method,
             "current_time": current_time,
         }
@@ -419,7 +421,7 @@ def obstacle_and_path(
         elif path_method == "astar":
             # Compute v0,vx and vy on this new domain with a certain size of cell
             v0, vx, vy, save_path_phi, save_path_flow = compute_v(
-                x_new, y_new, velocity_retina, B, grid_size, ratio, sdf_function
+                x_new, y_new, velocity_retina, B, grid_size, ratio, sdf_function,c
             )
 
             path, travel_time = astar_anisotropic(
@@ -432,6 +434,7 @@ def obstacle_and_path(
                 goal_point,
                 sdf_function,
                 heuristic_weight=heuristic_weight,
+                weight_sdf = weight_sdf,
             )
 
             path = np.array(path)  # de forme (N, 2)
@@ -493,7 +496,7 @@ if __name__ == "__main__":
     #             agents_file.append(os.path.join(directory_path, item.name))
     agents_file = ["agents/agent_TD3_2025-04-18_13-33"]
 
-    print("Agents files : ", agents_file)
+    print("Number of agents : ", len(agents_file))
 
     scale = 20
     ratio = 5
@@ -508,30 +511,33 @@ if __name__ == "__main__":
     heuristic_weight = 0.1
     weight_sdf = 8
     sigma = 15
-    description =''
+    c=1/2
+    B=1.57
+    description ='square alignment'
     
     compute_goal_points = True
 
-    # if compute_goal_points :
-    #     goal_points = create_list_of_goal_point(50,start_point)
-    #     for goal_point in goal_points:
-    #         goal_point=tuple(goal_point)
-    #         p_0, p_target, sdf_func, path, obstacle_contour, velocity_retina,current_time = obstacle_and_path(
-    #             scale=scale,
-    #             ratio=ratio,
-    #             flow_factor=2,
-    #             B=1,
-    #             res_factor=res_factor,
-    #             start_point=start_point,
-    #             goal_point=goal_point,
-    #             path_method='astar',
-    #             heuristic_weight=heuristic_weight,
-    #             weight_sdf = weight_sdf,
-    #             path_to_config_path=None,
-    #         )
-    #     np.save('data/random_target_points',np.array(goal_points))
-    # else :
-    #     goal_points= np.load('data/random_target_points')
+    if compute_goal_points :
+        goal_points = create_list_of_goal_point(50,start_point)
+        for goal_point in goal_points:
+            goal_point=tuple(goal_point)
+            p_0, p_target, sdf_func, path, obstacle_contour, velocity_retina,current_time = obstacle_and_path(
+                scale=scale,
+                ratio=ratio,
+                flow_factor=2,
+                B=B,
+                res_factor=res_factor,
+                start_point=start_point,
+                goal_point=goal_point,
+                path_method='astar',
+                heuristic_weight=heuristic_weight,
+                weight_sdf = weight_sdf,
+                c=c,
+                path_to_config_path=None,
+            )
+        np.save('data/random_target_points',np.array(goal_points))
+    else :
+        goal_points= np.load('data/random_target_points')
         
     start_time_eva = time.time()
     list_config_paths = []

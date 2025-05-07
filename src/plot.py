@@ -1,6 +1,7 @@
 import matplotlib.pyplot as plt
 import numpy as np
 import json
+import os
 colors_default = plt.cm.tab10.colors
 from .generate_path import (
     generate_curve,
@@ -134,7 +135,7 @@ def plot_success_rate(path_json_file,agent_file,save_plot):
     sucess_rate_d={}
     for id,config in enumerate(result_agent.keys()):
         sucess_rate_d[id] = result_agent[config]['success_rate']
-        name[id]=short_labelx[id]
+        name[id]=short_labels[id]
         
     ids = list(sucess_rate_d.keys())
     values = list(sucess_rate_d.values())
@@ -144,8 +145,7 @@ def plot_success_rate(path_json_file,agent_file,save_plot):
     plt.ylabel("Success rate")
     plt.title("Success rate")
     plt.grid(True)
-    print("Tableau des ID -> Chemins :\n")
-    file_table = os.patj.join(save_plot,'table.json')
+    file_table = os.path.join(save_plot,'table.json')
     with open(file_table,'w') as f:
         json.dump(name,f,indent=4)
     file_plot = os.path.join(save_plot,'result_success_rate.png')

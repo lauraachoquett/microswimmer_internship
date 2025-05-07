@@ -2,7 +2,7 @@ import heapq
 import os
 import time
 from datetime import datetime
-from math import ceil
+from math import ceil,sqrt
 import numpy as np
 from scipy.interpolate import RegularGridInterpolator, splev, splprep
 from scipy.ndimage import gaussian_filter1d
@@ -33,7 +33,7 @@ def contour_2D(sdf_function, X_new, Y_new, scale):
 
 
 def astar_anisotropic(
-    x, y, v0, vx, vy, start_point, goal_point, sdf_function, heuristic_weight=1.0
+    x, y, v0, vx, vy, start_point, goal_point, sdf_function, heuristic_weight=1.0,weight_sdf=1
 ):
     """
     Implémentation de l'algorithme A* adapté pour les écoulements anisotropes.
@@ -60,7 +60,7 @@ def astar_anisotropic(
     j_goal = np.argmin(np.abs(y - goal_point[1]))
 
     dir_offsets = [(1, 0), (1, 1), (0, 1), (-1, 1), (-1, 0), (-1, -1), (0, -1), (1, -1)]
-    move_costs = precalculate_move_costs(v0, vx, vy, dir_offsets, dx, dy)
+    move_costs = precalculate_move_costs(v0, vx, vy, dir_offsets, dx, dy,weight_sdf)
 
     closed_set = set()
     open_set = [(0, i_start, j_start)]
@@ -127,7 +127,7 @@ def astar_anisotropic(
     return [], travel_time
 
 
-def precalculate_move_costs(v0, vx, vy, dir_offsets, dx, dy):
+def precalculate_move_costs(v0, vx, vy, dir_offsets, dx, dy, weight_sdf):
     """
     Pré-calcule les coûts de déplacement pour chaque direction à chaque point.
 
@@ -139,7 +139,6 @@ def precalculate_move_costs(v0, vx, vy, dir_offsets, dx, dy):
     move_costs = np.full((ny, nx, n_directions), np.inf)
 
     U = 1
-
     for j in range(ny):
         for i in range(nx):
             for d_idx, (di, dj) in enumerate(dir_offsets):
@@ -152,15 +151,14 @@ def precalculate_move_costs(v0, vx, vy, dir_offsets, dx, dy):
                     v_l = np.array([vx[j, i], vy[j, i]]) + U * d
                     v = v_l + U * d
                     flow_component = v @ d
-                    alignment = np.linalg.norm(np.cross(v, d)) / (
-                        np.linalg.norm(v) * np.linalg.norm(d)
+                    alignment = np.linalg.norm(v_l@d) / (
+                        np.linalg.norm(v_l) * np.linalg.norm(d)
                     )
-                    alignment = max(alignment, 0.1)
-                    effective_speed = flow_component / alignment
-                    effective_speed = v0[j, i] * max(effective_speed, 0.001)
+                    alignment = alignment**(4)
+                    effective_speed = flow_component * alignment
+                    effective_speed = weight_sdf * v0[j, i] * max(effective_speed, 0.001)
                     if effective_speed > 0:
                         move_costs[j, i, d_idx] = distance / effective_speed
-
     return move_costs
 
 
@@ -227,7 +225,7 @@ def visualize_results_a_star(x, y, sdf_function, path, vx, vy, scale,B=None):
 
 
 
-def compute_v(x, y, velocity_retina, B, grid_size, ratio, sdf_function):
+def compute_v(x, y, velocity_retina, B, grid_size, ratio, sdf_function,c):
 
     if len(x) != grid_size[0] and len(y) != grid_size[1]:
         raise ValueError("x,y are not coherent with the size of the grid")
@@ -246,7 +244,7 @@ def compute_v(x, y, velocity_retina, B, grid_size, ratio, sdf_function):
         os.makedirs(os.path.dirname(save_path_phi), exist_ok=True)
         np.save(save_path_phi, phi)
     print("SDF computed")
-    speed = (1.0 / (1.0 + np.exp(B * phi))) - 1 / 2
+    speed = (1.0 / (1.0 + np.exp(B * phi))) - c
     speed = np.clip(speed, 0.001, 1.0)
 
     save_path_flow = f"data/velocity_flow/grid_size_{grid_size[0]}_{grid_size[1]}/"
@@ -322,7 +320,7 @@ if __name__ == "__main__":
     scale = 20
     ratio = 5
     start_point = (0.98, 0.3)
-    goal_point = (0.56, 0.08)
+    goal_point = (0.54, 0.675)
     domain_size = (1 * scale, 1 * scale)
 
     # Determine the size of the domain. It maps each point of the domain to each point on the grid.
@@ -340,18 +338,17 @@ if __name__ == "__main__":
     x_new = np.linspace(0, domain_size[0], grid_size[0])
     y_new = np.linspace(0, domain_size[1], grid_size[1])
 
-    B = 1
-    B_values = np.linspace(1/10,5,2)
+    c_values = np.linspace(0,2/3,4)
     # Compute v0,vx and vy on this new domain.
     plt.figure(figsize=(12, 10))
-    
-    for B in B_values:
+    weight_sdf = 1
+    start_point = (start_point[0] * scale, start_point[1] * scale)
+    goal_point = (goal_point[0] * scale, goal_point[1] * scale)
+    B = 1.6
+    for c in c_values:
         v0, vx, vy, _, _ = compute_v(
-            x_new, y_new, velocity_retina, B, grid_size, ratio, sdf_function
+            x_new, y_new, velocity_retina, B, grid_size, ratio, sdf_function,c
         )
-        weight_sdf = 8
-        start_point = (start_point[0] * scale, start_point[1] * scale)
-        goal_point = (goal_point[0] * scale, goal_point[1] * scale)
 
         ## Compute the path
         path, travel_time = astar_anisotropic(
