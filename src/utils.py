@@ -1,5 +1,6 @@
 import numpy as np
 import torch
+from pathlib import Path
 
 
 class ReplayBuffer(object):
@@ -82,3 +83,18 @@ def to_numpy(x):
         return np.array(x)
     else:
         raise TypeError(f"Unsupported type {type(x)} for conversion to numpy.")
+
+def create_numbered_run_folder(parent_dir):
+    parent_path = Path(parent_dir)
+    parent_path.mkdir(parents=True, exist_ok=True)  # crée le dossier parent si besoin
+
+    existing_folders = [p for p in parent_path.iterdir() if p.is_dir() and p.name.isdigit()]
+    
+    existing_numbers = [int(p.name) for p in existing_folders]
+    next_number = max(existing_numbers, default=0) + 1
+
+    new_folder = parent_path / str(next_number)
+    new_folder.mkdir()
+
+    print(f"✔ Nouveau dossier créé : {new_folder}")
+    return new_folder

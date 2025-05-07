@@ -63,7 +63,7 @@ def evaluate_agent(
     if random_parameters:
         dir, norm, center, a, cir = random_bg_parameters()
     else:
-        if len(parameters) != 0:
+        if len(parameters) > 0:
             if config["uniform_bg"]:
                 dir, norm = parameters
                 dir = np.array(dir)

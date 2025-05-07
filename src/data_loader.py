@@ -59,7 +59,7 @@ if __name__ == "__main__":
         for point in point_list
         if (sdf_function(point) < -0.15 and point[0] < 0.95)
     ]
-    goal_points = [(0.53, 0.6)]
+    goal_points = [(0.56, 0.08)]
 
     x_new = np.linspace(0, domain_size[0], N[0] * 5)
     y_new = np.linspace(0, domain_size[1], N[1] * 5)

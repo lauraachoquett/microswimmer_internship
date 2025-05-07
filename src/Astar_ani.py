@@ -2,7 +2,7 @@ import heapq
 import os
 import time
 from datetime import datetime
-
+from math import ceil
 import numpy as np
 from scipy.interpolate import RegularGridInterpolator, splev, splprep
 from scipy.ndimage import gaussian_filter1d
@@ -11,7 +11,8 @@ from .Astar import resample_path
 from .data_loader import load_sdf_from_csv, vel_read
 from .fmm import sdf_func_and_velocity_func
 from .sdf import get_contour_coordinates
-
+import matplotlib.pyplot as plt
+from matplotlib.colors import LogNorm
 
 def contour_2D(sdf_function, X_new, Y_new, scale):
     if os.path.exists(f"data/retina2D_contour_scale_{scale}.npy"):
@@ -173,12 +174,11 @@ def heuristic(i1, j1, i2, j2, dx, dy):
     return distance / v_max
 
 
-def visualize_results_a_star(x, y, sdf_function, path, vx, vy, scale):
+def visualize_results_a_star(x, y, sdf_function, path, vx, vy, scale,B=None):
     """
     Visualise les résultats de l'algorithme A*.
     """
-    import matplotlib.pyplot as plt
-    from matplotlib.colors import LogNorm
+
 
     # phi = np.zeros((len(y), len(x)))
     # for i in range(len(x)):
@@ -187,7 +187,7 @@ def visualize_results_a_star(x, y, sdf_function, path, vx, vy, scale):
     #         phi[j, i] = a
     # phi = phi / np.max(np.abs(phi))
 
-    plt.figure(figsize=(12, 10))
+
     X, Y = np.meshgrid(x, y)
 
     obstacle_contour = contour_2D(sdf_function, X, Y, scale)
@@ -196,10 +196,10 @@ def visualize_results_a_star(x, y, sdf_function, path, vx, vy, scale):
 
     if len(path) > 0:
         path_x, path_y = zip(*path)
-        plt.plot(path_x, path_y, color="royalblue", linewidth=2)
+        plt.plot(path_x, path_y, linewidth=2,label=f'B : {B}')
 
-        plt.scatter([path[0][0]], [path[0][1]], color="royalblue", s=50)
-        plt.scatter([path[-1][0]], [path[-1][1]], color="royalblue", s=50)
+        plt.scatter([path[0][0]], [path[0][1]], s=50)
+        plt.scatter([path[-1][0]], [path[-1][1]], s=50)
     # step = 40
 
     # X_sub = X[::step, ::step]
@@ -223,13 +223,8 @@ def visualize_results_a_star(x, y, sdf_function, path, vx, vy, scale):
     #     scale=100,
     #     alpha=0.7,
     # )
-    plt.gca().set_aspect("equal", adjustable="box")
-    plt.axis("off")
-    plt.title("SDF with path")
-    plt.tight_layout()
-    current_time = datetime.now().strftime("%m-%d_%H-%M-%S")
 
-    plt.savefig(f"fig/Astar_ani_test_{current_time}.png", dpi=300, bbox_inches="tight")
+
 
 
 def compute_v(x, y, velocity_retina, B, grid_size, ratio, sdf_function):
@@ -327,7 +322,7 @@ if __name__ == "__main__":
     scale = 20
     ratio = 5
     start_point = (0.98, 0.3)
-    goal_point = (0.53, 0.6)
+    goal_point = (0.56, 0.08)
     domain_size = (1 * scale, 1 * scale)
 
     # Determine the size of the domain. It maps each point of the domain to each point on the grid.
@@ -345,47 +340,56 @@ if __name__ == "__main__":
     x_new = np.linspace(0, domain_size[0], grid_size[0])
     y_new = np.linspace(0, domain_size[1], grid_size[1])
 
-    B = 1 / 10
-
+    B = 1
+    B_values = np.linspace(1/10,5,2)
     # Compute v0,vx and vy on this new domain.
-    v0, vx, vy, _, _ = compute_v(
-        x_new, y_new, velocity_retina, B, grid_size, ratio, sdf_function
-    )
-    weight_sdf = 8
-    start_point = (start_point[0] * scale, start_point[1] * scale)
-    goal_point = (goal_point[0] * scale, goal_point[1] * scale)
+    plt.figure(figsize=(12, 10))
+    
+    for B in B_values:
+        v0, vx, vy, _, _ = compute_v(
+            x_new, y_new, velocity_retina, B, grid_size, ratio, sdf_function
+        )
+        weight_sdf = 8
+        start_point = (start_point[0] * scale, start_point[1] * scale)
+        goal_point = (goal_point[0] * scale, goal_point[1] * scale)
 
-    ## Compute the path
-    path, travel_time = astar_anisotropic(
-        x_new,
-        y_new,
-        v0,
-        vx,
-        vy,
-        start_point,
-        goal_point,
-        sdf_function,
-        heuristic_weight=0.5,
-    )
-    # path = shortcut_path(path,is_collision_free,sdf_interpolator)
-    print("Travel time :", travel_time)
-    path = np.array(path)  # de forme (N, 2)
-    # print("Before resampling :",len(path))
-    # path=resample_path(path,1000)
-    print(len(path))
-    smoothed_x = gaussian_filter1d(path[:, 0], sigma=4)
-    smoothed_y = gaussian_filter1d(path[:, 1], sigma=4)
-    path = np.stack([smoothed_x, smoothed_y], axis=1)
-    print("smoooooth")
-    # x = path[:, 0]
-    # y = path[:, 1]
-    # tck, _ = splprep([x, y], s=5)  # s=5 contrôle le lissage
-    # u_fine = np.linspace(0, 1, 100)
-    # x_smooth, y_smooth = splev(u_fine, tck)
-    # smoothed_path = np.vstack([x_smooth, y_smooth]).T
+        ## Compute the path
+        path, travel_time = astar_anisotropic(
+            x_new,
+            y_new,
+            v0,
+            vx,
+            vy,
+            start_point,
+            goal_point,
+            sdf_function,
+            heuristic_weight=0.5,
+        )
+        # path = shortcut_path(path,is_collision_free,sdf_interpolator)
+        print("Travel time :", travel_time)
+    
+        path = np.array(path)  # de forme (N, 2)
+        dist = np.array([abs(path[i + 1] - path[i]) for i in range(len(path) - 1)])
+        print("path before resampling :", len(path))
+        n = ceil(np.max(dist) / (5 * 1e-3))
+        if n > 1:
+            path = resample_path(path, len(path) * n)
+        print("after resampling : ",len(path))
+        smoothed_x = gaussian_filter1d(path[:, 0], sigma=20)
+        smoothed_y = gaussian_filter1d(path[:, 1], sigma=20)
+        path = np.stack([smoothed_x, smoothed_y], axis=1)
+        print("smoooooth")
+        visualize_results_a_star(x_new, y_new, sdf_function, path, vx, vy, scale,B)
+
 
     end_time = time.time()
     elapsed_time = (end_time - start_time) / 60
     print("Execution time:", elapsed_time, "minutes")
-
-    visualize_results_a_star(x_new, y_new, sdf_function, path, vx, vy, scale)
+    
+    plt.legend()
+    current_time = datetime.now().strftime("%m-%d_%H-%M-%S")
+    plt.gca().set_aspect("equal", adjustable="box")
+    plt.axis("off")
+    plt.title("SDF with path")
+    plt.tight_layout()
+    plt.savefig(f"fig/Astar_ani_test_{current_time}.png", dpi=300, bbox_inches="tight")

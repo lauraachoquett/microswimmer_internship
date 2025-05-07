@@ -28,6 +28,7 @@ from statistics import mean
 from scipy.interpolate import RegularGridInterpolator
 from scipy.ndimage import gaussian_filter1d
 
+from .utils import create_numbered_run_folder
 from .analytic_solution_line import find_next_v
 from .Astar_ani import astar_anisotropic, compute_v, contour_2D
 from .data_loader import load_sdf_from_csv, vel_read
@@ -35,7 +36,7 @@ from .distance_to_path import min_dist_closest_point
 from .evaluate_agent import evaluate_agent
 from .fmm import compute_fmm_path
 from .invariant_state import coordinate_in_global_ref
-from .plot import plot_action, plot_trajectories
+from .plot import plot_action, plot_trajectories,plot_success_rate
 from .rank_agents import rank_agents_by_rewards
 from .sdf import get_contour_coordinates, sdf_circle, sdf_many_circle
 from .simulation import solver
@@ -58,13 +59,10 @@ def evaluate_after_training(
     obstacle_type=None,
     velocity_func=None,
     plot_velocity_field=None,
-    dir=None,
-    norm=None,
-    a=None,
-    center=None,
-    cir=None,
     title_add="",
     list_config_paths=[],
+    sigma = 10,
+    description='',
 ):
     np.random.seed(seed)
     random.seed(seed)
@@ -74,22 +72,16 @@ def evaluate_after_training(
 
     uniform_bg = False
     rankine_bg = False
-    if dir is not None and norm is not None:
-        dir = np.array(dir)
-        norm = norm
-        parameters = [dir, norm]
-        uniform_bg = True
-    elif a is not None and center is not None and cir is not None:
-        parameters = [center, a, cir]
-        rankine_bg = True
-    else:
-        parameters = []
 
-    file_path_result = "results_evaluation/"
+
+    file_path_result_global = "grid_search"
+    file_path_result = str(create_numbered_run_folder(file_path_result_global))
     os.makedirs(file_path_result, exist_ok=True)
+
     file_name_result = os.path.join(
-        file_path_result, "result_evaluation_" + f"{obstacle_type}" + ".json"
+        file_path_result, f"result_evaluation_{obstacle_type}_{title_add}.json"
     )
+    
     try:
         with open(file_name_result, "r") as f:
             results = json.load(f)
@@ -127,10 +119,8 @@ def evaluate_after_training(
         for path_to_config in list_config_paths:
             if agent_name in results.keys():
                 results_per_config = results[agent_name]["results_per_config"]
-                print("Path to config :", path_to_config)
                 if path_to_config in results[agent_name]["results_per_config"]:
-                    print(f"Agent {agent_name} already evaluated with this config.")
-                    # continue
+                    continue
             else:
                 results_per_config = {}
             (
@@ -143,8 +133,18 @@ def evaluate_after_training(
                 Y_new,
                 time,
                 ratio,
+                parameters,
             ) = load_config_path(path_to_config)
-
+            
+            file_path_result_parameters = os.path.join(file_path_result,'parameters.json')
+            parameters['sigma']=sigma
+            parameters['description'] = description
+            with open(file_path_result_parameters,'w') as f:
+                json.dump(parameters,f,indent=4)
+                
+            smoothed_x = gaussian_filter1d(path[:, 0], sigma=15)
+            smoothed_y = gaussian_filter1d(path[:, 1], sigma=15)
+            path = np.stack([smoothed_x, smoothed_y], axis=1)
             tree = KDTree(path)
             config_eval["path"] = path
             config_eval["tree"] = tree
@@ -152,8 +152,8 @@ def evaluate_after_training(
             config_eval["p_0"] = np.array(start_point)
             config_eval["x_0"] = np.array(start_point)
             print("Evaluation - Path ready")
-            title_add = f"{time}"
-            file_name_or = f"_{title_add}_obstacle_{obstacle_type}"
+            time_t = f"{time}"
+            file_name_or = f"_{time_t}_obstacle_{obstacle_type}_{title_add}"
 
             env = MicroSwimmer(
                 config_eval["x_0"],
@@ -191,7 +191,6 @@ def evaluate_after_training(
                 False,
                 title="",
                 plot=True,
-                parameters=parameters,
                 plot_background=True,
                 rng=rng,
                 obstacle_contour=obstacle_contour,
@@ -206,17 +205,17 @@ def evaluate_after_training(
                 "rewards_distance": rewards_d_per_episode,
                 "success_rate": success_rate,
             }
-
             success_rate_list.append(success_rate)
 
-        results[agent_name] = {
-            "mean_success_rate": mean(success_rate_list),
-            "n_eval_episodes": config_eval["eval_episodes"],
-            "training type": training_type,
-            "results_per_config": results_per_config,
-        }
-        with open(file_name_result, "w") as f:
-            json.dump(results, f, indent=4)
+            results[agent_name] = {
+                "mean_success_rate": mean(success_rate_list),
+                "n_eval_episodes": config_eval["eval_episodes"],
+                "training type": training_type,
+                "results_per_config": results_per_config,
+            }
+            with open(file_name_result, "w") as f:
+                json.dump(results, f, indent=4)
+            plot_success_rate(file_name_result,agent_name,file_path_result)
         print("-----------------------------------------------")
         print("Success rate : ", mean(success_rate_list))
         print("-----------------------------------------------")
@@ -254,7 +253,7 @@ def initialize_parameters(agent_file, bounce_thr):
     Dt_action = 1 / maximum_curvature
     threshold = 0.07
     D = threshold**2 / (20 * Dt_action)
-    threshold = 5 / 576 * 24
+    threshold = 10 / 576 * 24
     config_eval["D"] = D
     config_eval["bounce_thr"] = bounce_thr
     return config_eval
@@ -335,6 +334,7 @@ def load_config_path(path_to_config_path):
         Y_new,
         time,
         ratio,
+        parameters
     )
 
 
@@ -350,7 +350,7 @@ def obstacle_and_path(
     heuristic_weight=None,
     weight_sdf=None,
     path_to_config_path=None,
-):
+    ):
     current_time = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
     if path_to_config_path is not None:
         path, _, _, sdf_function, _, X_new, Y_new = load_config_path(
@@ -359,7 +359,7 @@ def obstacle_and_path(
     else:
         # If config_path_fmm is None, all other parameters must be provided
         print("Creation of config file...")
-        if None in [scale, ratio, B, flow_factor, res_factor, start_point, goal_point]:
+        if None in [scale, ratio, B, flow_factor, res_factor, start_point, goal_point,weight_sdf,heuristic_weight]:
             raise ValueError(
                 "If config_path_fmm is None, all other parameters (scale, ratio, B, flow_factor, res_factor, start_point, goal_point) must be provided."
             )
@@ -438,12 +438,7 @@ def obstacle_and_path(
             dist = np.array([abs(path[i + 1] - path[i]) for i in range(len(path) - 1)])
             n = ceil(np.max(dist) / (5 * 1e-3))
             if n > 1:
-                print(n)
                 path = resample_path(path, len(path) * n)
-            smoothed_x = gaussian_filter1d(path[:, 0], sigma=10)
-            smoothed_y = gaussian_filter1d(path[:, 1], sigma=10)
-            path = np.stack([smoothed_x, smoothed_y], axis=1)
-            print("maximum distance :", np.max(dist))
         config_path_fmm["path_path"] = save_path_path
         config_path_fmm["path_phi"] = save_path_phi
         config_path_fmm["path_flow"] = save_path_flow
@@ -479,7 +474,7 @@ def create_list_of_goal_point(n, start_point):
         point
         for point in point_list
         if (
-            sdf_function(point) < -0.15
+            sdf_function(point) < -0.3
             and point[0] < 0.9
             and np.linalg.norm(point - start_point) > 0.05
         )
@@ -512,10 +507,13 @@ if __name__ == "__main__":
     X_new, Y_new = np.meshgrid(x_new, y_new)
     heuristic_weight = 0.1
     weight_sdf = 8
+    sigma = 15
+    description =''
+    
     compute_goal_points = True
 
     # if compute_goal_points :
-    #     goal_points = create_list_of_goal_point(20,start_point)
+    #     goal_points = create_list_of_goal_point(50,start_point)
     #     for goal_point in goal_points:
     #         goal_point=tuple(goal_point)
     #         p_0, p_target, sdf_func, path, obstacle_contour, velocity_retina,current_time = obstacle_and_path(
@@ -528,44 +526,31 @@ if __name__ == "__main__":
     #             goal_point=goal_point,
     #             path_method='astar',
     #             heuristic_weight=heuristic_weight,
+    #             weight_sdf = weight_sdf,
     #             path_to_config_path=None,
     #         )
     #     np.save('data/random_target_points',np.array(goal_points))
     # else :
     #     goal_points= np.load('data/random_target_points')
-
-    p_0, p_target, sdf_func, path, obstacle_contour, velocity_retina, current_time = (
-        obstacle_and_path(
-            scale=scale,
-            ratio=ratio,
-            flow_factor=2,
-            B=1/10,
-            res_factor=res_factor,
-            start_point=start_point,
-            goal_point=(0.53, 0.6),
-            path_method="astar",
-            heuristic_weight=heuristic_weight,
-            path_to_config_path=None,
-        )
-    )
+        
     start_time_eva = time.time()
     list_config_paths = []
     dir_config_path = Path(f"config_path/velocity_ratio_{ratio}/")
 
     for item in dir_config_path.rglob("*.json"):
-        if current_time in item.name:
-            list_config_paths.append(os.path.join(dir_config_path, item.name))
+        list_config_paths.append(os.path.join(dir_config_path, item.name))
 
     sdf_func, velocity_retina = sdf_func_and_velocity_func(domain_size, ratio)
     obstacle_contour = contour_2D(sdf_func, X_new, Y_new, scale)
-    print(list_config_paths)
-    print("Path generated")
+    print("Number of different paths :",len(list_config_paths))
+    print("Path generated - Go for evaluation")
     results = evaluate_after_training(
         agents_file,
         obstacle_contour=obstacle_contour,
         obstacle_type=obstacle_type,
         velocity_func=velocity_retina,
         list_config_paths=list_config_paths,
+        sigma=15
     )
     end_time_eva = time.time()
     elapsed_time = (end_time_eva - start_time_eva) / 60
