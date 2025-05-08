@@ -2,17 +2,19 @@ import heapq
 import os
 import time
 from datetime import datetime
-from math import ceil,sqrt
+from math import ceil, sqrt
+
+import matplotlib.pyplot as plt
 import numpy as np
+from matplotlib.colors import LogNorm
 from scipy.interpolate import RegularGridInterpolator, splev, splprep
 from scipy.ndimage import gaussian_filter1d
 
-from .Astar import resample_path
-from .data_loader import load_sdf_from_csv, vel_read
-from .fmm import sdf_func_and_velocity_func
-from .sdf import get_contour_coordinates
-import matplotlib.pyplot as plt
-from matplotlib.colors import LogNorm
+from src.Astar import resample_path
+from src.data_loader import load_sdf_from_csv, vel_read
+from src.fmm import sdf_func_and_velocity_func
+from src.sdf import get_contour_coordinates
+
 
 def contour_2D(sdf_function, X_new, Y_new, scale):
     if os.path.exists(f"data/retina2D_contour_scale_{scale}.npy"):
@@ -154,10 +156,10 @@ def precalculate_move_costs(v0, vx, vy, dir_offsets, dx, dy, weight_sdf):
                     alignment = np.linalg.norm(v_l@d) / (
                         np.linalg.norm(v_l) * np.linalg.norm(d)
                     )
-                    alignment = alignment**(4)
+                    alignment = alignment**(1)
                     effective_speed = flow_component * alignment
-                    effective_speed = weight_sdf * v0[j, i] * max(effective_speed, 0.001)
-                    if effective_speed > 0:
+                    effective_speed =v0[j, i]**(2) * max(effective_speed, 0.001)
+                    if flow_component > 0 and v0[j, i] >0:
                         move_costs[j, i, d_idx] = distance / effective_speed
     return move_costs
 
@@ -172,7 +174,7 @@ def heuristic(i1, j1, i2, j2, dx, dy):
     return distance / v_max
 
 
-def visualize_results_a_star(x, y, sdf_function, path, vx, vy, scale,B=None):
+def visualize_results_a_star(x, y, sdf_function, path, vx, vy, scale,par=None,label=''):
     """
     Visualise les résultats de l'algorithme A*.
     """
@@ -194,7 +196,7 @@ def visualize_results_a_star(x, y, sdf_function, path, vx, vy, scale,B=None):
 
     if len(path) > 0:
         path_x, path_y = zip(*path)
-        plt.plot(path_x, path_y, linewidth=2,label=f'B : {B}')
+        plt.plot(path_x, path_y, linewidth=2,label=f'{label} : {par}')
 
         plt.scatter([path[0][0]], [path[0][1]], s=50)
         plt.scatter([path[-1][0]], [path[-1][1]], s=50)
@@ -315,7 +317,6 @@ def is_collision_free(p1, p2, sdf_interpolator):
 
 
 if __name__ == "__main__":
-    start_time = time.time()
 
     scale = 20
     ratio = 5
@@ -338,50 +339,53 @@ if __name__ == "__main__":
     x_new = np.linspace(0, domain_size[0], grid_size[0])
     y_new = np.linspace(0, domain_size[1], grid_size[1])
 
-    c_values = np.linspace(0,2/3,4)
+    c = 0.44
     # Compute v0,vx and vy on this new domain.
     plt.figure(figsize=(12, 10))
-    weight_sdf = 1
+    weight_sdf=1
     start_point = (start_point[0] * scale, start_point[1] * scale)
     goal_point = (goal_point[0] * scale, goal_point[1] * scale)
+    # goal_point = (17.14455146061312,11.52041838191506)
     B = 1.6
-    for c in c_values:
-        v0, vx, vy, _, _ = compute_v(
-            x_new, y_new, velocity_retina, B, grid_size, ratio, sdf_function,c
-        )
+    h = 3.8
+    start_time = time.time()
 
-        ## Compute the path
-        path, travel_time = astar_anisotropic(
-            x_new,
-            y_new,
-            v0,
-            vx,
-            vy,
-            start_point,
-            goal_point,
-            sdf_function,
-            heuristic_weight=0.5,
-        )
-        # path = shortcut_path(path,is_collision_free,sdf_interpolator)
-        print("Travel time :", travel_time)
-    
-        path = np.array(path)  # de forme (N, 2)
-        dist = np.array([abs(path[i + 1] - path[i]) for i in range(len(path) - 1)])
-        print("path before resampling :", len(path))
-        n = ceil(np.max(dist) / (5 * 1e-3))
-        if n > 1:
-            path = resample_path(path, len(path) * n)
-        print("after resampling : ",len(path))
-        smoothed_x = gaussian_filter1d(path[:, 0], sigma=20)
-        smoothed_y = gaussian_filter1d(path[:, 1], sigma=20)
-        path = np.stack([smoothed_x, smoothed_y], axis=1)
-        print("smoooooth")
-        visualize_results_a_star(x_new, y_new, sdf_function, path, vx, vy, scale,B)
+    v0, vx, vy, _, _ = compute_v(
+        x_new, y_new, velocity_retina, B, grid_size, ratio, sdf_function,c
+    )
+    ## Compute the path
+    path, travel_time = astar_anisotropic(
+        x_new,
+        y_new,
+        v0,
+        vx,
+        vy,
+        start_point,
+        goal_point,
+        sdf_function,
+        heuristic_weight=h,
+    )
+    # path = shortcut_path(path,is_collision_free,sdf_interpolator)
+    print("Travel time :", travel_time)
 
-
+    path = np.array(path)  # de forme (N, 2)
+    dist = np.array([abs(path[i + 1] - path[i]) for i in range(len(path) - 1)])
+    print("path before resampling :", len(path))
+    n = ceil(np.max(dist) / (5 * 1e-3))
+    if n > 1:
+        path = resample_path(path, len(path) * n)
+    print("after resampling : ",len(path))
+    smoothed_x = gaussian_filter1d(path[:, 0], sigma=20)
+    smoothed_y = gaussian_filter1d(path[:, 1], sigma=20)
+    path = np.stack([smoothed_x, smoothed_y], axis=1)
+    print("smoooooth")
+    visualize_results_a_star(x_new, y_new, sdf_function, path, vx, vy, scale,B,'B')
     end_time = time.time()
     elapsed_time = (end_time - start_time) / 60
     print("Execution time:", elapsed_time, "minutes")
+
+
+
     
     plt.legend()
     current_time = datetime.now().strftime("%m-%d_%H-%M-%S")

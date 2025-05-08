@@ -2,6 +2,7 @@ import os
 import sys
 import time
 from math import sqrt
+
 from tqdm import tqdm
 
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
@@ -14,9 +15,9 @@ from scipy.spatial import KDTree
 
 from Astar import resample_path, shortcut_path
 
-from .env_swimmer import MicroSwimmer
-from .generate_path import *
-from .TD3 import TD3
+from src.env_swimmer import MicroSwimmer
+from src.generate_path import *
+from src.TD3 import TD3
 
 colors = plt.cm.tab10.colors
 import copy
@@ -29,24 +30,20 @@ from statistics import mean
 from scipy.interpolate import RegularGridInterpolator
 from scipy.ndimage import gaussian_filter1d
 
-from .utils import create_numbered_run_folder
-from .analytic_solution_line import find_next_v
-from .Astar_ani import astar_anisotropic, compute_v, contour_2D
-from .data_loader import load_sdf_from_csv, vel_read
-from .distance_to_path import min_dist_closest_point
-from .evaluate_agent import evaluate_agent
-from .fmm import compute_fmm_path
-from .invariant_state import coordinate_in_global_ref
-from .plot import plot_action, plot_trajectories,plot_success_rate
-from .rank_agents import rank_agents_by_rewards
-from .sdf import get_contour_coordinates, sdf_circle, sdf_many_circle
-from .simulation import solver
-from .visualize import (
-    plot_robust_D,
-    plot_robust_u_bg_rankine,
-    plot_robust_u_bg_uniform,
-    visualize_streamline,
-)
+from src.analytic_solution_line import find_next_v
+from src.Astar_ani import astar_anisotropic, compute_v, contour_2D
+from src.data_loader import load_sdf_from_csv, vel_read
+from src.distance_to_path import min_dist_closest_point
+from src.evaluate_agent import evaluate_agent
+from src.fmm import compute_fmm_path
+from src.invariant_state import coordinate_in_global_ref
+from src.plot import plot_action, plot_success_rate, plot_trajectories
+from src.rank_agents import rank_agents_by_rewards
+from src.sdf import get_contour_coordinates, sdf_circle, sdf_many_circle
+from src.simulation import solver
+from src.utils import create_numbered_run_folder
+from src.visualize import (plot_robust_D, plot_robust_u_bg_rankine,
+                        plot_robust_u_bg_uniform, visualize_streamline)
 
 
 def format_sci(x):
@@ -59,12 +56,12 @@ def evaluate_after_training(
     seed=42,
     obstacle_type=None,
     velocity_func=None,
+    sdf_func=None,
     plot_velocity_field=None,
     title_add="",
     list_config_paths=[],
     sigma = 10,
-    description='',
-):
+    ):
     np.random.seed(seed)
     random.seed(seed)
     rng = np.random.default_rng(seed)
@@ -101,8 +98,10 @@ def evaluate_after_training(
             "load_model": config_eval["load_model"],
             "n_lookahead": config_eval["n_lookahead"],
             "beta": config_eval["beta"],
+            "add_action" : config_eval["add_action"],
+            "velocity_ahead" : config_eval["velocity_ahead"]
         }
-
+        print("Training type :", training_type)
         print("Agent name : ", agent_name)
         config_eval["uniform_bg"] = uniform_bg
         config_eval["rankine_bg"] = rankine_bg
@@ -139,7 +138,6 @@ def evaluate_after_training(
             
             file_path_result_parameters = os.path.join(file_path_result,'parameters.json')
             parameters['sigma']=sigma
-            parameters['description'] = description
             with open(file_path_result_parameters,'w') as f:
                 json.dump(parameters,f,indent=4)
                 
@@ -161,8 +159,8 @@ def evaluate_after_training(
                 Dt_sim,
                 config_eval["velocity_bool"],
                 config_eval["n_lookahead"],
-                seed,
-                config_eval["bounce_thr"],
+                config_eval["velocity_ahead"],
+                config_eval["add_action"],
             )
 
             state_dim = env.observation_space.shape[0]
@@ -194,8 +192,8 @@ def evaluate_after_training(
                 plot_background=True,
                 rng=rng,
                 obstacle_contour=obstacle_contour,
-                sdf=sdf,
-                velocity_func=velocity_func,
+                sdf=sdf_func,
+                velocity_func_l=velocity_func,
             )
 
             plt.close()
@@ -220,7 +218,6 @@ def evaluate_after_training(
         print("Success rate : ", mean(success_rate_list))
         print("-----------------------------------------------")
 
-    threshold = [0.07]
     D = config_eval["D"]
     # plot_robust_D(config_eval,file_name_or,agent,env,save_path_eval,15,threshold)
     config_eval["D"] = D
@@ -240,9 +237,15 @@ def initialize_parameters(agent_file, bounce_thr):
     )
     config_eval["nb_points_path"] = 500
     config_eval["t_max"] = 30
-    config_eval["eval_episodes"] = 200
+    config_eval["eval_episodes"] = 100
     config_eval["velocity_bool"] = (
         config["velocity_bool"] if "velocity_bool" in config else False
+    )
+    config_eval["velocity_ahead"] = (
+        config["velocity_ahead"] if "velocity_ahead" in config else False
+    )
+    config_eval["add_action"] = (
+        config["add_action"] if "add_action" in config else False
     )
     config_eval["Dt_action"] = (
         config_eval["Dt_action"] if "Dt_action" in config else 1 / 30
@@ -253,7 +256,8 @@ def initialize_parameters(agent_file, bounce_thr):
     Dt_action = 1 / maximum_curvature
     threshold = 0.07
     D = threshold**2 / (20 * Dt_action)
-    threshold = 10 / 576 * 24
+    threshold = 5 / 576 * 24
+    config_eval['threshold']=threshold
     config_eval["D"] = D
     config_eval["bounce_thr"] = bounce_thr
     return config_eval
@@ -350,6 +354,8 @@ def obstacle_and_path(
     heuristic_weight=None,
     weight_sdf=None,
     c=None,
+    file_to_config_path=None,
+    description=None,
     path_to_config_path=None,
     ):
     current_time = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
@@ -360,7 +366,7 @@ def obstacle_and_path(
     else:
         # If config_path_fmm is None, all other parameters must be provided
         print("Creation of config file...")
-        if None in [scale, ratio, B, flow_factor, res_factor, start_point, goal_point,weight_sdf,heuristic_weight,c]:
+        if None in [scale, ratio, B, flow_factor, res_factor, start_point, goal_point,weight_sdf,heuristic_weight,c,file_to_config_path]:
             raise ValueError(
                 "If config_path_fmm is None, all other parameters (scale, ratio, B, flow_factor, res_factor, start_point, goal_point) must be provided."
             )
@@ -398,6 +404,7 @@ def obstacle_and_path(
             "c" : c,
             "method": path_method,
             "current_time": current_time,
+            "description":description
         }
         config_path_fmm["parameters"] = parameters
 
@@ -447,8 +454,8 @@ def obstacle_and_path(
         config_path_fmm["path_flow"] = save_path_flow
 
         np.save(save_path_path, path, allow_pickle=False)
-        file_to_config_path = f"config_path/velocity_ratio_{ratio}"
-        os.makedirs(file_to_config_path, exist_ok=True)
+        
+
         path_to_config_path = os.path.join(
             file_to_config_path, f"config_path__{path_method}_{current_time}.json"
         )
@@ -477,7 +484,7 @@ def create_list_of_goal_point(n, start_point):
         point
         for point in point_list
         if (
-            sdf_function(point) < -0.3
+            sdf_function(point) < -0.4
             and point[0] < 0.9
             and np.linalg.norm(point - start_point) > 0.05
         )
@@ -508,17 +515,20 @@ if __name__ == "__main__":
     x_new = np.linspace(0, domain_size[0], grid_size[0])
     y_new = np.linspace(0, domain_size[1], grid_size[1])
     X_new, Y_new = np.meshgrid(x_new, y_new)
-    heuristic_weight = 0.1
-    weight_sdf = 8
+    heuristic_weight = 2.7
+    weight_sdf = 1
     sigma = 15
-    c=1/2
+    c=0.44
     B=1.57
-    description ='square alignment'
+    description ='cant swim against the current, v0**2 and alignment **1'
     
-    compute_goal_points = True
-
+    compute_goal_points = False
     if compute_goal_points :
-        goal_points = create_list_of_goal_point(50,start_point)
+        file_to_config_path_g = f"config_path/velocity_ratio_{ratio}"
+
+        file_to_config_path = str(create_numbered_run_folder(file_to_config_path_g))
+        os.makedirs(file_to_config_path, exist_ok=True)
+        goal_points = create_list_of_goal_point(100,start_point)
         for goal_point in goal_points:
             goal_point=tuple(goal_point)
             p_0, p_target, sdf_func, path, obstacle_contour, velocity_retina,current_time = obstacle_and_path(
@@ -533,15 +543,15 @@ if __name__ == "__main__":
                 heuristic_weight=heuristic_weight,
                 weight_sdf = weight_sdf,
                 c=c,
+                file_to_config_path=file_to_config_path,
+                description=description,
                 path_to_config_path=None,
             )
         np.save('data/random_target_points',np.array(goal_points))
-    else :
-        goal_points= np.load('data/random_target_points')
         
     start_time_eva = time.time()
     list_config_paths = []
-    dir_config_path = Path(f"config_path/velocity_ratio_{ratio}/")
+    dir_config_path = Path(f"config_path/velocity_ratio_{ratio}/4/")
 
     for item in dir_config_path.rglob("*.json"):
         list_config_paths.append(os.path.join(dir_config_path, item.name))
@@ -555,8 +565,9 @@ if __name__ == "__main__":
         obstacle_contour=obstacle_contour,
         obstacle_type=obstacle_type,
         velocity_func=velocity_retina,
+        sdf_func=sdf_func,
         list_config_paths=list_config_paths,
-        sigma=15
+        sigma=20
     )
     end_time_eva = time.time()
     elapsed_time = (end_time_eva - start_time_eva) / 60

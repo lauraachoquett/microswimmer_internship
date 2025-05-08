@@ -6,8 +6,8 @@ from math import atan2
 import matplotlib.pyplot as plt
 import numpy as np
 
-from .generate_path import generate_simple_line
-from .plot import plot_trajectories
+from src.generate_path import generate_simple_line
+from src.plot import plot_trajectories
 
 
 def f(v, v_target, beta):

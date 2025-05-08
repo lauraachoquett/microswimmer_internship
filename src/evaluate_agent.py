@@ -4,14 +4,14 @@ from statistics import mean
 import matplotlib.pyplot as plt
 import numpy as np
 
-from .simulation import rankine_vortex, uniform_velocity
-from .utils import random_bg_parameters
+from src.simulation import rankine_vortex, uniform_velocity
+from src.utils import random_bg_parameters
 
 colors = plt.cm.tab10.colors
 import copy
 
-from .generate_path import generate_curve
-from .plot import plot_trajectories
+from src.generate_path import generate_curve
+from src.plot import plot_trajectories
 
 
 def evaluate_agent(
@@ -30,7 +30,7 @@ def evaluate_agent(
     rng=None,
     obstacle_contour=None,
     sdf=None,
-    velocity_func=None,
+    velocity_func_l=None,
 ):
     config = copy.deepcopy(config)
     parameters = copy.deepcopy(parameters)
@@ -81,10 +81,16 @@ def evaluate_agent(
         norm = np.linalg.norm(u_bg)
         dir = np.array(u_bg / norm)
         plot_background = True
+    velocity_func=None
+    if velocity_func_l is not None:
+        velocity_func = lambda x: velocity_func_l(x).squeeze()
 
-    if velocity_func is not None:
-        plot_background = False
-
+    if config["uniform_bg"]:
+        velocity_func = lambda x: uniform_velocity(dir, norm)
+    elif config["rankine_bg"]:
+        velocity_func = lambda x: rankine_vortex(x, a, center, cir)
+        
+    
     if list_of_path_tree is not None:
         path, tree = list_of_path_tree[0]
         nb_of_path = len(list_of_path_tree)
@@ -94,7 +100,7 @@ def evaluate_agent(
         nb_of_path = 1
 
     #### EVALUATION ####
-    state, done = env.reset(tree, path), False
+    state, done = env.reset(tree, path,velocity_func), False
     while episode_num < eval_episodes:
         states_episode.append(x)
         iter += 1
@@ -102,14 +108,11 @@ def evaluate_agent(
         if iter % steps_per_action == 0 or iter == 1:
             action = agent.select_action(state)
 
-        if config["uniform_bg"]:
-            u_bg = uniform_velocity(np.array(dir), norm)
-        if config["rankine_bg"]:
-            u_bg = rankine_vortex(x, a, center, cir)
+        if config["uniform_bg"] or config["rankine_bg"]:
+            u_bg = velocity_func(x)
 
         if velocity_func is not None:
             u_bg = velocity_func(x)
-            u_bg = u_bg.squeeze()
             v = np.linalg.norm(u_bg)
             v_hist.append(v)
 
@@ -135,7 +138,7 @@ def evaluate_agent(
             if done:
                 count_succes += 1
             states_list_per_episode.append([np.array(states_episode), iter])
-            state, done = env.reset(tree, path), False
+            state, done = env.reset(tree, path,velocity_func), False
             iter = 0
             episode_num += 1
             x = p_0

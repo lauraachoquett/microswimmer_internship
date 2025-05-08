@@ -9,7 +9,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import seaborn as sns
-
+from src.plot import analyze_and_visualize_agent_data
 
 def rank_agents_by_rewards(results, print_stats=True):
     # Calculer les moyennes pour chaque agent
@@ -112,7 +112,7 @@ def rank_agents_all_criterion(files_results, agents_file):
     filtered_stats = sorted(
         filtered_stats, key=lambda x: x["mean_reward"], reverse=True
     )
-    print("\nMerged Top 10 agents by mean_reward (with more than 20 evaluations):")
+    print("\nMerged Top 10 agents by mean_reward :")
     for i, agent in enumerate(filtered_stats, 1):
         print(
             f"{i} Mean Reward: {agent['mean_reward']:.3f}__{agent['count']}__ __ {agent['agent_name']}__{agent['training type']} "
@@ -127,45 +127,43 @@ def rank_agents_all_criterion(files_results, agents_file):
 
 
 if __name__ == "__main__":
-    # types = ["ondulating", "curve_minus", "curve_plus", "line", "circle"]
-    # file = "results_evaluation"
-    # files_results = []
-    # for type in types:
-    #     files_results.extend(
-    #         [
-    #             f"results_evaluation/result_evaluation_east_05_{type}.json",
-    #             f"results_evaluation/result_evaluation_west_05_{type}.json",
-    #             f"results_evaluation/result_evaluation_north_05_{type}.json",
-    #             f"results_evaluation/result_evaluation_south_05_ondulating.json",
-    #         ]
-    #     )
-    #     files_results.extend(
-    #         [
-    #             f"results_evaluation/result_evaluation_rankine_a_05__cir_3_center_1_075_{type}.json"
-    #         ]
-    #     )
-    #     files_results.extend([f"results_evaluation/result_evaluation_free_{type}.json"])
-    # print("Overall ranking of agents:")
+    types = ["ondulating", "curve_minus", "curve_plus", "line"]
+    file = "results_evaluation"
+    files_results = []
+    for type in types:
+        # files_results.extend(
+        #     [
+        #         f"results_evaluation/result_evaluation_east_05_{type}.json",
+        #         f"results_evaluation/result_evaluation_west_05_{type}.json",
+        #         f"results_evaluation/result_evaluation_north_05_{type}.json",
+        #         f"results_evaluation/result_evaluation_south_05_{type}.json",
+        #     ]
+        # )
+        files_results.extend(
+            [
+                f"results_evaluation/result_evaluation_rankine_a_05__cir_3_center_1_075_{type}.json"
+            ]
+        )
+        # files_results.extend([f"results_evaluation/result_evaluation_free_{type}.json"])
+    print("Overall ranking of agents:")
+    print(files_results)
+    agents_file = []
 
-    # agents_file = []
+    directory_path = Path("agents/")
 
-    # directory_path = Path("agents/")
+    for item in directory_path.iterdir():
+        agents_file.append(os.path.join(directory_path, item.name))
 
-    # for item in directory_path.iterdir():
-    #     if item.is_dir() and "agent_TD3" in item.name :
-    #         if '2025-04-23' in item.name or '2025-04-22' in item.name:
-    #             agents_file.append(os.path.join(directory_path, item.name))
+    stats = rank_agents_all_criterion(files_results,agents_file)
+    timestamp = datetime.now().strftime("%Y-%m-%d_%H")
+    save_rank_file = os.path.join(file, f"results_rank_overall_rankine.json")
+    with open(save_rank_file, "w") as f:
+        json.dump(stats, f, indent=4)
 
-    # stats = rank_agents_all_criterion(files_results,agents_file)
-    # timestamp = datetime.now().strftime("%Y-%m-%d_%H")
-    # save_rank_file = os.path.join(file, f"results_rank_overall_beta_values.json")
-    # with open(save_rank_file, "w") as f:
-    #     json.dump(stats, f, indent=4)
+    file_path = "results_evaluation/results_rank_overall_rankine.json"
+    with open(file_path, "r") as f:
+        data = json.load(f)
 
-    # file_path = "results_evaluation/results_rank_overall_2025-04-18_15.json"
-    # with open(file_path, "r") as f:
-    #     data = json.load(f)
-
-    # analyze_and_visualize_agent_data(data)
-    file_path = "/Users/laura/Documents/MVA/Stage_Harvard/Project/results_evaluation/results_rank_overall_beta_values.json"
-    plot_return_beta(file_path)
+    # analyze_and_visualize_agent_data(data=data,name_fig='result_3_agents')
+    # file_path = "/Users/laura/Documents/MVA/Stage_Harvard/Project/results_evaluation/results_rank_overall_beta_values.json"
+    # plot_return_beta(file_path)

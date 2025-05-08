@@ -9,8 +9,8 @@ from scipy.interpolate import RegularGridInterpolator
 from scipy.ndimage import gaussian_filter
 from scipy.optimize import minimize
 
-from .data_loader import load_sdf_from_csv, vel_read
-from .sdf import sdf_circle
+from src.data_loader import load_sdf_from_csv, vel_read
+from src.sdf import sdf_circle
 
 
 def ordered_upwind_method_fast(x, y, v0, vx, vy, goal_point, narrow_band_width=5):

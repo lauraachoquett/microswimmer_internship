@@ -3,7 +3,8 @@ import math
 import matplotlib.pyplot as plt
 import numpy as np
 
-from .Astar import astar, plot_valid_invalid_points, resample_path, shortcut_path
+from src.Astar import (astar, plot_valid_invalid_points, resample_path,
+                    shortcut_path)
 
 
 def sdf_circle(point, center, radius):

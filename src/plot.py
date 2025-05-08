@@ -1,14 +1,17 @@
-import matplotlib.pyplot as plt
-import numpy as np
 import json
 import os
+import seaborn as sns
+import matplotlib.pyplot as plt
+import numpy as np
+import pandas as pd
+from collections import OrderedDict, defaultdict
+from datetime import datetime
+from pathlib import Path
+from statistics import mean
 colors_default = plt.cm.tab10.colors
-from .generate_path import (
-    generate_curve,
-    generate_demi_circle_path,
-    generate_random_ondulating_path,
-)
-from .simulation import rankine_vortex, uniform_velocity
+from src.generate_path import (generate_curve, generate_demi_circle_path,
+                            generate_random_ondulating_path)
+from src.simulation import rankine_vortex, uniform_velocity
 
 
 def plot_trajectories(
@@ -148,14 +151,15 @@ def plot_success_rate(path_json_file,agent_file,save_plot):
     file_table = os.path.join(save_plot,'table.json')
     with open(file_table,'w') as f:
         json.dump(name,f,indent=4)
-    file_plot = os.path.join(save_plot,'result_success_rate.png')
+    file_plot = os.path.join(save_plot,f'{agent_file}_result_success_rate.png')
+    os.makedirs(os.path.join(save_plot, 'agents'), exist_ok=True)
     plt.savefig(file_plot,dpi=200,bbox_inches='tight')
 
         
     
 
 def analyze_and_visualize_agent_data(
-    data, output_dir="./results_evaluation", fig_dir="./fig"
+    data, output_dir="./results_evaluation", fig_dir="./fig",name_fig=''
     ):
     df = pd.json_normalize(data)
     training_columns = [
@@ -186,7 +190,7 @@ def analyze_and_visualize_agent_data(
     agent_counts.to_json(agent_counts_file, orient="records", indent=4)
     print(f"Agent counts saved to {agent_counts_file}")
 
-    filtered_training_types = agent_counts[agent_counts["agent_count"] >= 5][
+    filtered_training_types = agent_counts[agent_counts["agent_count"] >= 1][
         "training_type"
     ]
     df = df[df["training_type_str"].isin(filtered_training_types)]
@@ -264,7 +268,7 @@ def analyze_and_visualize_agent_data(
 
     plt.tight_layout(rect=[0, 0, 0.85, 1])
     os.makedirs(fig_dir, exist_ok=True)
-    fig_path = os.path.join(fig_dir, "return_per_training.png")
+    fig_path = os.path.join(fig_dir, f"{name_fig}.png")
     plt.savefig(fig_path, dpi=300, bbox_inches="tight")
     print(f"Figure saved to {fig_path}")
     

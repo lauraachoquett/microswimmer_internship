@@ -15,14 +15,11 @@ from statistics import mean, stdev
 
 from scipy.spatial import KDTree
 
-from .env_swimmer import MicroSwimmer
-from .generate_path import (
-    generate_curve,
-    generate_demi_circle_path,
-    generate_random_ondulating_path,
-    generate_simple_line,
-)
-from .plot import plot_background_velocity, plot_trajectories
+from src.env_swimmer import MicroSwimmer
+from src.generate_path import (generate_curve, generate_demi_circle_path,
+                            generate_random_ondulating_path,
+                            generate_simple_line)
+from src.plot import plot_background_velocity, plot_trajectories
 
 
 def format_sci(x):
@@ -347,6 +344,9 @@ def visualize_streamline(
             config_eval_v["Dt_action"] / config_eval_v["steps_per_action"],
             config_eval_v["velocity_bool"],
             config_eval_v["n_lookahead"],
+            config_eval_v['velocity_ahead'],
+            config_eval_v['add_action'],
+            
         )
         _, _, _, _, states_list_per_episode = evaluate_agent(
             agent=agent,

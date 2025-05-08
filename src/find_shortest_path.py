@@ -1,7 +1,7 @@
 import numpy as np
 
-from .Astar import astar
-from .sdf import sdf_circle
+from src.Astar import astar
+from src.sdf import sdf_circle
 
 
 def find_shortest_path(start, goal, min_distance, Z):
