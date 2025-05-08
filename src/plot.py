@@ -1,10 +1,17 @@
+import json
+import os
+import seaborn as sns
 import matplotlib.pyplot as plt
 import numpy as np
-
+import pandas as pd
+from collections import OrderedDict, defaultdict
+from datetime import datetime
+from pathlib import Path
+from statistics import mean
 colors_default = plt.cm.tab10.colors
-from .generate_path import (generate_curve, generate_demi_circle_path,
+from src.generate_path import (generate_curve, generate_demi_circle_path,
                             generate_random_ondulating_path)
-from .simulation import rankine_vortex, uniform_velocity
+from src.simulation import rankine_vortex, uniform_velocity
 
 
 def plot_trajectories(
@@ -116,3 +123,211 @@ def plot_background_velocity(
         plt.scatter(center[0], center[1], marker="*")
     plt.xlabel("x")
     plt.ylabel("y")
+
+
+def plot_success_rate(path_json_file,agent_file,save_plot):
+    with open(path_json_file,'r') as f:
+        results = json.load(f)
+    result_agent = results[f'{agent_file}']['results_per_config']
+    
+    short_labels = []
+    for k in result_agent.keys():
+        name = k.split("__")[-1].replace(".json", "")  # Extrait '2025-05-06_17-26-52'
+        short_labels.append(name)
+    name={}
+    sucess_rate_d={}
+    for id,config in enumerate(result_agent.keys()):
+        sucess_rate_d[id] = result_agent[config]['success_rate']
+        name[id]=short_labels[id]
+        
+    ids = list(sucess_rate_d.keys())
+    values = list(sucess_rate_d.values())
+    plt.figure(figsize=(10, 5))
+    plt.bar(ids, values, tick_label=[f"{i}" for i in ids])
+    plt.xlabel("Agent ID")
+    plt.ylabel("Success rate")
+    plt.title("Success rate")
+    plt.grid(True)
+    file_table = os.path.join(save_plot,'table.json')
+    with open(file_table,'w') as f:
+        json.dump(name,f,indent=4)
+    file_plot = os.path.join(save_plot,f'{agent_file}_result_success_rate.png')
+    os.makedirs(os.path.join(save_plot, 'agents'), exist_ok=True)
+    plt.savefig(file_plot,dpi=200,bbox_inches='tight')
+
+        
+    
+
+def analyze_and_visualize_agent_data(
+    data, output_dir="./results_evaluation", fig_dir="./fig",name_fig=''
+    ):
+    df = pd.json_normalize(data)
+    training_columns = [
+        col
+        for col in df.columns
+        if col.startswith("training type.") and not col.endswith("load_model")
+    ]
+    df["training_type_str"] = df[training_columns].apply(
+        lambda row: ", ".join(
+            [f"{col.split('.')[-1]}={row[col]}" for col in training_columns]
+        ),
+        axis=1,
+    )
+
+    random_curve_agents = df[
+        df["training_type_str"].str.contains("random_curve=True", na=False)
+    ]
+    random_curve_file = os.path.join(output_dir, "agent_random_curve.json")
+    os.makedirs(os.path.dirname(random_curve_file), exist_ok=True)
+    random_curve_agents.to_json(random_curve_file, orient="records", indent=4)
+
+    agent_counts = df["training_type_str"].value_counts().reset_index()
+    agent_counts.columns = ["training_type", "agent_count"]
+    print("Number of agents per training type:")
+    print(agent_counts)
+
+    agent_counts_file = os.path.join(output_dir, "agent_counts.json")
+    agent_counts.to_json(agent_counts_file, orient="records", indent=4)
+    print(f"Agent counts saved to {agent_counts_file}")
+
+    filtered_training_types = agent_counts[agent_counts["agent_count"] >= 1][
+        "training_type"
+    ]
+    df = df[df["training_type_str"].isin(filtered_training_types)]
+
+    def format_training_type_label(training_type):
+        label = training_type.split(", ")
+        if "False" in label[0] or "False" in label[1]:
+            label_bis = ["Free"]
+        else:
+            label_bis = ["Varying background"]
+        if "True" in label[2]:
+            label_bis.append("Varying Curve")
+        else:
+            label_bis.append("Circle")
+        n = int(label[-1].split("=")[1])
+        label_bis.append(f"Lookahead (n={n})")
+        return "\n".join(label_bis)
+
+    df_melted = df.melt(
+        id_vars=["training_type_str"],
+        value_vars=["mean_reward", "mean_reward_t", "mean_reward_d"],
+        var_name="metric",
+        value_name="reward",
+    )
+
+    df_melted = df_melted[df_melted["training_type_str"].isin(filtered_training_types)]
+
+    df_melted["metric"] = df_melted["metric"].map(
+        {
+            "mean_reward": "Overall mean return",
+            "mean_reward_t": r"Time return: $-C \sum \Delta t_{sim}$",
+            "mean_reward_d": r"Distance return: $-\beta \sum d$",
+        }
+    )
+
+    df_melted["training_label"] = df_melted["training_type_str"].apply(
+        format_training_type_label
+    )
+
+    plt.figure(figsize=(16, 9))
+    sns.set(style="whitegrid")
+
+    ax = sns.stripplot(
+        data=df_melted,
+        x="training_label",
+        y="reward",
+        hue="metric",
+        dodge=True,
+        jitter=True,
+        size=6,
+        palette="Set2",
+    )
+
+    plt.rcParams["text.usetex"] = True
+    plt.title("Rewards per training", fontsize=14)
+    plt.xlabel("Training type", fontsize=12)
+    plt.ylabel("Reward", fontsize=12)
+    plt.xticks(rotation=45, ha="right", fontsize=9)
+    xticks = ax.get_xticks()
+    for i in range(len(xticks) - 1):
+        xpos = (xticks[i] + xticks[i + 1]) / 2
+        ax.axvline(x=xpos, color="grey", linestyle="--", linewidth=0.7, alpha=0.5)
+    handles, labels = ax.get_legend_handles_labels()
+
+    by_label = OrderedDict(zip(labels, handles))
+    ax.legend(
+        by_label.values(),
+        by_label.keys(),
+        fontsize=15,
+        title_fontsize=17,
+        loc="center left",
+        bbox_to_anchor=(1.01, 0.5),
+        borderaxespad=0.0,
+    )
+
+    plt.tight_layout(rect=[0, 0, 0.85, 1])
+    os.makedirs(fig_dir, exist_ok=True)
+    fig_path = os.path.join(fig_dir, f"{name_fig}.png")
+    plt.savefig(fig_path, dpi=300, bbox_inches="tight")
+    print(f"Figure saved to {fig_path}")
+    
+def plot_return_beta(file_path):
+
+    with open(file_path, "r") as file:
+        data = json.load(file)
+
+    # Extraire les valeurs de beta et des récompenses
+    betas = []
+    mean_rewards = []
+    mean_rewards_t = []
+    mean_rewards_d = []
+
+    for entry in data:
+        betas.append(entry["training type"]["beta"])
+        mean_rewards.append(entry["mean_reward"])
+        mean_rewards_t.append(entry["mean_reward_t"])
+        mean_rewards_d.append(entry["mean_reward_d"])
+
+    # Tracer les récompenses en fonction de beta
+    plt.figure(figsize=(10, 6))
+    palette = sns.color_palette("Set2")
+    plt.scatter(
+        betas, mean_rewards, label="Overall mean return", marker="o", color=palette[0]
+    )
+    plt.scatter(
+        betas,
+        mean_rewards_t,
+        label=r"Time return: $-C \sum \Delta t_{sim}$",
+        marker="o",
+        color=palette[1],
+    )
+    plt.scatter(
+        betas,
+        mean_rewards_d,
+        label=r"Distance return: $-\beta \sum d$",
+        marker="o",
+        color=palette[2],
+    )
+
+    # Ajouter des labels et une légende
+    plt.xlabel("Beta")
+    plt.ylabel("Reward")
+    plt.legend(
+        fontsize=10,
+        loc="center left",
+        bbox_to_anchor=(1.01, 0.5),
+        borderaxespad=0.0,
+    )
+    plt.tight_layout(rect=[0, 0, 0.9, 1])
+
+    plt.grid(True)
+
+    # Afficher le graphique
+    plt.savefig("fig/rank_beta_return.png", dpi=200, bbox_inches="tight")
+
+
+if __name__ =='__main__':
+    path_json_file = 'results_evaluation/result_evaluation_retina.json'
+    agent_file = "agents/agent_TD3_2025-04-18_13-33"
+    plot_success_rate(path_json_file,agent_file)

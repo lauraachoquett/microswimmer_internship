@@ -10,7 +10,7 @@ import torch
 from scipy.spatial import KDTree
 
 import src.TD3 as TD3
-from src.env_swimmer import MicroSwimmer, make_env
+from src.env_swimmer import MicroSwimmer
 from src.evaluate_agent import evaluate_agent
 from src.generate_path import *
 from src.invariant_state import *
@@ -23,7 +23,6 @@ import json
 import random
 from statistics import mean
 
-from stable_baselines3.common.vec_env import SubprocVecEnv
 
 from src.visualize import visualize_streamline
 
@@ -99,7 +98,7 @@ def run_expe(config, agent_file="agents"):
     Dt_action = config["Dt_action"]
     Dt_sim = Dt_action / steps_per_action
     n_lookahead = config["n_lookahead"]
-    env = MicroSwimmer(x_0, C, Dt_sim, config["velocity_bool"], n_lookahead)
+    env = MicroSwimmer(x_0, C, Dt_sim, config["velocity_bool"], n_lookahead,config['velocity_ahead'],config['add_action'])
 
     ## Environnement parameters ##
     t_max = config["t_max"]
@@ -175,17 +174,7 @@ def run_expe(config, agent_file="agents"):
             action = agent.select_action(state)
 
         if episode_num > config["pertubation_after_episode"]:
-
-            ## background flow ##
-            if both_rankine_and_uniform:
-                if episode_num % 2 == 0:
-                    u_bg = uniform_velocity(dir, norm)
-                else:
-                    u_bg = rankine_vortex(x, a, center, cir)
-            if uniform_bg:
-                u_bg = uniform_velocity(dir, norm)
-            if rankine_bg:
-                u_bg = rankine_vortex(x, a, center, cir)
+            u_bg = velocity_func(x)
 
         next_state, reward, done, info = env.step(
             action, tree, path, p_target, beta, D, u_bg, threshold
@@ -207,7 +196,7 @@ def run_expe(config, agent_file="agents"):
 
         ## Ending and Evaluation ##
         if done or iter * Dt_sim > t_max:
-            state, done = env.reset(tree, path), False
+            
             training_reward.append(episode_reward)
 
             if (episode_num) % eval_freq == 0 and episode_num >= 10:
@@ -218,18 +207,18 @@ def run_expe(config, agent_file="agents"):
                     save_path_result_fig, "training_reward.png"
                 )
                 eval_rew, _, _, _, _ = evaluate_agent(
-                    agent,
-                    env,
-                    eval_episodes,
-                    config_eval_bis,
-                    save_path_result_fig,
-                    "eval_during_training",
-                    False,
-                    list_of_path_tree,
-                    "",
-                    True,
-                    [],
-                    False,
+                    agent=agent,
+                    env=env,
+                    eval_episodes=eval_episodes,
+                    config=config_eval_bis,
+                    save_path_result_fig=save_path_result_fig,
+                    file_name="eval_during_training",
+                    random_parameters=False,
+                    list_of_path_tree=list_of_path_tree,
+                    title="",
+                    plot=True,
+                    parameters=[],
+                    plot_background=False,
                 )
                 visualize_streamline(
                     agent,
@@ -285,6 +274,14 @@ def run_expe(config, agent_file="agents"):
             episode_reward = 0
             episode_num += 1
             dir, norm, center, a, cir = random_bg_parameters()
+            
+            if both_rankine_and_uniform:
+                velocity_func = lambda x: uniform_velocity(dir, norm) if episode_num % 2 == 0 else rankine_vortex(x, a, center, cir)
+            elif uniform_bg:
+                velocity_func = lambda x: uniform_velocity(dir, norm)
+            elif rankine_bg:
+                velocity_func = lambda x: rankine_vortex(x, a, center, cir)
+            state, done = env.reset(tree, path,velocity_func), False
 
             if config["random_curve"] and episode_num > 10:
                 k = func_k_max(A, N, f, episode_num)
@@ -352,17 +349,16 @@ if __name__ == "__main__":
         "load_model": "",
         "episode_per_update": 3,
         "discount_factor": 1,
-        "beta": 0.25,
+        "beta": 0.5,
         "uniform_bg": True,  # Random uniform background flow during the training
         "rankine_bg": True,  # Random rankine vortex during the training
-        "pertubation_after_episode": 100,  # Background flow add in the training after this episode
+        "pertubation_after_episode": 20,  # Background flow add in the training after this episode
         "random_curve": True,  # To train on varying curve (no longer random)
         "nb_points_path": 500,  # Discretization of the path
         "Dt_action": Dt_action,
         "velocity_bool": True,  # Add the velocity in the state or not
-        "n_lookahead": 10,  # Number of points in the lookahead
+        "n_lookahead": 20,  # Number of points in the lookahead
+        "velocity_ahead":  True,
+        'add_action' : True
     }
-    # beta_values = np.linspace(0.5,5,10)
-    # for beta in beta_values:
-    #     config['beta']=beta
-    #     run_expe(config)
+    run_expe(config)

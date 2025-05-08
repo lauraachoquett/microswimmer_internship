@@ -9,9 +9,9 @@ from math import cos, sin
 import numpy as np
 from scipy.spatial import KDTree
 
-from .env_swimmer import MicroSwimmer
-from .generate_path import *
-from .TD3 import TD3
+from src.env_swimmer import MicroSwimmer
+from src.generate_path import *
+from src.TD3 import TD3
 
 colors = plt.cm.tab10.colors
 import copy
@@ -19,14 +19,14 @@ import random
 from pathlib import Path
 from statistics import mean
 
-from .analytic_solution_line import find_next_v
-from .distance_to_path import min_dist_closest_point
-from .evaluate_agent import evaluate_agent
-from .invariant_state import coordinate_in_global_ref
-from .plot import plot_action, plot_trajectories
-from .rank_agents import rank_agents_by_rewards
-from .simulation import solver
-from .visualize import (plot_robust_D, plot_robust_u_bg_rankine,
+from src.analytic_solution_line import find_next_v
+from src.distance_to_path import min_dist_closest_point
+from src.evaluate_agent import evaluate_agent
+from src.invariant_state import coordinate_in_global_ref
+from src.plot import plot_action, plot_trajectories
+from src.rank_agents import rank_agents_by_rewards
+from src.simulation import solver
+from src.visualize import (plot_robust_D, plot_robust_u_bg_rankine,
                         plot_robust_u_bg_uniform, visualize_streamline)
 
 
@@ -129,8 +129,10 @@ def evaluate_after_training(
             "load_model": config_eval["load_model"],
             "n_lookahead": config_eval["n_lookahead"],
             "beta": config_eval["beta"],
+            "add_action" : config_eval["add_action"],
+            "velocity_ahead" : config_eval["velocity_ahead"]
         }
-        if agent_name in results.keys():
+        if agent_name in results.keys() and "08_11-14" not in agent_name:
             results[agent_name]["training type"] = training_type
             print(f"Agent {agent_name} already evaluated.")
             continue
@@ -153,7 +155,8 @@ def evaluate_after_training(
             Dt_sim,
             config_eval["velocity_bool"],
             config_eval["n_lookahead"],
-            seed,
+            config_eval["velocity_ahead"],
+            config_eval["add_action"],
         )
 
         state_dim = env.observation_space.shape[0]
@@ -173,13 +176,13 @@ def evaluate_after_training(
             success_rate,
             _,
         ) = evaluate_agent(
-            agent,
-            env,
-            config_eval["eval_episodes"],
-            config_eval,
-            save_path_eval,
-            f"eval_with" + file_name_or,
-            False,
+            agent=agent,
+            env=env,
+            eval_episodes = config_eval["eval_episodes"],
+            config = config_eval,
+            save_path_result_fig=save_path_eval,
+            file_name=f"eval_with" + file_name_or,
+            random_parameters=False,
             title="",
             plot=True,
             parameters=parameters,
@@ -227,7 +230,6 @@ def evaluate_after_training(
                 offset=0.2,
             )
 
-    file_name_result = os.path.join(file_path_result, file_name_or)
     with open(file_name_result, "w") as f:
         json.dump(results, f, indent=4)
 
@@ -249,7 +251,7 @@ def compare_p_line(
     u_bg=np.zeros(2),
     title="",
     offset=0.2,
-):
+    ):
     config_eval = copy.deepcopy(config_eval)
     save_path_comparison = os.path.join(save_path_eval, "comparison_graph/")
     if not os.path.exists(save_path_comparison):
@@ -453,6 +455,12 @@ def initialize_parameters(agent_file, p_target, p_0):
     config_eval["velocity_bool"] = (
         config["velocity_bool"] if "velocity_bool" in config else False
     )
+    config_eval["velocity_ahead"] = (
+        config["velocity_ahead"] if "velocity_ahead" in config else False
+    )
+    config_eval["add_action"] = (
+        config["add_action"] if "add_action" in config else False
+    )
     config_eval["Dt_action"] = (
         config_eval["Dt_action"] if "Dt_action" in config else 1 / 30
     )
@@ -467,7 +475,7 @@ def initialize_parameters(agent_file, p_target, p_0):
 
 
 if __name__ == "__main__":
-    # agent_name='agents/agent_TD3_2025-04-17_13-28'
+    agent_name='agents/agent_TD3_2025-05-07_15-48'
     # p_target = np.array([2,0])
     # p_0 = np.array([0,0])
     # u_bg = np.array([0.0,0.2])
@@ -477,18 +485,28 @@ if __name__ == "__main__":
     # offset=0.2
     # compare_p_line(agent_name,config_eval_comp,'comparison_north_02',save_path_eval,u_bg,'',offset)
 
-    agents_file = []
+    agents_file = [agent_name,'agents/agent_TD3_2025-04-18_13-33','agents/agent_TD3_2025-05-08_10-09','agents/agent_TD3_2025-05-08_10-26','agents/agent_TD3_2025-05-08_10-40','agents/agent_TD3_2025-05-08_11-14']
 
-    directory_path = Path("agents/")
+    # directory_path = Path("agents/")
 
-    for item in directory_path.iterdir():
-        if item.is_dir() and "agent_TD3" in item.name:
-            if "2025-04-23" in item.name or "2025-04-22" in item.name:
-                agents_file.append(os.path.join(directory_path, item.name))
+    # for item in directory_path.iterdir():
+    #     if item.is_dir() and "agent_TD3" in item.name:
+    #         if "2025-04-23" in item.name or "2025-04-22" in item.name:
+    #             agents_file.append(os.path.join(directory_path, item.name))
 
     print("Agents files : ", agents_file)
     types = ["ondulating", "line", "curve_minus", "curve_plus"]
-    print("---------------------Evaluation with no bg---------------------")
+    title_add = 'rankine_a_05__cir_3_center_1_075'
+    print("--------------------- Evaluation with rankine bg ---------------------")
+    for type in types:
+        a= 0.5
+        cir = 2
+        center = np.array([1,3/4])
+        results = evaluate_after_training(agents_file,type=type,p_target = [2,0],p_0 = [0,0],title_add=title_add,a=a,center=center,cir=cir)
+        rank_agents_by_rewards(results)
+
+    
+    print("--------------------- Evaluation with no bg ---------------------")
     title_add = "free"
     for type in types:
         results = evaluate_after_training(
@@ -521,10 +539,3 @@ if __name__ == "__main__":
             )
             rank_agents_by_rewards(results)
 
-    # title_add = 'rankine_a_05__cir_3_center_1_075'
-    # print("---------------------Evaluation with rankine bg---------------------")
-    # for type in types:
-    #     a= 0.5
-    #     cir = 2
-    #     center = np.array([1,3/4])
-    #     results = evaluate_after_training(agents_file,f'result_evaluation_{title_add}_{type}.json',type=type,p_target = [2,0],p_0 = [0,0],title_add=title_add,a=a,center=center,cir=cir)
