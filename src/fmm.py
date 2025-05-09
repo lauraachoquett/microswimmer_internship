@@ -537,7 +537,7 @@ def retina_path():
     grid_size = (N[0] * res_factor, N[1] * res_factor)
     start_point = (start_point[0] * scale, start_point[1] * scale)
     goal_point = (goal_point[0] * scale, goal_point[1] * scale)
-    
+
     sdf_interpolator = RegularGridInterpolator(
         (y, x), sdf, bounds_error=False, fill_value=None
     )

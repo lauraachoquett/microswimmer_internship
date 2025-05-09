@@ -81,7 +81,7 @@ def evaluate_agent(
         norm = np.linalg.norm(u_bg)
         dir = np.array(u_bg / norm)
         plot_background = True
-    velocity_func=None
+    velocity_func = None
     if velocity_func_l is not None:
         velocity_func = lambda x: velocity_func_l(x).squeeze()
 
@@ -89,8 +89,7 @@ def evaluate_agent(
         velocity_func = lambda x: uniform_velocity(dir, norm)
     elif config["rankine_bg"]:
         velocity_func = lambda x: rankine_vortex(x, a, center, cir)
-        
-    
+
     if list_of_path_tree is not None:
         path, tree = list_of_path_tree[0]
         nb_of_path = len(list_of_path_tree)
@@ -100,7 +99,7 @@ def evaluate_agent(
         nb_of_path = 1
 
     #### EVALUATION ####
-    state, done = env.reset(tree, path,velocity_func), False
+    state, done = env.reset(tree, path, velocity_func), False
     while episode_num < eval_episodes:
         states_episode.append(x)
         iter += 1
@@ -138,7 +137,7 @@ def evaluate_agent(
             if done:
                 count_succes += 1
             states_list_per_episode.append([np.array(states_episode), iter])
-            state, done = env.reset(tree, path,velocity_func), False
+            state, done = env.reset(tree, path, velocity_func), False
             iter = 0
             episode_num += 1
             x = p_0

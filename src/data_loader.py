@@ -22,7 +22,7 @@ def vel_read(path):
 
 
 def load_sdf_from_csv(domain_size):
-    path = "data/retina.sdf"
+    path = "/home/lchoquet/project/microswimmer_internship/data/retina.sdf"
     N, h, sdf = sdf_read(path)
     sdf = sdf[N[2] // 2, :, :]
     x = np.linspace(0, domain_size[0], N[0])
@@ -79,11 +79,11 @@ if __name__ == "__main__":
     plt.scatter(start_point[0], start_point[1], label="Start", color="blue", s=5)
     plt.axis("off")
     plt.legend()
-    plt.savefig("fig/retina_example_test.png", dpi=400, bbox_inches="tight")
+    plt.savefig("../fig/retina_example_test.png", dpi=400, bbox_inches="tight")
     plt.close()
-    # np.save("data/retina2D.npy", sdf_new, allow_pickle=False)
+    # np.save("/home/lchoquet/project/microswimmer_internship/data/vel.sdf", sdf_new, allow_pickle=False)
 
-    # path_vel = "data/vel.sdf"
+    # path_vel = "/home/lchoquet/project/microswimmer_internship/data/vel.sdf"
     # n, h, vel = vel_read(path_vel)
     # print(vel.shape)
     # v = vel[n[2] // 2, :, :, 0:2]

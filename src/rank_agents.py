@@ -9,7 +9,9 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import seaborn as sns
+
 from src.plot import analyze_and_visualize_agent_data
+
 
 def rank_agents_by_rewards(results, print_stats=True):
     # Calculer les moyennes pour chaque agent
@@ -121,30 +123,26 @@ def rank_agents_all_criterion(files_results, agents_file):
     return filtered_stats
 
 
-
-
-
-
-
 if __name__ == "__main__":
     types = ["ondulating", "curve_minus", "curve_plus", "line"]
+    types = ["ondulating","line"]
     file = "results_evaluation"
     files_results = []
     for type in types:
-        # files_results.extend(
-        #     [
-        #         f"results_evaluation/result_evaluation_east_05_{type}.json",
-        #         f"results_evaluation/result_evaluation_west_05_{type}.json",
-        #         f"results_evaluation/result_evaluation_north_05_{type}.json",
-        #         f"results_evaluation/result_evaluation_south_05_{type}.json",
-        #     ]
-        # )
+        files_results.extend(
+            [
+                f"results_evaluation/result_evaluation_east_05_{type}.json",
+                f"results_evaluation/result_evaluation_west_05_{type}.json",
+                f"results_evaluation/result_evaluation_north_05_{type}.json",
+                f"results_evaluation/result_evaluation_south_05_{type}.json",
+            ]
+        )
         files_results.extend(
             [
                 f"results_evaluation/result_evaluation_rankine_a_05__cir_3_center_1_075_{type}.json"
             ]
         )
-        # files_results.extend([f"results_evaluation/result_evaluation_free_{type}.json"])
+        files_results.extend([f"results_evaluation/result_evaluation_free_{type}.json"])
     print("Overall ranking of agents:")
     print(files_results)
     agents_file = []
@@ -154,13 +152,13 @@ if __name__ == "__main__":
     for item in directory_path.iterdir():
         agents_file.append(os.path.join(directory_path, item.name))
 
-    stats = rank_agents_all_criterion(files_results,agents_file)
+    stats = rank_agents_all_criterion(files_results, agents_file)
     timestamp = datetime.now().strftime("%Y-%m-%d_%H")
-    save_rank_file = os.path.join(file, f"results_rank_overall_rankine.json")
+    save_rank_file = os.path.join(file, f"results_rank_overall_line_ondu.json")
     with open(save_rank_file, "w") as f:
         json.dump(stats, f, indent=4)
 
-    file_path = "results_evaluation/results_rank_overall_rankine.json"
+    file_path = "results_evaluation/results_rank_overall_line_ondu.json"
     with open(file_path, "r") as f:
         data = json.load(f)
 

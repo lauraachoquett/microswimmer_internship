@@ -1,7 +1,7 @@
 import time
 
-from .generate_path import generate_simple_line
-from .simulation import *
+from src.generate_path import generate_simple_line
+from src.simulation import *
 
 colors = plt.cm.tab10.colors
 from scipy.spatial import KDTree

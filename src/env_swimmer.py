@@ -9,7 +9,16 @@ from src.simulation import solver
 
 class MicroSwimmer(gym.Env):
     def __init__(
-        self, x_0, C, Dt, velocity_bool, n_lookahead=5, velocity_ahead = False,add_action = False,seed=None, bounce_thr=0
+        self,
+        x_0,
+        C,
+        Dt,
+        velocity_bool,
+        n_lookahead=5,
+        velocity_ahead=False,
+        add_action=False,
+        seed=None,
+        bounce_thr=0,
     ):
         super(MicroSwimmer, self).__init__()
         self.n_lookahead = n_lookahead
@@ -18,31 +27,31 @@ class MicroSwimmer(gym.Env):
         )
         if velocity_bool:
             if velocity_ahead:
-                if add_action: 
-                    self.observation_space = gym.spaces.Box(
-                        shape=(2 * (1 + 1 +1+ 2*self.n_lookahead),),
-                        low=-np.inf,
-                        high=np.inf,
-                        dtype=np.float32,
-                    )
-                else : 
-                    self.observation_space = gym.spaces.Box(
-                        shape=(2 * (1 + 1 + 2*self.n_lookahead),),
-                        low=-np.inf,
-                        high=np.inf,
-                        dtype=np.float32,
-                    )
-            
-            else:
                 if add_action:
                     self.observation_space = gym.spaces.Box(
-                        shape=(2 * (1 + 1 +1+ self.n_lookahead),),
+                        shape=(2 * (1 + 1 + 1 + 2 * self.n_lookahead),),
+                        low=-np.inf,
+                        high=np.inf,
+                        dtype=np.float32,
+                    )
+                else:
+                    self.observation_space = gym.spaces.Box(
+                        shape=(2 * (1 + 1 + 2 * self.n_lookahead),),
                         low=-np.inf,
                         high=np.inf,
                         dtype=np.float32,
                     )
 
-                else : 
+            else:
+                if add_action:
+                    self.observation_space = gym.spaces.Box(
+                        shape=(2 * (1 + 1 + 1 + self.n_lookahead),),
+                        low=-np.inf,
+                        high=np.inf,
+                        dtype=np.float32,
+                    )
+
+                else:
                     self.observation_space = gym.spaces.Box(
                         shape=(2 * (1 + 1 + self.n_lookahead),),
                         low=-np.inf,
@@ -67,12 +76,12 @@ class MicroSwimmer(gym.Env):
         self.dir_path = np.zeros(2)
         self.id_cp = 0
         self.d_cp = 0
-        self.action=np.zeros(2)
-        self.velocity_ahead=velocity_ahead
+        self.action = np.zeros(2)
+        self.velocity_ahead = velocity_ahead
         self.velocity_bool = velocity_bool
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         self.rng = np.random.default_rng(seed)
-        self.add_action=add_action
+        self.add_action = add_action
 
     def state(self, tree, path):
         if tree is None or path is None:
@@ -91,7 +100,7 @@ class MicroSwimmer(gym.Env):
         s_previous = coordinate_in_path_ref(p_cp, self.dir_path, self.previous_x)
         v_local_path = (s - s_previous) / self.Dt
 
-        result = [s.reshape(1, 2)]  
+        result = [s.reshape(1, 2)]
 
         if self.velocity_bool:
             result.append(v_local_path.reshape(1, 2))
@@ -103,15 +112,17 @@ class MicroSwimmer(gym.Env):
             for i in range(1, self.n_lookahead + 1):
                 idx = min(self.id_cp + i, path_len - 1)
                 next_p = path[idx]
-                lookahead.append(coordinate_in_path_ref(p_cp, self.dir_path, next_p).reshape(1, 2))
+                lookahead.append(
+                    coordinate_in_path_ref(p_cp, self.dir_path, next_p).reshape(1, 2)
+                )
                 if self.velocity_ahead:
                     vel = self.velocity_func(next_p)
-                    lookahead_vel.append(coordinate_in_path_ref(np.zeros(2), self.dir_path, vel).reshape(1, 2))
+                    lookahead_vel.append(vel.reshape(1, 2))
             result.append(np.concatenate(lookahead, axis=0))
             if self.velocity_ahead:
                 result.append(np.concatenate(lookahead_vel, axis=0))
         if self.add_action:
-            result.append(self.action.reshape(1,2))
+            result.append(self.action.reshape(1, 2))
         return np.concatenate(result, axis=0)
 
     def reward(self, x_target, beta):
@@ -138,7 +149,7 @@ class MicroSwimmer(gym.Env):
     ):
         rew_t, rew_d, rew_tar, rew = self.reward(x_target, beta)
         self.previous_x = self.x
-        self.action=action
+        self.action = action
         action_global_ref = coordinate_in_global_ref(np.zeros(2), self.dir_path, action)
         self.x = solver(
             x=self.x,
@@ -168,10 +179,10 @@ class MicroSwimmer(gym.Env):
             },
         )
 
-    def reset(self, tree=None, path=None,velocity_func=None):
+    def reset(self, tree=None, path=None, velocity_func=None):
         if velocity_func is None:
-            self.velocity_func=lambda x : np.zeros(2)
-        else : 
+            self.velocity_func = lambda x: np.zeros(2)
+        else:
             self.velocity_func = velocity_func
         self.x = self.x_0
         return self.state(tree, path)

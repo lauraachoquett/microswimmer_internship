@@ -357,8 +357,8 @@ if __name__ == "__main__":
         "nb_points_path": 500,  # Discretization of the path
         "Dt_action": Dt_action,
         "velocity_bool": True,  # Add the velocity in the state or not
-        "n_lookahead": 20,  # Number of points in the lookahead
-        "velocity_ahead":  True,
+        "n_lookahead": 10,  # Number of points in the lookahead
+        "velocity_ahead":  False,
         'add_action' : True
     }
     run_expe(config)

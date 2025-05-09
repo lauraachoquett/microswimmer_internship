@@ -26,8 +26,12 @@ from src.invariant_state import coordinate_in_global_ref
 from src.plot import plot_action, plot_trajectories
 from src.rank_agents import rank_agents_by_rewards
 from src.simulation import solver
-from src.visualize import (plot_robust_D, plot_robust_u_bg_rankine,
-                        plot_robust_u_bg_uniform, visualize_streamline)
+from src.visualize import (
+    plot_robust_D,
+    plot_robust_u_bg_rankine,
+    plot_robust_u_bg_uniform,
+    visualize_streamline,
+)
 
 
 def format_sci(x):
@@ -129,10 +133,10 @@ def evaluate_after_training(
             "load_model": config_eval["load_model"],
             "n_lookahead": config_eval["n_lookahead"],
             "beta": config_eval["beta"],
-            "add_action" : config_eval["add_action"],
-            "velocity_ahead" : config_eval["velocity_ahead"]
+            "add_action": config_eval["add_action"],
+            "velocity_ahead": config_eval["velocity_ahead"],
         }
-        if agent_name in results.keys() and "08_11-14" not in agent_name:
+        if agent_name in results.keys():
             results[agent_name]["training type"] = training_type
             print(f"Agent {agent_name} already evaluated.")
             continue
@@ -178,8 +182,8 @@ def evaluate_after_training(
         ) = evaluate_agent(
             agent=agent,
             env=env,
-            eval_episodes = config_eval["eval_episodes"],
-            config = config_eval,
+            eval_episodes=config_eval["eval_episodes"],
+            config=config_eval,
             save_path_result_fig=save_path_eval,
             file_name=f"eval_with" + file_name_or,
             random_parameters=False,
@@ -251,7 +255,7 @@ def compare_p_line(
     u_bg=np.zeros(2),
     title="",
     offset=0.2,
-    ):
+):
     config_eval = copy.deepcopy(config_eval)
     save_path_comparison = os.path.join(save_path_eval, "comparison_graph/")
     if not os.path.exists(save_path_comparison):
@@ -475,7 +479,7 @@ def initialize_parameters(agent_file, p_target, p_0):
 
 
 if __name__ == "__main__":
-    agent_name='agents/agent_TD3_2025-05-07_15-48'
+    agent_name = "agents/agent_TD3_2025-05-07_15-48"
     # p_target = np.array([2,0])
     # p_0 = np.array([0,0])
     # u_bg = np.array([0.0,0.2])
@@ -485,7 +489,17 @@ if __name__ == "__main__":
     # offset=0.2
     # compare_p_line(agent_name,config_eval_comp,'comparison_north_02',save_path_eval,u_bg,'',offset)
 
-    agents_file = [agent_name,'agents/agent_TD3_2025-04-18_13-33','agents/agent_TD3_2025-05-08_10-09','agents/agent_TD3_2025-05-08_10-26','agents/agent_TD3_2025-05-08_10-40','agents/agent_TD3_2025-05-08_11-14']
+    agents_file = [
+        agent_name,
+        "agents/agent_TD3_2025-04-18_13-33",
+        "agents/agent_TD3_2025-05-08_10-09",
+        "agents/agent_TD3_2025-05-08_10-26",
+        "agents/agent_TD3_2025-05-08_10-40",
+        "agents/agent_TD3_2025-05-08_11-14",
+        "agents/agent_TD3_2025-05-08_11-32",
+        "agents/agent_TD3_2025-05-08_13-57",
+        "agents/agent_TD3_2025-05-08_14-51",
+    ]
 
     # directory_path = Path("agents/")
 
@@ -495,17 +509,25 @@ if __name__ == "__main__":
     #             agents_file.append(os.path.join(directory_path, item.name))
 
     print("Agents files : ", agents_file)
-    types = ["ondulating", "line", "curve_minus", "curve_plus"]
-    title_add = 'rankine_a_05__cir_3_center_1_075'
+    types = ["ondulating", "line"]
+    title_add = "rankine_a_05__cir_3_center_1_075"
     print("--------------------- Evaluation with rankine bg ---------------------")
     for type in types:
-        a= 0.5
+        a = 0.5
         cir = 2
-        center = np.array([1,3/4])
-        results = evaluate_after_training(agents_file,type=type,p_target = [2,0],p_0 = [0,0],title_add=title_add,a=a,center=center,cir=cir)
+        center = np.array([1, 3 / 4])
+        results = evaluate_after_training(
+            agents_file,
+            type=type,
+            p_target=[2, 0],
+            p_0=[0, 0],
+            title_add=title_add,
+            a=a,
+            center=center,
+            cir=cir,
+        )
         rank_agents_by_rewards(results)
 
-    
     print("--------------------- Evaluation with no bg ---------------------")
     title_add = "free"
     for type in types:
@@ -538,4 +560,3 @@ if __name__ == "__main__":
                 norm=norm,
             )
             rank_agents_by_rewards(results)
-

@@ -168,14 +168,24 @@ class TD3(object):
         torch.save(self.actor_optimizer.state_dict(), filename + "_actor_optimizer")
 
     def load(self, filename):
-        self.critic.load_state_dict(torch.load(filename + "_critic", weights_only=True))
+        device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
+        self.critic.load_state_dict(
+            torch.load(filename + "_critic", map_location=device, weights_only=True)
+        )
         self.critic_optimizer.load_state_dict(
-            torch.load(filename + "_critic_optimizer", weights_only=True)
+            torch.load(
+                filename + "_critic_optimizer", map_location=device, weights_only=True
+            )
         )
         self.critic_target = copy.deepcopy(self.critic)
 
-        self.actor.load_state_dict(torch.load(filename + "_actor", weights_only=True))
+        self.actor.load_state_dict(
+            torch.load(filename + "_actor", map_location=device, weights_only=True)
+        )
         self.actor_optimizer.load_state_dict(
-            torch.load(filename + "_actor_optimizer", weights_only=True)
+            torch.load(
+                filename + "_actor_optimizer", map_location=device, weights_only=True
+            )
         )
         self.actor_target = copy.deepcopy(self.actor)
