@@ -175,7 +175,7 @@ def precalculate_move_costs(v0, vx, vy, dir_offsets, dx, dy, weight_sdf, pow_v0,
                     alignment = alignment ** (pow_al)
                     effective_speed = flow_component * alignment
                     effective_speed = v0[j, i] ** (pow_v0) * max(effective_speed, 0.001)
-                    if flow_component > 0 and v0[j, i] > 0:
+                    if v_l @ d > 0 and v0[j, i] > 0:
                         move_costs[j, i, d_idx] = distance / effective_speed
     return move_costs
 
@@ -249,7 +249,6 @@ def compute_v(x, y, velocity_retina, B, grid_size, ratio, sdf_function, c):
     save_path_phi = f"data/phi/grid_size_{grid_size[0]}_{grid_size[1]}_phi.npy"
     if os.path.exists(save_path_phi):
         phi = np.load(save_path_phi)
-        print("Phi loaded")
     else:
         phi = np.zeros((grid_size[1], grid_size[0]))
         for i in range(grid_size[0]):
@@ -259,7 +258,7 @@ def compute_v(x, y, velocity_retina, B, grid_size, ratio, sdf_function, c):
         phi = 3 * phi / np.max(np.abs(phi))
         os.makedirs(os.path.dirname(save_path_phi), exist_ok=True)
         np.save(save_path_phi, phi)
-    print("SDF computed")
+    print("Phi Ready")
     speed = (1.0 / (1.0 + np.exp(B * phi))) - c
     speed = np.clip(speed, 0.001, 1.0)
 
@@ -275,7 +274,6 @@ def compute_v(x, y, velocity_retina, B, grid_size, ratio, sdf_function, c):
             flow_direction_y = np.load(
                 os.path.join(save_path_flow, "flow_direction_y.npy")
             )
-            print("Flow loaded")
 
         else:
             flow_strength = np.zeros((grid_size[1], grid_size[0]))
@@ -299,7 +297,7 @@ def compute_v(x, y, velocity_retina, B, grid_size, ratio, sdf_function, c):
                 os.path.join(save_path_flow, "flow_direction_y.npy"), flow_direction_y
             )
 
-        print("Flow computed")
+        print("Flow ready")
         vx = flow_direction_x * flow_strength
         vy = flow_direction_y * flow_strength
 
@@ -362,15 +360,16 @@ if __name__ == "__main__":
     # goal_point = (11.722579560997241,15.783432205612964)
     # goal_point = (17.095518023108937,12.520765146894497)
     # goal_point =  (5.762615626076424,16.142539758719423)
+    # goal_point=(7.855210513776498,19.169570750237117)
     B = 1.6
     h = 3.8
     pow_v0 = 7
-    pow_al = 3
+    pow_al = 4
 
     v0, vx, vy, _, _ = compute_v(
         x_new, y_new, velocity_retina, B, grid_size, ratio, sdf_function, c
     )
-    for pow_v0 in np.linspace(3,10,6):
+    for pow_al in [5]:
         start_time = time.time()
         ## Compute the path
         path, travel_time = astar_anisotropic(
@@ -396,12 +395,12 @@ if __name__ == "__main__":
         if n > 1:
             path = resample_path(path, len(path) * n)
         print("after resampling : ", len(path))
-        smoothed_x = gaussian_filter1d(path[:, 0], sigma=20)
-        smoothed_y = gaussian_filter1d(path[:, 1], sigma=20)
+        smoothed_x = gaussian_filter1d(path[:, 0], sigma=30)
+        smoothed_y = gaussian_filter1d(path[:, 1], sigma=30)
         path = np.stack([smoothed_x, smoothed_y], axis=1)
         print("smoooooth")
         visualize_results_a_star(
-            x_new, y_new, sdf_function, path, vx, vy, scale, pow_v0, "pow_v0"
+            x_new, y_new, sdf_function, path, vx, vy, scale, pow_al, "pow_al"
         )
         end_time = time.time()
         elapsed_time = (end_time - start_time) / 60

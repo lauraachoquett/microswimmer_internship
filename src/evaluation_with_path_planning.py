@@ -367,7 +367,7 @@ def obstacle_and_path(
     pow_v0=None,
     pow_al = None,
     path_to_config_path=None,
-):
+    ):
     current_time = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
     if path_to_config_path is not None:
         path, _, _, sdf_function, _, X_new, Y_new = load_config_path(
@@ -467,6 +467,7 @@ def obstacle_and_path(
                 heuristic_weight=heuristic_weight,
                 weight_sdf=weight_sdf,
                 pow_v0=pow_v0,
+                pow_al=pow_al,
             )
 
             path = np.array(path)  # de forme (N, 2)
@@ -544,10 +545,34 @@ if __name__ == "__main__":
     sigma = 15
     c = 0.44
     B = 1.57
-    pow_v0 = 7.2
-    pow_al = 3
-    description = "cant swim against the current, v0**7.2 and alignment **3"
+    pow_v0 = 7
+    pow_al = 5
+    description = "cant swim against the current (condition over v_l @ d >0), v0**7 and alignment ** 5"
+    
+    
+    file_to_config_path_pre_list = []
+    file_to_config_path_pre = 'config_path/velocity_ratio_5/7'
+    dir_config_path = Path(file_to_config_path_pre)
 
+    failure_case_file = 'config_path/velocity_ratio_5/failure_case.json'
+    
+    
+    with open(failure_case_file,'r') as f:
+        failure_case = json.load(f)
+    print(failure_case)
+    for item in dir_config_path.rglob("*.json"):
+        file_name_path = os.path.join(dir_config_path, item.name)
+        if file_name_path in failure_case:
+            file_to_config_path_pre_list.append(file_name_path)
+            
+    goal_points=[]     
+    for config_path in file_to_config_path_pre_list:
+        with open(config_path, "r") as f:
+            config_path_a_star = json.load(f)
+        parameters_bis = config_path_a_star["parameters"]
+        goal_points.append(list(np.array(parameters_bis['goal_point'])/scale))
+    
+    
     compute_goal_points = True
     if compute_goal_points:
         file_to_config_path_g = f"config_path/velocity_ratio_{ratio}"
@@ -555,9 +580,11 @@ if __name__ == "__main__":
         file_to_config_path = str(create_numbered_run_folder(file_to_config_path_g))
         
         os.makedirs(file_to_config_path, exist_ok=True)
-        goal_points = create_list_of_goal_point(30000, start_point)
-        print(len(goal_points))
-        for goal_point in goal_points[:1000]:    
+        # goal_points = create_list_of_goal_point(30000, start_point)
+        # print(len(goal_points))
+        
+        for nb,goal_point in enumerate(goal_points):  
+            print(f'Iter : {nb+1} over {len(goal_points)}')  
             goal_point = tuple(goal_point)
             (
                 p_0,
@@ -588,13 +615,14 @@ if __name__ == "__main__":
           
 
     start_time_eva = time.time()
-
     list_config_paths = []
-    dir_config_path = Path(file_to_config_path)
+    dir_config_path = Path("config_path/velocity_ratio_5/11")
 
     for item in dir_config_path.rglob("*.json"):
         list_config_paths.append(os.path.join(dir_config_path, item.name))
 
+
+    print("Number of path : ",len(list_config_paths))
     sdf_func, velocity_retina = sdf_func_and_velocity_func(domain_size, ratio)
     obstacle_contour = contour_2D(sdf_func, X_new, Y_new, scale)
     print("Number of different paths :", len(list_config_paths))

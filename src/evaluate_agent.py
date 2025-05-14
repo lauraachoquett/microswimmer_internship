@@ -165,7 +165,7 @@ def evaluate_agent(
                 label="path",
                 color="black",
                 linewidth=1,
-                zorder=10,
+                zorder=0,
             )
         ylim = ax.get_ylim()
         if ylim[1] - ylim[0] < 1 / 3:
