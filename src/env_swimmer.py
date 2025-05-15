@@ -19,52 +19,37 @@ class MicroSwimmer(gym.Env):
         add_action=False,
         seed=None,
         bounce_thr=0,
+        in_3D = False,
     ):
-        super(MicroSwimmer, self).__init__()
-        self.n_lookahead = n_lookahead
-        self.action_space = gym.spaces.Box(
-            shape=(2,), low=-np.inf, high=np.inf, dtype=np.float32
-        )
-        if velocity_bool:
-            if velocity_ahead:
-                if add_action:
-                    self.observation_space = gym.spaces.Box(
-                        shape=(2 * (1 + 1 + 1 + 2 * self.n_lookahead),),
-                        low=-np.inf,
-                        high=np.inf,
-                        dtype=np.float32,
-                    )
-                else:
-                    self.observation_space = gym.spaces.Box(
-                        shape=(2 * (1 + 1 + 2 * self.n_lookahead),),
-                        low=-np.inf,
-                        high=np.inf,
-                        dtype=np.float32,
-                    )
-
-            else:
-                if add_action:
-                    self.observation_space = gym.spaces.Box(
-                        shape=(2 * (1 + 1 + 1 + self.n_lookahead),),
-                        low=-np.inf,
-                        high=np.inf,
-                        dtype=np.float32,
-                    )
-
-                else:
-                    self.observation_space = gym.spaces.Box(
-                        shape=(2 * (1 + 1 + self.n_lookahead),),
-                        low=-np.inf,
-                        high=np.inf,
-                        dtype=np.float32,
-                    )
+    if in_3D :
+        dim = 3
+    else :
+        dim = 2
+        
+    super(MicroSwimmer, self).__init__()
+    self.n_lookahead = n_lookahead
+    self.action_space = gym.spaces.Box(
+        shape=(dim,), low=-np.inf, high=np.inf, dtype=np.float32
+    )
+    if velocity_bool:
+        base = 1 + 1 #Position and velocity
+        if velocity_ahead:
+            base += 2 * self.n_lookahead #Velocity and Position of points ahead
         else:
-            self.observation_space = gym.spaces.Box(
-                shape=(2 * (1 + self.n_lookahead),),
-                low=-np.inf,
-                high=np.inf,
-                dtype=np.float32,
-            )
+            base += self.n_lookahead  # Position of points ahead
+        if add_action:
+            base += 1 #Past action in the state
+    else:
+        base = 1 + self.n_lookahead #Current position and points ahead
+
+
+        
+    self.observation_space = gym.spaces.Box(
+        shape=(dim * base,),
+        low=-np.inf,
+        high=np.inf,
+        dtype=np.float32,
+    )
 
         self.x = x_0
         self.x_0 = x_0
@@ -73,10 +58,10 @@ class MicroSwimmer(gym.Env):
         self.Dt = Dt
         self.U = 1
         self.bounce_thr = bounce_thr
-        self.dir_path = np.zeros(2)
+        self.dir_path = np.zeros(dim)
         self.id_cp = 0
         self.d_cp = 0
-        self.action = np.zeros(2)
+        self.action = np.zeros(dim)
         self.velocity_ahead = velocity_ahead
         self.velocity_bool = velocity_bool
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")

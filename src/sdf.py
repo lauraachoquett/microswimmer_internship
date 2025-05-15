@@ -2,9 +2,10 @@ import math
 
 import matplotlib.pyplot as plt
 import numpy as np
+from skimage import measure
 
 from src.Astar import astar, plot_valid_invalid_points, resample_path, shortcut_path
-
+from matplotlib.contour import QuadContourSet
 
 def sdf_circle(point, center, radius):
     px, py = point
@@ -24,12 +25,30 @@ def sdf_many_circle(point, centers, radius):
 
 
 def get_contour_coordinates(X, Y, Z, level=0):
-    contours = plt.contour(X, Y, Z, levels=[level])
-    coordinates = []
-    for collection in contours.collections:
-        for path in collection.get_paths():
-            coordinates.append(path.vertices)
-    return np.squeeze(np.array(coordinates))
+    if not np.isfinite(Z).all():
+        raise ValueError("Z contient des NaN ou des valeurs infinies.")
+    if not (np.min(Z) <= level <= np.max(Z)):
+        raise ValueError(
+            f"Le niveau demandé ({level}) est en dehors des valeurs de Z (min: {np.min(Z)}, max: {np.max(Z)})"
+        )
+
+    contours = measure.find_contours(Z, level=level)
+    if not contours:
+        raise RuntimeError("Aucun contour trouvé pour ce niveau.")
+
+    all_coords = []
+    for contour in contours:
+        i = contour[:, 0]  # ligne (axe y)
+        j = contour[:, 1]  # colonne (axe x)
+        x_coords = X[0, :]  # axe x
+        y_coords = Y[:, 0]  # axe y
+        x = np.interp(j, np.arange(X.shape[1]), x_coords)
+        y = np.interp(i, np.arange(Y.shape[0]), y_coords)
+        coords = np.stack((x, y), axis=-1)  # shape (M, 2)
+        all_coords.append(coords)
+
+    # Concaténer tous les points en un seul tableau de shape (N, 2)
+    return np.concatenate(all_coords, axis=0)
 
 
 def plot_sdf_path(X, Y, Z, path):

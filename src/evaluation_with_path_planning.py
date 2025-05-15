@@ -142,7 +142,9 @@ def evaluate_after_training(
                 ratio,
                 parameters,
             ) = load_config_path(path_to_config)
-
+            if len(path) == 0 :
+                print("Path empty : ", path_config['path_path'])
+                continue
             file_path_result_parameters = os.path.join(
                 file_path_result, "parameters.json"
             )
@@ -203,7 +205,7 @@ def evaluate_after_training(
                 obstacle_contour=obstacle_contour,
                 sdf=sdf_func,
                 velocity_func_l=velocity_func,
-                video=True
+                video=False
             )
 
             plt.close()
@@ -581,7 +583,7 @@ if __name__ == "__main__":
     with open("src/config_path_eva.yaml", "r") as f:
         config_par_path = yaml.safe_load(f)
           
-    file_to_config_path = create_all_path(config_par_path,500)
+    # file_to_config_path = create_all_path(config_par_path,500)
     
     domain_size,X_new,Y_new,ratio,scale = grid(config_par_path)
     
@@ -602,7 +604,7 @@ if __name__ == "__main__":
         
     start_time_eva = time.time()
     list_config_paths = []
-    dir_config_path = Path(file_to_config_path)
+    dir_config_path = Path('config_path/velocity_ratio_5/31')
 
     for item in dir_config_path.rglob("*.json"):
         list_config_paths.append(os.path.join(dir_config_path, item.name))
