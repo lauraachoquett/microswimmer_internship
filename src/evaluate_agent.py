@@ -11,7 +11,7 @@ colors = plt.cm.tab10.colors
 import copy
 
 from src.generate_path import generate_curve
-from src.plot import plot_trajectories
+from src.plot import plot_trajectories,video_trajectory
 
 
 def evaluate_agent(
@@ -31,6 +31,7 @@ def evaluate_agent(
     obstacle_contour=None,
     sdf=None,
     velocity_func_l=None,
+    video=False
 ):
     config = copy.deepcopy(config)
     parameters = copy.deepcopy(parameters)
@@ -149,13 +150,13 @@ def evaluate_agent(
             episode_rew_t = 0
             episode_rew_d = 0
             path, tree = list_of_path_tree[episode_num % nb_of_path]
-
-    if plot:
-        path_save_fig = os.path.join(save_path_result_fig, file_name)
+    if video : 
+        print("Making video...")
+        path_save_video = os.path.join(save_path_result_fig,file_name+"_video_trajectory.mp4")
         fig, ax = plt.subplots(figsize=(10, 8))
         if obstacle_contour is not None:
             ax.scatter(
-                obstacle_contour[:, 0], obstacle_contour[:, 1], color="black", s=0.5
+                obstacle_contour[:, 0], obstacle_contour[:, 1], color="black", s=0.2
             )
         for elt in list_of_path_tree:
             path, _ = elt
@@ -163,7 +164,42 @@ def evaluate_agent(
                 path[:, 0],
                 path[:, 1],
                 label="path",
-                color="black",
+                color="firebrick",
+                linewidth=1,
+                zorder=0,
+            )
+        ylim = ax.get_ylim()
+        if ylim[1] - ylim[0] < 1 / 3:
+            ax.set_ylim(top=1.0, bottom=-1)
+        video_trajectory(
+            fig,
+            ax,
+            states_list_per_episode[0][0],
+            path,
+            title,
+            a,
+            center,
+            cir,
+            dir,
+            norm,
+            plot_background,
+            path_save_video,
+        )
+
+    if plot:
+        path_save_fig = os.path.join(save_path_result_fig, file_name)
+        fig, ax = plt.subplots(figsize=(10, 8))
+        if obstacle_contour is not None:
+            ax.scatter(
+                obstacle_contour[:, 0], obstacle_contour[:, 1], color="black", s=0.2
+            )
+        for elt in list_of_path_tree:
+            path, _ = elt
+            ax.plot(
+                path[:, 0],
+                path[:, 1],
+                label="path",
+                color="firebrick",
                 linewidth=1,
                 zorder=0,
             )
@@ -189,6 +225,8 @@ def evaluate_agent(
 
         fig.savefig(path_save_fig, dpi=400, bbox_inches="tight")
         plt.close(fig)
+
+        
     # print(mean(v_hist))
     # path_save_fig = os.path.join(save_path_result_fig, file_name + "_hist_v.png")
     # plt.hist(v_hist, bins=50, color="blue", alpha=0.7)
@@ -204,5 +242,5 @@ def evaluate_agent(
         rewards_t_per_episode,
         rewards_d_per_episode,
         count_succes / eval_episodes,
-        states_list_per_episode,
+        states_list_per_episode[-4:],
     )

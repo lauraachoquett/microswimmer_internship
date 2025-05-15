@@ -2,6 +2,7 @@ import os
 import sys
 import time
 from math import sqrt
+import yaml
 
 from tqdm import tqdm
 
@@ -186,7 +187,7 @@ def evaluate_after_training(
                 rewards_t_per_episode,
                 rewards_d_per_episode,
                 success_rate,
-                _,
+                states_per_epsiode,
             ) = evaluate_agent(
                 agent,
                 env,
@@ -202,6 +203,7 @@ def evaluate_after_training(
                 obstacle_contour=obstacle_contour,
                 sdf=sdf_func,
                 velocity_func_l=velocity_func,
+                video=True
             )
 
             plt.close()
@@ -315,22 +317,17 @@ def sdf_func_and_velocity_func(domain_size, ratio):
 
 
 def load_config_path(path_to_config_path):
-    # If config_path_fmm is provided, other parameters can be None
     with open(path_to_config_path, "r") as f:
-        config_path_fmm = json.load(f)
+        config_path_a = json.load(f)
 
-    parameters = config_path_fmm["parameters"]
+    parameters = config_path_a["parameters"]
     start_point = parameters["start_point"]
     goal_point = parameters["goal_point"]
     domain_size = parameters["domain_size"]
     grid_size = parameters["grid_size"]
     ratio = parameters["ratio"]
-    B = parameters["B"]
-    flow_factor = parameters["flow_factor"]
     time = parameters["current_time"]
-    path = np.load(config_path_fmm["path_path"], allow_pickle=False)
-    save_path_phi = config_path_fmm["path_phi"]
-    save_path_flow = config_path_fmm["path_flow"]
+    path = np.load(config_path_a["path_path"], allow_pickle=False)
 
     sdf_function, velocity_retina = sdf_func_and_velocity_func(domain_size, ratio)
     x_new = np.linspace(0, domain_size[0], parameters["grid_size"][0])
@@ -351,23 +348,25 @@ def load_config_path(path_to_config_path):
 
 
 def obstacle_and_path(
-    scale=None,
-    ratio=None,
-    B=None,
-    flow_factor=None,
-    res_factor=None,
-    start_point=None,
+    config_par_path,
     goal_point=None,
     path_method=None,
-    heuristic_weight=None,
-    weight_sdf=None,
-    c=None,
     file_to_config_path=None,
-    description=None,
-    pow_v0=None,
-    pow_al = None,
+    type = '',
     path_to_config_path=None,
     ):
+    ratio = config_par_path['ratio']
+    start_point = config_par_path['start_point']
+    scale = config_par_path['scale']
+    B = config_par_path['B']
+    c = config_par_path['c']
+    heuristic_weight = config_par_path['heuristic_weight']
+    pow_al = config_par_path['pow_al']
+    pow_v0 = config_par_path['pow_v0']
+    description = config_par_path['description']
+    res_factor = config_par_path['res_factor']
+    weight_sdf = config_par_path['weight_sdf']
+    
     current_time = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
     if path_to_config_path is not None:
         path, _, _, sdf_function, _, X_new, Y_new = load_config_path(
@@ -376,24 +375,7 @@ def obstacle_and_path(
     else:
         # If config_path_fmm is None, all other parameters must be provided
         print("Creation of config file...")
-        if None in [
-            scale,
-            ratio,
-            B,
-            flow_factor,
-            res_factor,
-            start_point,
-            goal_point,
-            weight_sdf,
-            heuristic_weight,
-            c,
-            file_to_config_path,
-        ]:
-            raise ValueError(
-                "If config_path_fmm is None, all other parameters (scale, ratio, B, flow_factor, res_factor, start_point, goal_point) must be provided."
-            )
-
-        config_path_fmm = {}
+        config_path_a = {}
 
         domain_size = (1 * scale, 1 * scale)
 
@@ -420,7 +402,6 @@ def obstacle_and_path(
             "domain_size": domain_size,
             "ratio": ratio,
             "B": B,
-            "flow_factor": flow_factor,
             "heuristic_weight": heuristic_weight,
             "weight_sdf": weight_sdf,
             "c": c,
@@ -428,32 +409,27 @@ def obstacle_and_path(
             "pow_al": pow_al,
             "method": path_method,
             "current_time": current_time,
+            "type" : type,
             "description": description,
         }
-        config_path_fmm["parameters"] = parameters
+        config_path_a["parameters"] = parameters
 
         save_path_path = f"data/retina2D_path_time_{current_time}.npy"
-        if path_method == "fmm":
-            path, travel_time, grid_info, save_path_phi, save_path_flow = (
-                compute_fmm_path(
-                    start_point,
-                    goal_point,
-                    sdf_function,
-                    x_new,
-                    y_new,
-                    B=B,
-                    flow_field=velocity_retina,
-                    grid_size=parameters["grid_size"],
-                    domain_size=domain_size,
-                    ratio=ratio,
-                    flow_factor=flow_factor,
-                )
-            )
-        elif path_method == "astar":
+
+        if path_method == "astar":
             # Compute v0,vx and vy on this new domain with a certain size of cell
             v0, vx, vy, save_path_phi, save_path_flow = compute_v(
-                x_new, y_new, velocity_retina, B, grid_size, ratio, sdf_function, c
+                x_new, y_new, velocity_retina, B, grid_size, ratio, sdf_function, c,scale
             )
+            if type =='free' :
+                print('free')
+                v0 = np.ones_like(v0)
+                vx,vy = None,None
+            if type =='v1':
+                print('v1')
+                h=0.1
+                pow_v0 = 1
+                pow_al = 0 
 
             path, travel_time = astar_anisotropic(
                 x_new,
@@ -474,10 +450,11 @@ def obstacle_and_path(
             dist = np.array([abs(path[i + 1] - path[i]) for i in range(len(path) - 1)])
             n = ceil(np.max(dist) / (5 * 1e-3))
             if n > 1:
-                path = resample_path(path, len(path) * n)
-        config_path_fmm["path_path"] = save_path_path
-        config_path_fmm["path_phi"] = save_path_phi
-        config_path_fmm["path_flow"] = save_path_flow
+                path,distances = resample_path(path, len(path) * n)
+        config_path_a["path_path"] = save_path_path
+        config_path_a["path_phi"] = save_path_phi
+        config_path_a["path_flow"] = save_path_flow
+        config_path_a['distances'] = distances
 
         np.save(save_path_path, path, allow_pickle=False)
 
@@ -485,7 +462,7 @@ def obstacle_and_path(
             file_to_config_path, f"config_path__{path_method}_{current_time}.json"
         )
         with open(path_to_config_path, "w") as f:
-            json.dump(config_path_fmm, f, indent=4)
+            json.dump(config_path_a, f, indent=4)
             print("Config saved ")
 
     X_new, Y_new = np.meshgrid(x_new, y_new)
@@ -501,8 +478,69 @@ def obstacle_and_path(
         current_time,
     )
 
+def create_all_path(config_par_path,nb_points,failure_cases=False):
+    domain_size,X_new,Y_new,ratio,scale = grid(config_par_path)
 
-def create_list_of_goal_point(n, start_point):
+
+    file_to_config_path_pre_list = []
+    file_to_config_path_pre = 'config_path/velocity_ratio_5/7'
+    dir_config_path = Path(file_to_config_path_pre)
+
+    failure_case_file = 'config_path/velocity_ratio_5/failure_case.json'
+    
+    
+    
+    if failure_cases :
+        with open(failure_case_file,'r') as f:
+            failure_case = json.load(f)
+        print(failure_case)
+        for item in dir_config_path.rglob("*.json"):
+            file_name_path = os.path.join(dir_config_path, item.name)
+            if file_name_path in failure_case:
+                file_to_config_path_pre_list.append(file_name_path)
+                
+        goal_points=[]     
+        for config_path in file_to_config_path_pre_list:
+            with open(config_path, "r") as f:
+                config_path_a_star = json.load(f)
+            parameters_bis = config_path_a_star["parameters"]
+            goal_points.append(list(np.array(parameters_bis['goal_point'])/scale))
+            
+    for item in dir_config_path.rglob("*.json"):
+            file_name_path = os.path.join(dir_config_path, item.name)
+            file_to_config_path_pre_list.append(file_name_path)
+    
+    compute_goal_points = True
+    if compute_goal_points:
+        file_to_config_path_g = f"config_path/velocity_ratio_{ratio}"
+
+        file_to_config_path = str(create_numbered_run_folder(file_to_config_path_g))
+        
+        os.makedirs(file_to_config_path, exist_ok=True)
+        goal_points = create_list_of_goal_point(30000, config_par_path['start_point'],ratio)
+        print(len(goal_points))
+        goal_points = goal_points[:min(nb_points,len(goal_points))]
+        for nb,goal_point in enumerate(goal_points):  
+            print(f'Iter : {nb+1} over {len(goal_points)}')  
+            goal_point = tuple(goal_point)
+            (
+                p_0,
+                p_target,
+                sdf_func,
+                path,
+                obstacle_contour,
+                velocity_retina,
+                current_time,
+            ) = obstacle_and_path(
+                config_par_path,
+                path_method="astar",
+                goal_point=goal_point,
+                file_to_config_path=file_to_config_path,
+                path_to_config_path=None,
+            )
+    return file_to_config_path
+
+def create_list_of_goal_point(n, start_point,ratio):
     point_list = np.random.rand(n, 2)
     sdf_function, _ = sdf_func_and_velocity_func((1, 1), ratio)
     goal_points = [
@@ -516,107 +554,55 @@ def create_list_of_goal_point(n, start_point):
     ]
     return goal_points
 
+def grid(config_par_path):
+    N = config_par_path['N']
+    scale = config_par_path['scale']
+    ratio  = config_par_path['ratio']
+    grid_size = (N[0] * config_par_path['res_factor'], N[1] * config_par_path['res_factor'])
+    domain_size = (1 *  config_par_path['scale'], 1 *  config_par_path['scale'])
+    x_new = np.linspace(0, domain_size[0], grid_size[0])
+    y_new = np.linspace(0, domain_size[1], grid_size[1])
+    X_new, Y_new = np.meshgrid(x_new, y_new)
+    return domain_size,X_new,Y_new,ratio,scale
 
 if __name__ == "__main__":
     obstacle_type = "retina"
-    agents_file = []
-    directory_path = Path("agents/")
-
+    # agents_file = []
+    # directory_path = Path("agents/")
     # for item in directory_path.iterdir():
     #     if item.is_dir() and "agent_TD3" in item.name:
     #         if "2025-04-23" in item.name or "2025-04-22" in item.name:
     #             agents_file.append(os.path.join(directory_path, item.name))
+    
     agents_file = ["agents/agent_TD3_2025-05-07_15-48"]
 
     print("Number of agents : ", len(agents_file))
 
-    scale = 20
-    ratio = 5
-    N = (576, 528)
-    start_point = (0.98, 0.3)
-    res_factor = 1
-    grid_size = (N[0] * res_factor, N[1] * res_factor)
-    domain_size = (1 * scale, 1 * scale)
-    x_new = np.linspace(0, domain_size[0], grid_size[0])
-    y_new = np.linspace(0, domain_size[1], grid_size[1])
-    X_new, Y_new = np.meshgrid(x_new, y_new)
-    heuristic_weight = 2.7
-    weight_sdf = 1
-    sigma = 15
-    c = 0.44
-    B = 1.57
-    pow_v0 = 7
-    pow_al = 5
-    description = "cant swim against the current (condition over v_l @ d >0), v0**7 and alignment ** 5"
-    
-    
-    file_to_config_path_pre_list = []
-    file_to_config_path_pre = 'config_path/velocity_ratio_5/7'
-    dir_config_path = Path(file_to_config_path_pre)
-
-    failure_case_file = 'config_path/velocity_ratio_5/failure_case.json'
-    
-    
-    with open(failure_case_file,'r') as f:
-        failure_case = json.load(f)
-    print(failure_case)
-    for item in dir_config_path.rglob("*.json"):
-        file_name_path = os.path.join(dir_config_path, item.name)
-        if file_name_path in failure_case:
-            file_to_config_path_pre_list.append(file_name_path)
-            
-    goal_points=[]     
-    for config_path in file_to_config_path_pre_list:
-        with open(config_path, "r") as f:
-            config_path_a_star = json.load(f)
-        parameters_bis = config_path_a_star["parameters"]
-        goal_points.append(list(np.array(parameters_bis['goal_point'])/scale))
-    
-    
-    compute_goal_points = True
-    if compute_goal_points:
-        file_to_config_path_g = f"config_path/velocity_ratio_{ratio}"
-
-        file_to_config_path = str(create_numbered_run_folder(file_to_config_path_g))
-        
-        os.makedirs(file_to_config_path, exist_ok=True)
-        # goal_points = create_list_of_goal_point(30000, start_point)
-        # print(len(goal_points))
-        
-        for nb,goal_point in enumerate(goal_points):  
-            print(f'Iter : {nb+1} over {len(goal_points)}')  
-            goal_point = tuple(goal_point)
-            (
-                p_0,
-                p_target,
-                sdf_func,
-                path,
-                obstacle_contour,
-                velocity_retina,
-                current_time,
-            ) = obstacle_and_path(
-                scale=scale,
-                ratio=ratio,
-                flow_factor=2,
-                B=B,
-                res_factor=res_factor,
-                start_point=start_point,
-                goal_point=goal_point,
-                path_method="astar",
-                heuristic_weight=heuristic_weight,
-                weight_sdf=weight_sdf,
-                c=c,
-                file_to_config_path=file_to_config_path,
-                description=description,
-                pow_v0 = pow_v0,
-                pow_al = pow_al,
-                path_to_config_path=None,
-            )
+    with open("src/config_path_eva.yaml", "r") as f:
+        config_par_path = yaml.safe_load(f)
           
-
+    file_to_config_path = create_all_path(config_par_path,500)
+    
+    domain_size,X_new,Y_new,ratio,scale = grid(config_par_path)
+    
+    scale = config_par_path['scale']
+    file_to_config_path_g = f"config_path/velocity_ratio_{ratio}"
+    file_to_config_path = str(create_numbered_run_folder(file_to_config_path_g))
+    
+    types = ['free','v1','']
+    
+    # for type in types :
+    #     obstacle_and_path(
+    #         config_par_path,
+    #         goal_point = (10.79606786617848/20,12.296130605776128/20),
+    #         path_method="astar",
+    #         file_to_config_path=file_to_config_path,
+    #         type = type,
+    #     )
+        
     start_time_eva = time.time()
     list_config_paths = []
-    dir_config_path = Path("config_path/velocity_ratio_5/11")
+    dir_config_path = Path(file_to_config_path)
 
     for item in dir_config_path.rglob("*.json"):
         list_config_paths.append(os.path.join(dir_config_path, item.name))
@@ -625,7 +611,6 @@ if __name__ == "__main__":
     print("Number of path : ",len(list_config_paths))
     sdf_func, velocity_retina = sdf_func_and_velocity_func(domain_size, ratio)
     obstacle_contour = contour_2D(sdf_func, X_new, Y_new, scale)
-    print("Number of different paths :", len(list_config_paths))
     print("Path generated - Go for evaluation")
     results = evaluate_after_training(
         agents_file,
@@ -634,7 +619,7 @@ if __name__ == "__main__":
         velocity_func=velocity_retina,
         sdf_func=sdf_func,
         list_config_paths=list_config_paths,
-        sigma=sigma,
+        sigma= config_par_path['sigma'],
     )
     end_time_eva = time.time()
     elapsed_time = (end_time_eva - start_time_eva) / 60

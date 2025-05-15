@@ -131,7 +131,7 @@ def resample_path(path, n_points=500):
     fx = interp1d(cumulative, path[:, 0], kind="linear")
     fy = interp1d(cumulative, path[:, 1], kind="linear")
     new_distances = np.linspace(0, total_length, n_points)
-    return np.stack((fx(new_distances), fy(new_distances)), axis=1)
+    return np.stack((fx(new_distances), fy(new_distances)), axis=1),np.sum(distances)
 
 
 def line_of_sight(p1, p2, Z, min_distance):

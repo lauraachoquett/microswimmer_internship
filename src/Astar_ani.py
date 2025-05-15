@@ -3,7 +3,7 @@ import os
 import time
 from datetime import datetime
 from math import ceil, sqrt
-
+import seaborn as sns
 import matplotlib.pyplot as plt
 import numpy as np
 from matplotlib.colors import LogNorm
@@ -158,8 +158,12 @@ def precalculate_move_costs(v0, vx, vy, dir_offsets, dx, dy, weight_sdf, pow_v0,
         for i in range(nx):
             for d_idx, (di, dj) in enumerate(dir_offsets):
                 distance = np.sqrt((di * dx) ** 2 + (dj * dy) ** 2)
+                
 
                 if distance > 0:
+                    if vx is None or vy is None:
+                        move_costs[j, i, d_idx] = distance
+                        continue
                     dir_x = di * dx / distance
                     dir_y = dj * dy / distance
                     d = np.array([dir_x, dir_y])
@@ -175,8 +179,12 @@ def precalculate_move_costs(v0, vx, vy, dir_offsets, dx, dy, weight_sdf, pow_v0,
                     alignment = alignment ** (pow_al)
                     effective_speed = flow_component * alignment
                     effective_speed = v0[j, i] ** (pow_v0) * max(effective_speed, 0.001)
-                    if v_l @ d > 0 and v0[j, i] > 0:
-                        move_costs[j, i, d_idx] = distance / effective_speed
+                    if pow_al > 0  or pow_v0 > 0:
+                        if v_l @ d > 0 and v0[j, i] > 0:
+                            move_costs[j, i, d_idx] = distance / effective_speed
+                    else : 
+                        if flow_component > 0:
+                            move_costs[j, i, d_idx] = distance / (flow_component)
     return move_costs
 
 
@@ -189,59 +197,62 @@ def heuristic(i1, j1, i2, j2, dx, dy):
     v_max = 1.0
     return distance / v_max
 
+def plot_velocity(step,vx,vy,v0,X,Y):
+    step = 6
+
+    X_sub = X[::step, ::step]
+    Y_sub = Y[::step, ::step]
+    vx_sub = vx[::step, ::step]
+    vy_sub = vy[::step, ::step]
+    v0_sub = v0[::step, ::step]
+    print(v0_sub.shape)
+    mask = ((vx_sub != 0) | (vy_sub != 0)) & (v0_sub > 0.07) 
+
+    X_masked = X_sub[mask]
+    Y_masked = Y_sub[mask]
+    vx_masked = vx_sub[mask]
+    vy_masked = vy_sub[mask]
+
+    plt.quiver(
+        X_masked,
+        Y_masked,
+        vx_masked,
+        vy_masked,
+        color="darkred",
+        scale=90,
+        alpha=0.3,
+    )
 
 def visualize_results_a_star(
-    x, y, sdf_function, path, vx, vy, scale, par=None, label=""
-):
+    X, Y, sdf_function, path, vx, vy,v0, scale,label = '',color=None
+    ):
     """
     Visualise les résultats de l'algorithme A*.
     """
+    x_new = np.linspace(0, 20 , 528)
+    y_new = np.linspace(0,20 , 576)
 
-    # phi = np.zeros((len(y), len(x)))
-    # for i in range(len(x)):
-    #     for j in range(len(y)):
-    #         a = sdf_function((x[i], y[j]))
-    #         phi[j, i] = a
-    # phi = phi / np.max(np.abs(phi))
+    phi = np.zeros((len(y), len(x)))
+    for i in range(len(x)):
+        for j in range(len(y)):
+            a = sdf_function((x[i], y[j]))
+            phi[j, i] = a
+    print(np.min(phi))
 
-    X, Y = np.meshgrid(x, y)
 
     obstacle_contour = contour_2D(sdf_function, X, Y, scale)
 
-    plt.scatter(obstacle_contour[:, 0], obstacle_contour[:, 1], color="black", s=0.5)
+    plt.scatter(obstacle_contour[:, 0], obstacle_contour[:, 1], color="black", s=0.2)
+    palette = sns.color_palette()
 
-    if len(path) > 0:
-        path_x, path_y = zip(*path)
-        plt.plot(path_x, path_y, linewidth=2, label=f"{label} : {par}")
-
-        plt.scatter([path[0][0]], [path[0][1]], s=50)
-        plt.scatter([path[-1][0]], [path[-1][1]], s=50)
-    # step = 40
-
-    # X_sub = X[::step, ::step]
-    # Y_sub = Y[::step, ::step]
-    # vx_sub = vx[::step, ::step]
-    # vy_sub = vy[::step, ::step]
-
-    # mask = (vx_sub != 0) | (vy_sub != 0)
-
-    # X_masked = X_sub[mask]
-    # Y_masked = Y_sub[mask]
-    # vx_masked = vx_sub[mask]
-    # vy_masked = vy_sub[mask]
-
-    # plt.quiver(
-    #     X_masked,
-    #     Y_masked,
-    #     vx_masked,
-    #     vy_masked,
-    #     color="darkred",
-    #     scale=100,
-    #     alpha=0.7,
-    # )
+    path_x, path_y = zip(*path)
+    plt.plot(path_x, path_y, linewidth=2, label=label)
+    # plt.scatter([path[0][0]], [path[0][1]], s=50)
+    # plt.scatter([path[-1][0]], [path[-1][1]], s=20, color = palette[id])
+    
 
 
-def compute_v(x, y, velocity_retina, B, grid_size, ratio, sdf_function, c):
+def compute_v(x, y, velocity_retina, B, grid_size, ratio, sdf_function, c,scale):
 
     if len(x) != grid_size[0] and len(y) != grid_size[1]:
         raise ValueError("x,y are not coherent with the size of the grid")
@@ -258,6 +269,7 @@ def compute_v(x, y, velocity_retina, B, grid_size, ratio, sdf_function, c):
         phi = 3 * phi / np.max(np.abs(phi))
         os.makedirs(os.path.dirname(save_path_phi), exist_ok=True)
         np.save(save_path_phi, phi)
+
     print("Phi Ready")
     speed = (1.0 / (1.0 + np.exp(B * phi))) - c
     speed = np.clip(speed, 0.001, 1.0)
@@ -303,29 +315,24 @@ def compute_v(x, y, velocity_retina, B, grid_size, ratio, sdf_function, c):
 
     return speed, vx, vy, save_path_phi, save_path_flow
 
+def plot_different_path(files_path,label_list,x_new,y_new,sdf_function,vx,vy,v0,scale) : 
+    path_list = []
+    palette = sns.color_palette()
+    
+    for id,file_path in enumerate(files_path) : 
+        path = np.load(file_path)
+        visualize_results_a_star(
+            x_new, y_new, sdf_function, path, vx, vy,v0,scale,label = label_list[id],color = palette[id]
+        )
 
-def shortcut_path(path, is_collision_free, sdf):
-    smoothed = [path[0]]
-    i = 0
-    while i < len(path) - 1:
-        j = len(path) - 1
-        while j > i:
-            if is_collision_free(path[i], path[j], sdf):
-                smoothed.append(path[j])
-                i = j
-                break
-            j -= 1
-    return smoothed
+    plt.legend()
+    current_time = datetime.now().strftime("%m-%d_%H-%M-%S")
+    plt.gca().set_aspect("equal", adjustable="box")
+    plt.axis("off")
+    plt.title("Path")
+    plt.tight_layout()
+    plt.savefig(f"fig/Astar_ani_test_{current_time}.png", dpi=300, bbox_inches="tight")
 
-
-def is_collision_free(p1, p2, sdf_interpolator):
-    points = np.linspace(p1, p2, 20)
-    try:
-        values = sdf_interpolator(points)
-    except ValueError:
-        # Si les points sont hors des limites du domaine
-        return False
-    return np.all(values <= 0)
 
 
 if __name__ == "__main__":
@@ -356,60 +363,95 @@ if __name__ == "__main__":
     plt.figure(figsize=(12, 10))
     weight_sdf = 1
     start_point = (start_point[0] * scale, start_point[1] * scale)
-    goal_point = (goal_point[0] * scale, goal_point[1] * scale)
-    # goal_point = (11.722579560997241,15.783432205612964)
+    # goal_point = (goal_point[0] * scale, goal_point[1] * scale)
+    goal_point =  (10.79606786617848,12.296130605776128)
     # goal_point = (17.095518023108937,12.520765146894497)
     # goal_point =  (5.762615626076424,16.142539758719423)
     # goal_point=(7.855210513776498,19.169570750237117)
+    # goal_point = ( 8.670006951086492,10.962489435445624)
+    print('distance between the two points : ',  np.linalg.norm(np.array(goal_point)-np.array(start_point)))
+    aaa
     B = 1.6
-    h = 3.8
+    h = 2
     pow_v0 = 7
     pow_al = 4
 
+
+    shortest_geo_path = False
+    v1 = True
     v0, vx, vy, _, _ = compute_v(
-        x_new, y_new, velocity_retina, B, grid_size, ratio, sdf_function, c
+        x_new, y_new, velocity_retina, B, grid_size, ratio, sdf_function, c,scale
     )
-    for pow_al in [5]:
-        start_time = time.time()
-        ## Compute the path
-        path, travel_time = astar_anisotropic(
-            x_new,
-            y_new,
-            v0,
-            vx,
-            vy,
-            start_point,
-            goal_point,
-            sdf_function,
-            heuristic_weight=h,
-            pow_v0=pow_v0,
-            pow_al=pow_al
-        )
-        # path = shortcut_path(path,is_collision_free,sdf_interpolator)
-        print("Travel time :", travel_time)
+    
+    if shortest_geo_path: 
+        v0 = np.ones_like(v0)
+        vx = None
+        vy = None
+        h = 0.1
+    
+    if v1 : 
+        v0 = np.ones_like(v0)
+        pow_v0 = 1 
+        pow_al = 0
+        h = 0.1
+    
+        
+        
+    start_time = time.time()
+    # Compute the path
+    path, travel_time = astar_anisotropic(
+        x_new,
+        y_new,
+        v0,
+        vx,
+        vy,
+        start_point,
+        goal_point,
+        sdf_function,
+        heuristic_weight=h,
+        pow_v0=pow_v0,
+        pow_al=pow_al
+    )
+    # path = shortcut_path(path,is_collision_free,sdf_interpolator)
+    print("Travel time :", travel_time)
 
-        path = np.array(path)  # de forme (N, 2)
-        dist = np.array([abs(path[i + 1] - path[i]) for i in range(len(path) - 1)])
-        print("path before resampling :", len(path))
-        n = ceil(np.max(dist) / (5 * 1e-3))
-        if n > 1:
-            path = resample_path(path, len(path) * n)
-        print("after resampling : ", len(path))
-        smoothed_x = gaussian_filter1d(path[:, 0], sigma=30)
-        smoothed_y = gaussian_filter1d(path[:, 1], sigma=30)
-        path = np.stack([smoothed_x, smoothed_y], axis=1)
-        print("smoooooth")
-        visualize_results_a_star(
-            x_new, y_new, sdf_function, path, vx, vy, scale, pow_al, "pow_al"
-        )
-        end_time = time.time()
-        elapsed_time = (end_time - start_time) / 60
-        print("Execution time:", elapsed_time, "minutes")
+    path = np.array(path)  # de forme (N, 2)
+    dist = np.array([abs(path[i + 1] - path[i]) for i in range(len(path) - 1)])
+    print("path before resampling :", len(path))
+    n = ceil(np.max(dist) / (5 * 1e-3))
+    if n > 1:
+        path,distances = resample_path(path, len(path) * n)
+    print("after resampling : ", len(path))
+    smoothed_x = gaussian_filter1d(path[:, 0], sigma=30)
+    smoothed_y = gaussian_filter1d(path[:, 1], sigma=30)
+    path = np.stack([smoothed_x, smoothed_y], axis=1)
+    print("Path length : ",distances)
+    # path_list=[path]
+    # X, Y = np.meshgrid(x_new, y_new)
+    # visualize_results_a_star(
+    #     X, Y, sdf_function, path_list, vx, vy,v0,scale,label_list = [f'h : {h}']
+    # )
+    # plot_velocity(6,vx,vy,v0,X,Y)
+    # plt.legend()
+    # current_time = datetime.now().strftime("%m-%d_%H-%M-%S")
+    # plt.gca().set_aspect("equal", adjustable="box")
+    # plt.axis("off")
+    # plt.title("Path")
+    # plt.tight_layout()
+    # plt.savefig(f"fig/Astar_ani_test_{current_time}.png", dpi=300, bbox_inches="tight")
+    # plt.close()
 
-    plt.legend()
-    current_time = datetime.now().strftime("%m-%d_%H-%M-%S")
-    plt.gca().set_aspect("equal", adjustable="box")
-    plt.axis("off")
-    plt.title("SDF with path")
-    plt.tight_layout()
-    plt.savefig(f"fig/Astar_ani_test_{current_time}.png", dpi=300, bbox_inches="tight")
+    
+    save_path_path = f"data/retina2D_path_time_4_v1_bg.npy"
+    np.save(save_path_path, path, allow_pickle=False)
+
+    
+    end_time = time.time()
+    elapsed_time = (end_time - start_time) / 60
+    print("Execution time:", elapsed_time, "minutes")
+    files_path = ['data/retina2D_path_time_4_free_bg.npy','data/retina2D_path_time_4_v1_bg.npy','data/retina2D_path_time_4_v2_bg.npy']
+    label_list = ['Shortest geometrical path','Algorithm 1', 'Algorithm 2']
+    plot_different_path(files_path,label_list,x_new,y_new,sdf_function,vx,vy,v0,scale)
+
+        
+    

@@ -42,9 +42,9 @@ if __name__ == "__main__":
     grid_size = (N[0], N[1])
 
     start_point = (0.98, 0.3)
-
+    scale=20
     sdf_interpolator = RegularGridInterpolator(
-        (y, x), sdf, bounds_error=False, fill_value=None
+        (y, x), sdf/scale, bounds_error=False, fill_value=None
     )
 
     def sdf_function(point):
@@ -61,12 +61,12 @@ if __name__ == "__main__":
     ]
     goal_points = [(0.54, 0.675)]
 
-    x_new = np.linspace(0, domain_size[0], N[0] * 5)
-    y_new = np.linspace(0, domain_size[1], N[1] * 5)
+    x_new = np.linspace(0, scale, N[0] * 1)
+    y_new = np.linspace(0, scale, N[1] * 1)
     X_new, Y_new = np.meshgrid(x_new, y_new)
     X, Y = np.meshgrid(x, y)
-    print("Acc_x : ", 1 / (N[0] * 5))
-    print("Acc_y : ", 1 / (N[1] * 5))
+    print("Acc_x : ", 1 / (N[0] * 1))
+    print("Acc_y : ", 1 / (N[1] * 1))
     sdf_new = sdf_interpolator((Y_new, X_new))
     print(sdf_new.shape)
     plt.figure(figsize=(8, 6))
@@ -79,7 +79,6 @@ if __name__ == "__main__":
     plt.scatter(start_point[0], start_point[1], label="Start", color="blue", s=5)
     plt.axis("off")
     plt.legend()
-    plt.savefig("../fig/retina_example_test.png", dpi=400, bbox_inches="tight")
     plt.close()
     # np.save("/home/lchoquet/project/microswimmer_internship/data/vel.sdf", sdf_new, allow_pickle=False)
 

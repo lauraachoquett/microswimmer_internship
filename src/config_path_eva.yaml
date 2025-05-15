@@ -1,0 +1,13 @@
+scale: 20
+ratio: 5
+N: [576, 528]
+start_point: [0.98, 0.3]
+res_factor: 1
+heuristic_weight: 2
+weight_sdf: 1
+sigma: 15
+c: 0.44
+B: 1.57
+pow_v0: 7
+pow_al: 5
+description: "cant swim against the current (condition over v_l @ d >0), v0**7 and alignment ** 5"

@@ -137,7 +137,7 @@ def analyse_retina_json(name_file):
     success_rates = df_sample.loc["success_rate"].astype(float)
 
 
-    filtered_success_rates = success_rates[success_rates < 0.4]
+    filtered_success_rates = success_rates[success_rates < 0.7]
 
     filtered_success_rates = filtered_success_rates.sort_values()
     case_names = list(filtered_success_rates.index)
@@ -151,7 +151,7 @@ def analyse_retina_json(name_file):
     plt.figure(figsize=(12, 5))
     filtered_success_rates.plot(kind='bar', color='skyblue', edgecolor='black')
 
-    plt.title('Configurations with success rate < 0.9')
+    plt.title('Configurations with success rate < 0.7')
     plt.ylabel('Success Rate')
     plt.xlabel('Configuration')
     plt.xticks(rotation=90)
