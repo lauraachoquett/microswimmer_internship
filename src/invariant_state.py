@@ -26,3 +26,14 @@ def coordinate_in_global_ref(p, dir, x):
     x = R @ x + p
 
     return x
+
+
+def coordinate_in_path_ref_3D(p,x,t,n,b): 
+    B = np.column_stack((t, n, b)) 
+    x = np.array(x) - np.array(p)
+    return B.T@x 
+
+def coordinate_in_global_ref_3D(p,x,t,n,b):
+    B = np.column_stack((t, n, b)) 
+    x = B @ x + p
+    return x

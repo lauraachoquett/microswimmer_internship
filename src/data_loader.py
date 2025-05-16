@@ -208,6 +208,8 @@ if __name__ == "__main__":
     
     vx_interp =  velocity_interpolator_x(points).reshape(Y_phys.shape)
     vy_interp =  velocity_interpolator_y(points).reshape(Y_phys.shape)
+    v_magnitude_or = np.sqrt(vx_interp**2 + vy_interp**2)
+    print("norm V_max on the grid: ", np.max(v_magnitude_or))
     vx_phys = vx_interp * scale
     vy_phys = vy_interp * scale
     v_magnitude = np.sqrt(vx_phys**2 + vy_phys**2)

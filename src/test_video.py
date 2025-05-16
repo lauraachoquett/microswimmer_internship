@@ -68,4 +68,3 @@ ani = animation.FuncAnimation(fig, update, frames=len(t),
                               init_func=init, blit=True)
 
 ani.save("champ_avec_particules.mp4", writer='ffmpeg', fps=30, dpi=300)
-plt.show()

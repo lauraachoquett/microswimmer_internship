@@ -6,12 +6,13 @@ import numpy as np
 
 from src.simulation import rankine_vortex, uniform_velocity
 from src.utils import random_bg_parameters
+from src.frenet import compute_frenet_frame
 
 colors = plt.cm.tab10.colors
 import copy
 
 from src.generate_path import generate_curve
-from src.plot import plot_trajectories,video_trajectory
+from src.plot import plot_trajectories,video_trajectory,plot_trajectories_3D
 
 
 def evaluate_agent(
@@ -44,6 +45,7 @@ def evaluate_agent(
     Dt_sim = Dt_action / steps_per_action
     p_0 = config["p_0"]
     beta = config["beta"]
+    dim =  config['dim']
     iter = 0
     episode_num = 0
     episode_reward = 0
@@ -100,7 +102,8 @@ def evaluate_agent(
         nb_of_path = 1
 
     #### EVALUATION ####
-    state, done = env.reset(tree, path, velocity_func), False
+    T,N,B = compute_frenet_frame(path,dim)
+    state, done = env.reset(tree, path,T, velocity_func,N,B), False
     while episode_num < eval_episodes:
         states_episode.append(x)
         iter += 1
@@ -120,12 +123,15 @@ def evaluate_agent(
             action=action,
             tree=tree,
             path=path,
+            T=T,
             x_target=p_target,
             beta=beta,
             D=D,
             u_bg=u_bg,
             threshold=threshold,
             sdf=sdf,
+            N=N,
+            B=B
         )
 
         x = info["x"]
@@ -138,7 +144,6 @@ def evaluate_agent(
             if done:
                 count_succes += 1
             states_list_per_episode.append([np.array(states_episode), iter])
-            state, done = env.reset(tree, path, velocity_func), False
             iter = 0
             episode_num += 1
             x = p_0
@@ -150,6 +155,10 @@ def evaluate_agent(
             episode_rew_t = 0
             episode_rew_d = 0
             path, tree = list_of_path_tree[episode_num % nb_of_path]
+            T,N,B = compute_frenet_frame(path,dim)
+            ## Reset ##
+            state, done = env.reset(tree, path,T, velocity_func,N,B), False
+
     if video : 
         print("Making video...")
         path_save_video = os.path.join(save_path_result_fig,file_name+"_video_trajectory.mp4")
@@ -188,40 +197,59 @@ def evaluate_agent(
 
     if plot:
         path_save_fig = os.path.join(save_path_result_fig, file_name)
-        fig, ax = plt.subplots(figsize=(10, 8))
-        if obstacle_contour is not None:
-            ax.scatter(
-                obstacle_contour[:, 0], obstacle_contour[:, 1], color="black", s=0.2
-            )
-        for elt in list_of_path_tree:
-            path, _ = elt
-            ax.plot(
-                path[:, 0],
-                path[:, 1],
-                label="path",
-                color="firebrick",
-                linewidth=1,
-                zorder=0,
-            )
-        ylim = ax.get_ylim()
-        if ylim[1] - ylim[0] < 1 / 3:
-            ax.set_ylim(top=1.0, bottom=-1)
-        plot_trajectories(
-            ax,
-            states_list_per_episode[-4:],
-            path,
-            title,
-            a,
-            center,
-            cir,
-            dir,
-            norm,
-            plot_background,
-            type=type,
-        )
 
-        ax.set_aspect("equal")
-        ax.set_axis_off()
+        if dim == 2:
+            fig, ax = plt.subplots(figsize=(10, 8))
+
+            if obstacle_contour is not None:
+                ax.scatter(obstacle_contour[:, 0], obstacle_contour[:, 1], color="black", s=0.2)
+
+            for elt in list_of_path_tree:
+                path, _ = elt
+                ax.plot(path[:, 0], path[:, 1], label="path", color="firebrick", linewidth=1, zorder=0)
+
+            ylim = ax.get_ylim()
+            if ylim[1] - ylim[0] < 1 / 3:
+                ax.set_ylim(top=1.0, bottom=-1)
+
+            plot_trajectories(
+                ax,
+                states_list_per_episode[-4:],
+                path,
+                title,
+                a,
+                center,
+                cir,
+                dir,
+                norm,
+                plot_background,
+                type=type,
+                dim=dim,
+            )
+
+            ax.set_aspect("equal")
+            ax.set_axis_off()
+
+        elif dim == 3:
+            fig = plt.figure(figsize=(10, 8))
+            ax = fig.add_subplot(111, projection='3d')
+
+            for elt in list_of_path_tree:
+                path, _ = elt
+                ax.plot(path[:, 0], path[:, 1], path[:, 2], color="firebrick", linewidth=1)
+
+            plot_trajectories_3D(
+                ax,
+                states_list_per_episode[-4:],
+                title=title,
+                type=type,
+                a=a,
+                cir=cir,
+                norm=norm,
+            )
+
+            # Si ax.set_axis_off() ne fonctionne pas pour un plot 3D, tu peux commenter cette ligne
+            ax.set_axis_off()
 
         fig.savefig(path_save_fig, dpi=400, bbox_inches="tight")
         plt.close(fig)

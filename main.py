@@ -3,11 +3,12 @@ import os
 import pickle
 from datetime import datetime
 from math import sqrt
-
+import yaml
 import matplotlib.pyplot as plt
 import numpy as np
 import torch
 from scipy.spatial import KDTree
+import time
 
 import src.TD3 as TD3
 from src.env_swimmer import MicroSwimmer
@@ -16,6 +17,7 @@ from src.generate_path import *
 from src.invariant_state import *
 from src.simulation import rankine_vortex, uniform_velocity
 from src.utils import ReplayBuffer, courbures, random_bg_parameters
+from src.frenet import compute_frenet_frame
 
 colors = plt.cm.tab10.colors
 import copy
@@ -76,6 +78,7 @@ def run_expe(config, agent_file="agents"):
         pickle.dump(config, f)
 
     ## Path ##
+    dim = config['dim']
     p_target = config["p_target"]
     p_0 = config["p_0"]
     path = config["path"]
@@ -83,13 +86,18 @@ def run_expe(config, agent_file="agents"):
     print(f"Starting point : {p_0}")
     print(f"Target point : {path[-1]}")
     x = p_0
+    T,N,B = compute_frenet_frame(path,dim)
+    print(T[1])
+    print(N[1])
+    print(B[1])
 
     ## Background flow ##
     uniform_bg = config["uniform_bg"]
     rankine_bg = config["rankine_bg"]
     both_rankine_and_uniform = config["uniform_bg"] and config["rankine_bg"]
     random_curve = config["random_curve"]
-    u_bg = np.zeros(2)
+    u_bg = np.zeros(dim)
+    velocity_func = lambda x: u_bg
 
     ## Environnement creation ##
     x_0 = config["x_0"]
@@ -98,7 +106,7 @@ def run_expe(config, agent_file="agents"):
     Dt_action = config["Dt_action"]
     Dt_sim = Dt_action / steps_per_action
     n_lookahead = config["n_lookahead"]
-    env = MicroSwimmer(x_0, C, Dt_sim, config["velocity_bool"], n_lookahead,config['velocity_ahead'],config['add_action'])
+    env = MicroSwimmer(x_0, C, Dt_sim, config["velocity_bool"], n_lookahead,config['velocity_ahead'],config['add_action'],dim = config['dim'])
 
     ## Environnement parameters ##
     t_max = config["t_max"]
@@ -106,7 +114,7 @@ def run_expe(config, agent_file="agents"):
     beta = config["beta"]
     Dt_action = Dt_sim * steps_per_action
     D = config["D"]
-
+    
     ## Agent and Replay Buffer ##
     state_dim = env.observation_space.shape[0]
     action_dim = env.action_space.shape[0]
@@ -152,17 +160,18 @@ def run_expe(config, agent_file="agents"):
     count_reach_target = 0
 
     ## Reset ##
-    state, done = env.reset(tree, path), False
+    state, done = env.reset(tree, path,T,None,N,B), False
 
     ## Config for evaluation ##
     config_eval_bis = copy.deepcopy(config)
     config_eval_bis["uniform_bg"] = False
     config_eval_bis["rankine_bg"] = False
+    
     if config["random_curve"]:
         list_of_path_tree = varying_curve_init(config)
         A = 2
         f = 4
-        N = nb_episode / 2
+        N_k = nb_episode / 2
 
     print("Both pertubations : ", config["uniform_bg"] and config["rankine_bg"])
 
@@ -177,7 +186,7 @@ def run_expe(config, agent_file="agents"):
             u_bg = velocity_func(x)
 
         next_state, reward, done, info = env.step(
-            action, tree, path, p_target, beta, D, u_bg, threshold
+            action = action, tree = tree,path= path, T=T,x_target =p_target,beta= beta,D= D, u_bg = u_bg, threshold =threshold,N=N,B=B
         )
         x = info["x"]
         replay_buffer.add(state.flatten(), action, next_state.flatten(), reward, done)
@@ -186,7 +195,9 @@ def run_expe(config, agent_file="agents"):
 
         ## Update ##
         if episode_num % episode_update == 0 and episode_num > episode_start_update:
+            start_time_train = time.time()
             agent.train(replay_buffer, batch_size)
+            # print("time to update :",time.time()-start_time_train)
 
         ## Evolutive reward and success rate ##
         if done:
@@ -220,16 +231,16 @@ def run_expe(config, agent_file="agents"):
                     parameters=[],
                     plot_background=False,
                 )
-                visualize_streamline(
-                    agent,
-                    config_eval_bis,
-                    f"eval_during_training_streamline_{beta:.3f}.png",
-                    save_path_result_fig,
-                    type="line",
-                    title="",
-                    k=0,
-                    parameters=[],
-                )
+                # visualize_streamline(
+                #     agent,
+                #     config_eval_bis,
+                #     f"eval_during_training_streamline_{beta:.3f}.png",
+                #     save_path_result_fig,
+                #     type="line",
+                #     title="",
+                #     k=0,
+                #     parameters=[],
+                # )
                 eval_rew = mean(eval_rew)
                 eval_list.append(eval_rew)
                 print(f"Eval result : {eval_rew:.3f}")
@@ -281,15 +292,17 @@ def run_expe(config, agent_file="agents"):
                 velocity_func = lambda x: uniform_velocity(dir, norm)
             elif rankine_bg:
                 velocity_func = lambda x: rankine_vortex(x, a, center, cir)
-            state, done = env.reset(tree, path,velocity_func), False
 
             if config["random_curve"] and episode_num > 10:
-                k = func_k_max(A, N, f, episode_num)
+                k = func_k_max(A, N_k, f, episode_num)
                 path = generate_curve(p_0, p_target, k, config["nb_points_path"])
                 tree = KDTree(path)
                 config["path"] = path
                 config["tree"] = tree
+                T,N,B = compute_frenet_frame(path,dim)
 
+            state, done = env.reset(tree, path,T,velocity_func,N,B), False
+            
     ## Save evaluation returns ##
     file_reward_eval = os.path.join(save_path_result, "rewards_eval")
     with open(file_reward_eval, "w") as f:
@@ -298,39 +311,47 @@ def run_expe(config, agent_file="agents"):
 def set_parameters_training(threshold,maximum_curv):
     l = 1 / maximum_curv
     Dt_action = 1 / maximum_curv
-    D = threshold**2 / (20 * Dt_action)
+    D = threshold**2 / (40 * Dt_action)
     return Dt_action,D
 
 if __name__ == "__main__":
 
-    p_target = np.array([2, 0])
-    p_0 = np.zeros(2)
-    nb_points_path = 500
-    path, d = generate_simple_line(p_0, p_target, nb_points_path)
-    print(
-        "Distance path points:      ",
-        format_sci(np.linalg.norm(path[1, :] - path[0, :])),
-    )
+    # p_target = np.array([2,0, 0])
+    # p_0 = np.zeros(3)
+    # nb_points_path = 500
+    # path, d = generate_simple_line(p_0, p_target, nb_points_path)
+    # print(
+    #     "Distance path points:      ",
+    #     format_sci(np.linalg.norm(path[1, :] - path[0, :])),
+    # )
+    
+    path =  generate_helix(2000, 1/2, 2,1,False)
+    p_0 = path[0]
+    p_target = path[-1]
+    
     tree = KDTree(path)
+    
+    
     print("Curvature max du chemin :  ", format_sci(np.max(courbures(path))))
     t_max = 8
     t_init = 0
     maximum_curvature = 30
     threshold=0.07
     Dt_action,D = set_parameters_training(threshold=threshold,maximum_curv=maximum_curvature)
-
+    dim=3
     print("D:                         ", format_sci(D))
     print("Dt_action:                 ", format_sci(Dt_action))
     print("Threshold:                 ", format_sci(threshold))
     print("Mean diffusion distance:   ", format_sci(sqrt(2 * Dt_action * D)))
     print("Distance during Dt_action: ", format_sci(Dt_action))
-    print("Distance to cover:         ", format_sci(d))
-    print("Expected precision:        ", format_sci(threshold / d))
+    # print("Distance to cover:         ", format_sci(d))
+    # print("Expected precision:        ", format_sci(threshold / d))
+
+    
     config = {
         "x_0": p_0,  # m
         "C": 1,  # m/s
         "D": D,  # m2/s (Diffusion coefficient)
-        "u_bg": np.array([0, 1]) * 0.0,  # m/s
         "threshold": threshold,  # m
         "t_max": t_max,  # s
         "t_init": t_init,  # s
@@ -338,6 +359,7 @@ if __name__ == "__main__":
         "nb_episode": 650,
         "batch_size": 256,
         "eval_freq": 50,
+        'u_bg':np.zeros(3),
         "save_model": True,
         "eval_episodes": 8,
         "episode_start_update": 10,
@@ -349,16 +371,20 @@ if __name__ == "__main__":
         "load_model": "",
         "episode_per_update": 3,
         "discount_factor": 1,
-        "beta": 0.5,
-        "uniform_bg": True,  # Random uniform background flow during the training
-        "rankine_bg": True,  # Random rankine vortex during the training
+        "beta": 0.4,
+        "uniform_bg": False,  # Random uniform background flow during the training
+        "rankine_bg": False,  # Random rankine vortex during the training
         "pertubation_after_episode": 20,  # Background flow add in the training after this episode
-        "random_curve": True,  # To train on varying curve (no longer random)
+        "random_curve": False,  # To train on varying curve (no longer random)
         "nb_points_path": 500,  # Discretization of the path
         "Dt_action": Dt_action,
-        "velocity_bool": True,  # Add the velocity in the state or not
-        "n_lookahead": 10,  # Number of points in the lookahead
+        "velocity_bool": False,  # Add the velocity in the state or not
+        "n_lookahead": 5,  # Number of points in the lookahead
         "velocity_ahead":  False,
-        'add_action' : True
+        'add_action' : True,
+        'dim':dim,
     }
+    start_time = time.time()
     run_expe(config)
+    print("Time to do the training :",time.time()-start_time)
+    

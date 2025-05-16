@@ -10,6 +10,8 @@ import matplotlib.animation as animation
 import numpy as np
 import pandas as pd
 import seaborn as sns
+from mpl_toolkits.mplot3d import Axes3D  # nécessaire pour l'import
+import matplotlib.pyplot as plt
 
 colors_default = plt.cm.tab10.colors
 from src.generate_path import (
@@ -66,6 +68,7 @@ def video_trajectory(
     ani.save(path_save_video, writer='ffmpeg', dpi=200)
 
     plt.close(fig)
+    
 def plot_trajectories(
     ax,
     trajectories_list,
@@ -78,6 +81,7 @@ def plot_trajectories(
     norm=0,
     plot_background=False,
     type="",
+    dim=2,
     color_id=0,
     colors=plt.cm.tab10.colors,
     label="",
@@ -132,6 +136,53 @@ def plot_trajectories(
             ax.set_title(f"Trajectories - a : {a} - circulation : {cir}")
 
 
+
+def plot_trajectories_3D(ax, trajectories_list, colors=None, label=None, title="", 
+                         type="", norm=None, a=None, cir=None, color_id=0):
+    colors_default = ['red', 'blue', 'green', 'orange', 'purple', 'brown']
+    if colors is None:
+        colors = colors_default
+
+    if isinstance(trajectories_list[0][0], np.ndarray):
+        for idx, list_state in enumerate(trajectories_list):
+            states = list_state[0]
+            color_id_t = max(idx, color_id)
+            ax.plot(
+                states[:, 0],
+                states[:, 1],
+                states[:, 2],
+                color=colors[color_id_t],
+                linewidth=0.9,
+                label=label,
+            )
+            ax.scatter(states[0, 0], states[0, 1], states[0, 2], color=colors[color_id_t], s=5)
+            ax.scatter(states[-1, 0], states[-1, 1], states[-1, 2], color=colors[color_id_t], s=5)
+    else:
+        states = trajectories_list
+        color_id_t = color_id
+        ax.plot(
+            states[:, 0],
+            states[:, 1],
+            states[:, 2],
+            color=colors[color_id_t],
+            linewidth=0.9,
+            label=label,
+        )
+        ax.scatter(states[0, 0], states[0, 1], states[0, 2], color=colors[color_id_t], s=5)
+        ax.scatter(states[-1, 0], states[-1, 1], states[-1, 2], color=colors[color_id_t], s=5)
+
+    ax.set_xlabel("x")
+    ax.set_ylabel("y")
+    ax.set_zlabel("z")
+
+    if title != "":
+        ax.set_title(f"{title}")
+    else:
+        if type == "uniform":
+            ax.set_title(f"Trajectories - norm : {norm}")
+        if type == "rankine":
+            ax.set_title(f"Trajectories - a : {a} - circulation : {cir}")
+            
 def plot_action(path, x, p_0, id_cp, action, id):
     plt.scatter(x[0], x[1], color=colors_default[id % 10])
     plt.annotate(

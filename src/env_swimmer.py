@@ -19,37 +19,38 @@ class MicroSwimmer(gym.Env):
         add_action=False,
         seed=None,
         bounce_thr=0,
-        in_3D = False,
+        dim=2,
     ):
-    if in_3D :
-        dim = 3
-    else :
-        dim = 2
         
-    super(MicroSwimmer, self).__init__()
-    self.n_lookahead = n_lookahead
-    self.action_space = gym.spaces.Box(
-        shape=(dim,), low=-np.inf, high=np.inf, dtype=np.float32
-    )
-    if velocity_bool:
-        base = 1 + 1 #Position and velocity
+        super(MicroSwimmer, self).__init__()
+        self.dim=dim
+        self.n_lookahead = n_lookahead
+        self.action_space = gym.spaces.Box(
+            shape=(self.dim,), low=-np.inf, high=np.inf, dtype=np.float32
+        )
+        base = 1 # Position
+        
+        if add_action:
+            base +=1 # Past_action
+        
+        if velocity_bool:
+            base = +1 # Velocity of the agent
+            
         if velocity_ahead:
-            base += 2 * self.n_lookahead #Velocity and Position of points ahead
+                base +=2 * self.n_lookahead #Velocity and Position of points ahead
         else:
             base += self.n_lookahead  # Position of points ahead
-        if add_action:
-            base += 1 #Past action in the state
-    else:
-        base = 1 + self.n_lookahead #Current position and points ahead
+           
 
 
-        
-    self.observation_space = gym.spaces.Box(
-        shape=(dim * base,),
-        low=-np.inf,
-        high=np.inf,
-        dtype=np.float32,
-    )
+
+            
+        self.observation_space = gym.spaces.Box(
+            shape=(self.dim * base,),
+            low=-np.inf,
+            high=np.inf,
+            dtype=np.float32,
+        )
 
         self.x = x_0
         self.x_0 = x_0
@@ -58,37 +59,45 @@ class MicroSwimmer(gym.Env):
         self.Dt = Dt
         self.U = 1
         self.bounce_thr = bounce_thr
-        self.dir_path = np.zeros(dim)
+        self.dir_path = np.zeros(self.dim)
+        self.t = np.zeros(self.dim)
+        self.n = np.zeros(self.dim)
+        self.b = np.zeros(self.dim)
         self.id_cp = 0
         self.d_cp = 0
-        self.action = np.zeros(dim)
+        self.action = np.zeros(self.dim)
         self.velocity_ahead = velocity_ahead
         self.velocity_bool = velocity_bool
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         self.rng = np.random.default_rng(seed)
         self.add_action = add_action
 
-    def state(self, tree, path):
-        if tree is None or path is None:
+    def state(self, tree, path,T,N=None,B=None):
+        if tree is None or path is None or T is None:
             return self.x
 
         self.d, self.id_cp = min_dist_closest_point(self.x, tree)
         path_len = len(path)
-
-        if self.id_cp < path_len - 1:
-            self.dir_path = path[self.id_cp + 1] - path[self.id_cp]
-        else:
-            self.dir_path = path[self.id_cp - 1] - path[self.id_cp]
-
         p_cp = path[self.id_cp]
-        s = coordinate_in_path_ref(p_cp, self.dir_path, self.x)
-        s_previous = coordinate_in_path_ref(p_cp, self.dir_path, self.previous_x)
+        
+        if self.dim==2:
+            self.dir_path = T[self.id_cp]
+            s = coordinate_in_path_ref(p_cp, self.dir_path, self.x)
+            s_previous = coordinate_in_path_ref(p_cp, self.dir_path, self.previous_x)
+
+        else : 
+            self.t = T[self.id_cp]
+            self.n = N[self.id_cp]
+            self.b = B[self.id_cp]
+            s = coordinate_in_path_ref_3D(p_cp,self.x,self.t,self.n,self.b)
+            s_previous = coordinate_in_path_ref_3D(p_cp,self.previous_x,self.t,self.n,self.b)
+
         v_local_path = (s - s_previous) / self.Dt
 
-        result = [s.reshape(1, 2)]
+        result = [s.reshape(1, self.dim)]
 
         if self.velocity_bool:
-            result.append(v_local_path.reshape(1, 2))
+            result.append(v_local_path.reshape(1, self.dim))
 
         if self.n_lookahead > 0:
             lookahead = []
@@ -96,18 +105,27 @@ class MicroSwimmer(gym.Env):
 
             for i in range(1, self.n_lookahead + 1):
                 idx = min(self.id_cp + i, path_len - 1)
-                next_p = path[idx]
+                next_p = path[idx] 
+                if self.dim==2:
+                    self.dir_path = T[self.id_cp]
+                    next_p_local=  coordinate_in_path_ref(p_cp, self.dir_path, next_p).reshape(1, self.dim)
+                else : 
+                    self.t = T[self.id_cp]
+                    self.n = N[self.id_cp]
+                    self.b = B[self.id_cp]
+                    next_p_local = coordinate_in_path_ref_3D(p_cp,next_p,self.t,self.n,self.b).reshape(1, self.dim)
+                   
                 lookahead.append(
-                    coordinate_in_path_ref(p_cp, self.dir_path, next_p).reshape(1, 2)
+                   next_p_local
                 )
                 if self.velocity_ahead:
                     vel = self.velocity_func(next_p)
-                    lookahead_vel.append(vel.reshape(1, 2))
+                    lookahead_vel.append(vel.reshape(1, self.dim))
             result.append(np.concatenate(lookahead, axis=0))
             if self.velocity_ahead:
                 result.append(np.concatenate(lookahead_vel, axis=0))
         if self.add_action:
-            result.append(self.action.reshape(1, 2))
+            result.append(self.action.reshape(1, self.dim))
         return np.concatenate(result, axis=0)
 
     def reward(self, x_target, beta):
@@ -125,17 +143,26 @@ class MicroSwimmer(gym.Env):
         action,
         tree,
         path,
+        T,
         x_target,
         beta,
         D=0.1,
-        u_bg=np.zeros(2),
+        u_bg=None,
         threshold=0.2,
-        sdf=None,
+        sdf = None,
+        N = None,
+        B = None
+        
     ):
         rew_t, rew_d, rew_tar, rew = self.reward(x_target, beta)
         self.previous_x = self.x
         self.action = action
-        action_global_ref = coordinate_in_global_ref(np.zeros(2), self.dir_path, action)
+        if self.dim==2:
+            action_global_ref=  coordinate_in_global_ref(np.zeros(self.dim), self.dir_path, action)
+        else : 
+            action_global_ref= coordinate_in_global_ref_3D(np.zeros(self.dim),action,self.t,self.n,self.b)
+        if u_bg is None: 
+            u_bg = np.zeros(self.dim)
         self.x = solver(
             x=self.x,
             U=self.U,
@@ -143,11 +170,11 @@ class MicroSwimmer(gym.Env):
             Dt=self.Dt,
             D=D,
             u_bg=u_bg,
-            rng=self.rng,
             bounce_thr=self.bounce_thr,
             sdf=sdf,
+            dim=self.dim,
         )
-        next_state = self.state(tree, path)
+        next_state = self.state(tree, path,T,N,B)
         done = False
         d = np.linalg.norm(self.x - x_target)
         if d < threshold:
@@ -164,10 +191,10 @@ class MicroSwimmer(gym.Env):
             },
         )
 
-    def reset(self, tree=None, path=None, velocity_func=None):
+    def reset(self, tree=None, path=None, T=None,velocity_func=None,N=None,B=None):
         if velocity_func is None:
-            self.velocity_func = lambda x: np.zeros(2)
+            self.velocity_func = lambda x: np.zeros(self.dim)
         else:
             self.velocity_func = velocity_func
         self.x = self.x_0
-        return self.state(tree, path)
+        return self.state(tree, path,T,N,B)

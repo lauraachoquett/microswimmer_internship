@@ -270,7 +270,6 @@ def compute_v(x, y, velocity_retina, B, grid_size, ratio, sdf_function, c):
                 phi[j, i] = a
         os.makedirs(os.path.dirname(save_path_phi), exist_ok=True)
         np.save(save_path_phi, phi)
-
     speed = (1.0 / (1.0 + np.exp(B * phi))) - c
     speed = np.clip(speed, 0.001, 1.0)
 
@@ -360,7 +359,7 @@ if __name__ == "__main__":
     # goal_point = ( 8.670006951086492,10.962489435445624)
     goal_point = (physical_width * goal_point[0], physical_height * goal_point[1])
     print('distance between the two points : ',  np.linalg.norm(np.array(goal_point)-np.array(start_point)))
-    B = 5
+    B = 1
     h = 2
     pow_v0 = 4
     pow_al = 7
@@ -369,60 +368,58 @@ if __name__ == "__main__":
     shortest_geo_path = False
     v1 = False
     grid_size = (len(x_phys),len(y_phys))
-    v0, vx, vy, _, _ = compute_v(
-        x_phys, y_phys, velocity_retina, B, grid_size, ratio, sdf_func, c
-    )
-    print("Shape : ")
-    print(v0.shape)
-    print(vx.shape)
-    print(vy.shape)
-    if shortest_geo_path: 
-        v0 = np.ones_like(v0)
-        vx = None
-        vy = None
-        h = 0.1
-    
-    if v1 : 
-        v0 = np.ones_like(v0)
-        pow_v0 = 1 
-        pow_al = 0
-        h = 0.1
-    
-        
-        
-    start_time = time.time()
-    # Compute the path
-    path, travel_time = astar_anisotropic(
-        x_phys,
-        y_phys,
-        v0,
-        vx,
-        vy,
-        start_point,
-        goal_point,
-        sdf_func,
-        heuristic_weight=h,
-        pow_v0=pow_v0,
-        pow_al=pow_al
-    )
-    # path = shortcut_path(path,is_collision_free,sdf_interpolator)
-    print("Travel time :", travel_time)
+    for B in np.linspace(1,5,5):
+        v0, vx, vy, _, _ = compute_v(
+            x_phys, y_phys, velocity_retina, B, grid_size, ratio, sdf_func, c
+        )
 
-    path = np.array(path)  # de forme (N, 2)
-    dist = np.array([abs(path[i + 1] - path[i]) for i in range(len(path) - 1)])
-    print("path before resampling :", len(path))
-    n = ceil(np.max(dist) / (5 * 1e-3))
-    if n > 1:
-        path,distances = resample_path(path, len(path) * n)
-    print("after resampling : ", len(path))
-    smoothed_x = gaussian_filter1d(path[:, 0], sigma=30)
-    smoothed_y = gaussian_filter1d(path[:, 1], sigma=30)
-    path = np.stack([smoothed_x, smoothed_y], axis=1)
-    print("Path length : ",distances)
-    X, Y = np.meshgrid(x_phys, y_phys)
-    visualize_results_a_star(
-        X, Y, sdf_func, path, vx, vy,v0,scale,label = 'path'
-    )
+        if shortest_geo_path: 
+            v0 = np.ones_like(v0)
+            vx = None
+            vy = None
+            h = 0.1
+        
+        if v1 : 
+            v0 = np.ones_like(v0)
+            pow_v0 = 1 
+            pow_al = 0
+            h = 0.1
+        
+            
+            
+        start_time = time.time()
+        # Compute the path
+        path, travel_time = astar_anisotropic(
+            x_phys,
+            y_phys,
+            v0,
+            vx,
+            vy,
+            start_point,
+            goal_point,
+            sdf_func,
+            heuristic_weight=h,
+            pow_v0=pow_v0,
+            pow_al=pow_al
+        )
+        # path = shortcut_path(path,is_collision_free,sdf_interpolator)
+        print("Travel time :", travel_time)
+
+        path = np.array(path)  # de forme (N, 2)
+        dist = np.array([abs(path[i + 1] - path[i]) for i in range(len(path) - 1)])
+        print("path before resampling :", len(path))
+        n = ceil(np.max(dist) / (5 * 1e-3))
+        if n > 1:
+            path,distances = resample_path(path, len(path) * n)
+        print("after resampling : ", len(path))
+        smoothed_x = gaussian_filter1d(path[:, 0], sigma=30)
+        smoothed_y = gaussian_filter1d(path[:, 1], sigma=30)
+        path = np.stack([smoothed_x, smoothed_y], axis=1)
+        print("Path length : ",distances)
+        X, Y = np.meshgrid(x_phys, y_phys)
+        visualize_results_a_star(
+            X, Y, sdf_func, path, vx, vy,v0,scale,label = f'B : {B}'
+        )
     plot_velocity(6,vx,vy,v0,X,Y)
     plt.legend()
     current_time = datetime.now().strftime("%m-%d_%H-%M-%S")

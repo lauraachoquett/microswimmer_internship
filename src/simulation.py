@@ -4,14 +4,14 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 
-def dW(delta_t, rng=None):
-    return rng.normal(loc=0.0, scale=np.sqrt(delta_t), size=(2))
+def dW(delta_t, rng=None,dim=2):
+    return rng.normal(loc=0.0, scale=np.sqrt(delta_t), size=(dim))
 
 
-def solver(x, U, p, Dt, D, u_bg=np.zeros(2), rng=None, bounce_thr=0.0, sdf=None):
+def solver(x, U, p, Dt, D, u_bg=np.zeros(2), rng=None, bounce_thr=0.0, sdf=None,dim=2):
     if rng is None:
         rng = np.random.default_rng()
-    dW_t = dW(Dt, rng)
+    dW_t = dW(Dt, rng,dim)
     next_x = x + u_bg * Dt + U * p * Dt + sqrt(D) * dW_t
 
     if sdf is not None:

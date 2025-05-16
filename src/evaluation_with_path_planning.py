@@ -274,13 +274,11 @@ def initialize_parameters(agent_file, bounce_thr):
     config_eval["bounce_thr"] = bounce_thr
     return config_eval
 
-
 def sdf_circle(point, center, radius):
     px, py = point
     cx, cy = center
     distance_to_center = sqrt((px - cx) ** 2 + (py - cy) ** 2)
     return distance_to_center - radius
-
 
 def sdf_func_and_velocity_func(domain_size, ratio):
     x, y, N, h, sdf = load_sdf_from_csv(domain_size)
@@ -317,7 +315,6 @@ def sdf_func_and_velocity_func(domain_size, ratio):
 
     return sdf_function, velocity_retina
 
-
 def load_config_path(path_to_config_path):
     with open(path_to_config_path, "r") as f:
         config_path_a = json.load(f)
@@ -347,7 +344,6 @@ def load_config_path(path_to_config_path):
         ratio,
         parameters,
     )
-
 
 def obstacle_and_path(
     config_par_path,

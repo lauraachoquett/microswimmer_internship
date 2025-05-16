@@ -77,6 +77,18 @@ def func_k_max(A, N, f, n):
     return -A * amp * cos(n * freq)
 
 
+def generate_helix(num_points=1000, radius=1.0, pitch=0.1, turns=3,clockwise = True):
+    t = np.linspace(0, 2 * np.pi * turns, num_points)
+    if clockwise : 
+        x = radius * np.sin(t) 
+        z = radius * np.cos(t)
+    else: 
+        x = radius * np.cos(t) 
+        z = radius * np.sin(t)
+    y = pitch * t/(2*np.pi)
+    curve = np.stack((x, y, z), axis=1)
+    return curve
+
 def plot_path(p_0, p_target, nb_points, type="line"):
     if type == "line":
         path, _ = generate_simple_line(p_0, p_target, nb_points)
