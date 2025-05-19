@@ -10,14 +10,23 @@ import matplotlib.animation as animation
 import numpy as np
 import pandas as pd
 import seaborn as sns
+<<<<<<< main
+=======
+from mpl_toolkits.mplot3d import Axes3D  # nécessaire pour l'import
+import matplotlib.pyplot as plt
+import plotly.graph_objects as go
+>>>>>>> local
 
-colors_default = plt.cm.tab10.colors
 from src.generate_path import (
     generate_curve,
     generate_demi_circle_path,
     generate_random_ondulating_path,
 )
+
 from src.simulation import rankine_vortex, uniform_velocity
+
+colors_default = ['purple', 'blue', 'green', 'orange', 'red', 'brown']
+
 
 def video_trajectory(
     fig,
@@ -132,6 +141,135 @@ def plot_trajectories(
             ax.set_title(f"Trajectories - a : {a} - circulation : {cir}")
 
 
+<<<<<<< main
+=======
+
+def plot_trajectories_3D(ax, trajectories_list, colors=None, label=None, title="", 
+                         type="", norm=None, a=None, cir=None, color_id=0):
+    if colors is None:
+        colors = colors_default
+
+    if isinstance(trajectories_list[0][0], np.ndarray):
+        for idx, list_state in enumerate(trajectories_list):
+            states = list_state[0]
+            color_id_t = max(idx, color_id)
+            ax.plot(
+                states[:, 0],
+                states[:, 1],
+                states[:, 2],
+                color=colors[color_id_t],
+                linewidth=0.9,
+                label=label,
+            )
+            ax.scatter(states[0, 0], states[0, 1], states[0, 2], color=colors[color_id_t], s=5)
+            ax.scatter(states[-1, 0], states[-1, 1], states[-1, 2], color=colors[color_id_t], s=5)
+    else:
+        states = trajectories_list
+        color_id_t = color_id
+        ax.plot(
+            states[:, 0],
+            states[:, 1],
+            states[:, 2],
+            color=colors[color_id_t],
+            linewidth=0.9,
+            label=label,
+        )
+        ax.scatter(states[0, 0], states[0, 1], states[0, 2], color=colors[color_id_t], s=5)
+        ax.scatter(states[-1, 0], states[-1, 1], states[-1, 2], color=colors[color_id_t], s=5)
+
+    ax.set_xlabel("x")
+    ax.set_ylabel("y")
+    ax.set_zlabel("z")
+
+    if title != "":
+        ax.set_title(f"{title}")
+    else:
+        if type == "uniform":
+            ax.set_title(f"Trajectories - norm : {norm}")
+        if type == "rankine":
+            ax.set_title(f"Trajectories - a : {a} - circulation : {cir}")
+
+def plot_interactif(path,trajectories_list,path_save_html,colors = None,color_id=0):
+    if colors is None:
+        colors = colors_default
+        
+
+    fig = go.Figure()
+
+    x = path[:, 0]
+    y = path[:, 1]
+    z = path[:, 2]
+    fig.add_trace(go.Scatter3d(
+        x=x, y=y, z=z,
+        mode='lines',
+        name="Path",
+        line=dict(color='black', width=4)
+    ))
+
+    if isinstance(trajectories_list[0][0], np.ndarray):
+        for idx, list_state in enumerate(trajectories_list):
+            states = list_state[0]
+            color_id_t = max(idx, color_id)
+            fig.add_trace(go.Scatter3d(
+                x=states[:, 0], y=states[:, 1], z=states[:, 2],
+                mode='lines',
+                name=f'Trajectory {idx}',
+                line=dict(color=colors[color_id_t], width=1)
+            ))
+            # Ajout du point de départ
+            fig.add_trace(go.Scatter3d(
+                x=[states[0, 0]], y=[states[0, 1]], z=[states[0, 2]],
+                mode='markers',
+                marker=dict(size=3, color=colors[color_id_t]),
+                name=f"Start {idx}"
+            ))
+            # Ajout du point d’arrivée
+            fig.add_trace(go.Scatter3d(
+                x=[states[-1, 0]], y=[states[-1, 1]], z=[states[-1, 2]],
+                mode='markers',
+                marker=dict(size=3, color=colors[color_id_t]),
+                name=f"End {idx}"
+            ))
+    else:
+        states = trajectories_list
+        color_id_t = color_id
+        fig.add_trace(go.Scatter3d(
+            x=states[:, 0], y=states[:, 1], z=states[:, 2],
+            mode='lines',
+            name='Trajectory',
+            line=dict(color=colors[color_id_t], width=1)
+        ))
+        fig.add_trace(go.Scatter3d(
+            x=[states[0, 0]], y=[states[0, 1]], z=[states[0, 2]],
+            mode='markers',
+            marker=dict(size=3, color=colors[color_id_t]),
+            name="Start"
+        ))
+        fig.add_trace(go.Scatter3d(
+            x=[states[-1, 0]], y=[states[-1, 1]], z=[states[-1, 2]],
+            mode='markers',
+            marker=dict(size=3, color=colors[color_id_t]),
+            name="End"
+        ))
+
+    # Mise en forme
+    fig.update_layout(
+        scene=dict(
+            xaxis_title='X',
+            yaxis_title='Y',
+            zaxis_title='Z',
+            xaxis=dict(showgrid=False),
+            yaxis=dict(showgrid=False),
+            zaxis=dict(showgrid=False),
+        ),
+        title="Trajectoires 3D interactives",
+        legend=dict(itemsizing='constant')
+    )
+
+    fig.write_html(path_save_html)
+
+           
+>>>>>>> local
 def plot_action(path, x, p_0, id_cp, action, id):
     plt.scatter(x[0], x[1], color=colors_default[id % 10])
     plt.annotate(

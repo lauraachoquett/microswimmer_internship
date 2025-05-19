@@ -164,6 +164,7 @@ def run_expe(config, agent_file="agents"):
         f = 4
         N = nb_episode / 2
 
+        
     print("Both pertubations : ", config["uniform_bg"] and config["rankine_bg"])
 
     ########### TRAINING LOOP ###########

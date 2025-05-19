@@ -11,7 +11,11 @@ colors = plt.cm.tab10.colors
 import copy
 
 from src.generate_path import generate_curve
+<<<<<<< main
 from src.plot import plot_trajectories,video_trajectory
+=======
+from src.plot import plot_trajectories,video_trajectory,plot_trajectories_3D,plot_interactif
+>>>>>>> local
 
 
 def evaluate_agent(
@@ -188,55 +192,70 @@ def evaluate_agent(
 
     if plot:
         path_save_fig = os.path.join(save_path_result_fig, file_name)
-        fig, ax = plt.subplots(figsize=(10, 8))
-        if obstacle_contour is not None:
-            ax.scatter(
-                obstacle_contour[:, 0], obstacle_contour[:, 1], color="black", s=0.2
+
+        if dim == 2:
+            fig, ax = plt.subplots(figsize=(10, 8))
+
+            if obstacle_contour is not None:
+                ax.scatter(obstacle_contour[:, 0], obstacle_contour[:, 1], color="black", s=0.2)
+
+            for elt in list_of_path_tree:
+                path, _ = elt
+                ax.plot(path[:, 0], path[:, 1], label="path", color="black", linewidth=1, zorder=0)
+
+            ylim = ax.get_ylim()
+            if ylim[1] - ylim[0] < 1 / 3:
+                ax.set_ylim(top=1.0, bottom=-1)
+
+            plot_trajectories(
+                ax,
+                states_list_per_episode[-4:],
+                path,
+                title,
+                a,
+                center,
+                cir,
+                dir,
+                norm,
+                plot_background,
+                type=type,
+                dim=dim,
             )
-        for elt in list_of_path_tree:
-            path, _ = elt
-            ax.plot(
-                path[:, 0],
-                path[:, 1],
-                label="path",
-                color="firebrick",
-                linewidth=1,
-                zorder=0,
+
+            ax.set_aspect("equal")
+            ax.set_axis_off()
+
+        elif dim == 3:
+            fig = plt.figure(figsize=(10, 8))
+            ax = fig.add_subplot(111, projection='3d')
+
+            for elt in list_of_path_tree:
+                path, _ = elt
+                ax.plot(path[:, 0], path[:, 1], path[:, 2], color="black", linewidth=2)
+
+            plot_trajectories_3D(
+                ax,
+                states_list_per_episode[-4:],
+                title=title,
+                type=type,
+                a=a,
+                cir=cir,
+                norm=norm,
             )
-        ylim = ax.get_ylim()
-        if ylim[1] - ylim[0] < 1 / 3:
-            ax.set_ylim(top=1.0, bottom=-1)
-        plot_trajectories(
-            ax,
-            states_list_per_episode[-4:],
-            path,
-            title,
-            a,
-            center,
-            cir,
-            dir,
-            norm,
-            plot_background,
-            type=type,
-        )
+            
 
         ax.set_aspect("equal")
         ax.set_axis_off()
 
         fig.savefig(path_save_fig, dpi=400, bbox_inches="tight")
         plt.close(fig)
-
         
-    # print(mean(v_hist))
-    # path_save_fig = os.path.join(save_path_result_fig, file_name + "_hist_v.png")
-    # plt.hist(v_hist, bins=50, color="blue", alpha=0.7)
-    # plt.axvline(
-    #     mean(v_hist), color="green", linestyle="dashed", linewidth=1.5, label="Mean"
-    # )
-    # plt.xlabel(r"$u_{bg} / \|U\|$")
-    # plt.legend()
-    # plt.savefig(path_save_fig, dpi=100, bbox_inches="tight")
-    # plt.close()
+        
+        
+    if dim == 3:
+        path_save_html =  os.path.join(save_path_result_fig, "trajectoires_3d.html")
+        plot_interactif(path,states_list_per_episode[-4:],path_save_html)
+
     return (
         rewards_per_episode,
         rewards_t_per_episode,
