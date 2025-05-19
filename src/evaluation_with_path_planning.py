@@ -34,7 +34,7 @@ from scipy.ndimage import gaussian_filter1d
 
 from src.analytic_solution_line import find_next_v
 from src.Astar_ani import astar_anisotropic, compute_v, contour_2D
-from src.data_loader import load_sdf_from_csv, vel_read
+from src.data_loader import load_sdf_from_csv, vel_read, load_sim_sdf
 from src.distance_to_path import min_dist_closest_point
 from src.evaluate_agent import evaluate_agent
 from src.fmm import compute_fmm_path
@@ -325,24 +325,20 @@ def load_config_path(path_to_config_path):
     parameters = config_path_a["parameters"]
     start_point = parameters["start_point"]
     goal_point = parameters["goal_point"]
-    domain_size = parameters["domain_size"]
     grid_size = parameters["grid_size"]
     ratio = parameters["ratio"]
     time = parameters["current_time"]
     path = np.load(config_path_a["path_path"], allow_pickle=False)
-
-    sdf_function, velocity_retina = sdf_func_and_velocity_func(domain_size, ratio)
-    x_new = np.linspace(0, domain_size[0], parameters["grid_size"][0])
-    y_new = np.linspace(0, domain_size[1], parameters["grid_size"][1])
-    X_new, Y_new = np.meshgrid(x_new, y_new)
+    sdf_func,velocity_retina,x_phys,y_phys,physical_width,physical_height,scale= load_sim_sdf(ratio)
+    X,Y = np.meshgrid(x_phys,y_phys)
     return (
         path,
         start_point,
         goal_point,
-        sdf_function,
+        sdf_func,
         velocity_retina,
-        X_new,
-        Y_new,
+        X,
+        Y,
         time,
         ratio,
         parameters,
@@ -357,9 +353,7 @@ def obstacle_and_path(
     type = '',
     path_to_config_path=None,
     ):
-    ratio = config_par_path['ratio']
     start_point = config_par_path['start_point']
-    scale = config_par_path['scale']
     B = config_par_path['B']
     c = config_par_path['c']
     heuristic_weight = config_par_path['heuristic_weight']
@@ -368,6 +362,7 @@ def obstacle_and_path(
     description = config_par_path['description']
     res_factor = config_par_path['res_factor']
     weight_sdf = config_par_path['weight_sdf']
+    max_radius = config_par_path['max_radius']
     
     current_time = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
     if path_to_config_path is not None:
@@ -379,30 +374,17 @@ def obstacle_and_path(
         print("Creation of config file...")
         config_path_a = {}
 
-        domain_size = (1 * scale, 1 * scale)
 
-        # Determine the size of the domain. It maps each point of the domain to each point on the grid.
-        x, y, N, h, sdf = load_sdf_from_csv(domain_size)
-        # Compute sdf and velocity interpolator regarding the size of the domain. x,y and sdf must have the same shape
-        sdf_function, velocity_retina = sdf_func_and_velocity_func(domain_size, ratio)
-
-        # sdf_function :  Calculate the sdf in any point of the domain py interpolation
-        # velocity_retina :  Calculate the velocity in any point of the domain py interpolation
-
-        start_point = (start_point[0] * scale, start_point[1] * scale)
-        goal_point = (goal_point[0] * scale, goal_point[1] * scale)
+        start_point = (start_point[0] * physical_width, start_point[1] * physical_height)
+        goal_point = (goal_point[0] * physical_width, goal_point[1] * physical_height)
 
         # Reduce the cell size by a factor : res_factor
-
-        grid_size = (N[0] * res_factor, N[1] * res_factor)
-        x_new = np.linspace(0, domain_size[0], grid_size[0])
-        y_new = np.linspace(0, domain_size[1], grid_size[1])
+        grid_size = (len(x_phys),len(y_phys))
+        
         parameters = {
-            "start_point": start_point,
-            "goal_point": goal_point,
+            "start_point": tuple(float(x) for x in start_point),
+            "goal_point": tuple(float(x) for x in goal_point),
             "grid_size": grid_size,
-            "domain_size": domain_size,
-            "ratio": ratio,
             "B": B,
             "heuristic_weight": heuristic_weight,
             "weight_sdf": weight_sdf,
@@ -421,31 +403,35 @@ def obstacle_and_path(
         if path_method == "astar":
             # Compute v0,vx and vy on this new domain with a certain size of cell
             v0, vx, vy, save_path_phi, save_path_flow = compute_v(
-                x_new, y_new, velocity_retina, B, grid_size, ratio, sdf_function, c,scale
+                x_phys, y_phys, velocity_retina, B, grid_size, ratio, sdf_func, c
             )
+            
             if type =='free' :
-                print('free')
                 v0 = np.ones_like(v0)
-                vx,vy = None,None
+                vx = None
+                vy = None
+                heuristic_weight = 0.0
+                max_radius=5
             if type =='v1':
-                print('v1')
-                h=0.1
-                pow_v0 = 1
-                pow_al = 0 
+                v0 = np.ones_like(v0)
+                pow_v0 = 0
+                pow_al = 0
+                heuristic_weight = 0.0
+                max_radius=5
 
             path, travel_time = astar_anisotropic(
-                x_new,
-                y_new,
+                x_phys,
+                y_phys,
                 v0,
                 vx,
                 vy,
                 start_point,
                 goal_point,
-                sdf_function,
+                sdf_func,
                 heuristic_weight=heuristic_weight,
-                weight_sdf=weight_sdf,
                 pow_v0=pow_v0,
                 pow_al=pow_al,
+                max_radius=max_radius
             )
 
             path = np.array(path)  # de forme (N, 2)
@@ -457,6 +443,7 @@ def obstacle_and_path(
         config_path_a["path_phi"] = save_path_phi
         config_path_a["path_flow"] = save_path_flow
         config_path_a['distances'] = distances
+        config_path_a = {k: float(v) if isinstance(v, np.float32) else v for k, v in config_path_a.items()}
 
         np.save(save_path_path, path, allow_pickle=False)
 
@@ -467,21 +454,20 @@ def obstacle_and_path(
             json.dump(config_path_a, f, indent=4)
             print("Config saved ")
 
-    X_new, Y_new = np.meshgrid(x_new, y_new)
-    obstacle_contour = contour_2D(sdf_function, X_new, Y_new, scale)
+    X, Y = np.meshgrid(x_phys, y_phys)
+    obstacle_contour = contour_2D(sdf_func, X, Y, scale)
 
     return (
         np.array(start_point),
         np.array(goal_point),
-        sdf_function,
+        sdf_func,
         path,
         obstacle_contour,
         velocity_retina,
         current_time,
     )
 
-def create_all_path(config_par_path,nb_points,failure_cases=False):
-    domain_size,X_new,Y_new,ratio,scale = grid(config_par_path)
+def create_all_path(config_par_path,nb_points,ratio=5,failure_cases=False):
 
 
     file_to_config_path_pre_list = []
@@ -506,7 +492,7 @@ def create_all_path(config_par_path,nb_points,failure_cases=False):
             with open(config_path, "r") as f:
                 config_path_a_star = json.load(f)
             parameters_bis = config_path_a_star["parameters"]
-            goal_points.append(list(np.array(parameters_bis['goal_point'])/scale))
+            goal_points.append(list(np.array(parameters_bis['goal_point'])/20))
             
     for item in dir_config_path.rglob("*.json"):
             file_name_path = os.path.join(dir_config_path, item.name)
@@ -556,16 +542,7 @@ def create_list_of_goal_point(n, start_point,ratio):
     ]
     return goal_points
 
-def grid(config_par_path):
-    N = config_par_path['N']
-    scale = config_par_path['scale']
-    ratio  = config_par_path['ratio']
-    grid_size = (N[0] * config_par_path['res_factor'], N[1] * config_par_path['res_factor'])
-    domain_size = (1 *  config_par_path['scale'], 1 *  config_par_path['scale'])
-    x_new = np.linspace(0, domain_size[0], grid_size[0])
-    y_new = np.linspace(0, domain_size[1], grid_size[1])
-    X_new, Y_new = np.meshgrid(x_new, y_new)
-    return domain_size,X_new,Y_new,ratio,scale
+
 
 if __name__ == "__main__":
     obstacle_type = "retina"
@@ -584,35 +561,36 @@ if __name__ == "__main__":
         config_par_path = yaml.safe_load(f)
           
     # file_to_config_path = create_all_path(config_par_path,500)
+    ratio = 5
+    sdf_func,velocity_retina,x_phys,y_phys,physical_width,physical_height,scale= load_sim_sdf(ratio)
+
     
-    domain_size,X_new,Y_new,ratio,scale = grid(config_par_path)
+    # file_to_config_path_g = f"config_path/velocity_ratio_{ratio}"
+    # file_to_config_path = str(create_numbered_run_folder(file_to_config_path_g))
+    file_to_config_path = 'config_path/velocity_ratio_5/42'
+    types = ['']
     
-    scale = config_par_path['scale']
-    file_to_config_path_g = f"config_path/velocity_ratio_{ratio}"
-    file_to_config_path = str(create_numbered_run_folder(file_to_config_path_g))
-    
-    types = ['free','v1','']
-    
-    # for type in types :
-    #     obstacle_and_path(
-    #         config_par_path,
-    #         goal_point = (10.79606786617848/20,12.296130605776128/20),
-    #         path_method="astar",
-    #         file_to_config_path=file_to_config_path,
-    #         type = type,
-    #     )
+    for type in types :
+        obstacle_and_path(
+            config_par_path,
+            goal_point = (10.79606786617848/20,12.296130605776128/20),
+            path_method="astar",
+            file_to_config_path=file_to_config_path,
+            type = type,
+        )
         
     start_time_eva = time.time()
     list_config_paths = []
-    dir_config_path = Path('config_path/velocity_ratio_5/31')
+    dir_config_path = Path(file_to_config_path)
 
     for item in dir_config_path.rglob("*.json"):
         list_config_paths.append(os.path.join(dir_config_path, item.name))
 
 
     print("Number of path : ",len(list_config_paths))
-    sdf_func, velocity_retina = sdf_func_and_velocity_func(domain_size, ratio)
-    obstacle_contour = contour_2D(sdf_func, X_new, Y_new, scale)
+    
+    X,Y = np.meshgrid(x_phys,y_phys)
+    obstacle_contour = contour_2D(sdf_func, X, Y, scale)
     print("Path generated - Go for evaluation")
     results = evaluate_after_training(
         agents_file,

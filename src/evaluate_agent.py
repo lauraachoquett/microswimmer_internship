@@ -11,11 +11,7 @@ colors = plt.cm.tab10.colors
 import copy
 
 from src.generate_path import generate_curve
-<<<<<<< main
 from src.plot import plot_trajectories,video_trajectory
-=======
-from src.plot import plot_trajectories,video_trajectory,plot_trajectories_3D,plot_interactif
->>>>>>> local
 
 
 def evaluate_agent(
@@ -37,6 +33,7 @@ def evaluate_agent(
     velocity_func_l=None,
     video=False
 ):
+    dim=2
     config = copy.deepcopy(config)
     parameters = copy.deepcopy(parameters)
     rewards_per_episode = []

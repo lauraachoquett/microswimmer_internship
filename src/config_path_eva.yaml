@@ -10,4 +10,5 @@ c: 0.44
 B: 1.57
 pow_v0: 7
 pow_al: 5
+max_radius : 3
 description: "cant swim against the current (condition over v_l @ d >0), v0**7 and alignment ** 5"

@@ -15,6 +15,22 @@ from src.data_loader import load_sdf_from_csv, vel_read,load_sim_sdf
 from src.fmm import sdf_func_and_velocity_func
 from src.sdf import get_contour_coordinates
 
+from math import gcd, sqrt
+
+def generate_directions(max_radius):
+    directions = set()
+    for dx in range(-max_radius, max_radius + 1):
+        for dy in range(-max_radius, max_radius + 1):
+            if dx == 0 and dy == 0:
+                continue
+            distance = sqrt(dx**2 + dy**2)
+            if distance <= max_radius:
+                # Réduction de la direction (évite les doublons comme (2,2) si (1,1) est déjà là)
+                g = gcd(abs(dx), abs(dy))
+                reduced = (dx // g, dy // g)
+                directions.add(reduced)
+    return list(directions)
+
 
 def contour_2D(sdf_function, X_new, Y_new, scale):
     if os.path.exists(f"data/retina2D_contour_scale_{scale}.npy"):
@@ -46,7 +62,8 @@ def astar_anisotropic(
     heuristic_weight=1.0,
     weight_sdf=1,
     pow_v0=1,
-    pow_al=1
+    pow_al=1,
+    max_radius=2,
 ):
     """
     Implémentation de l'algorithme A* adapté pour les écoulements anisotropes.
@@ -72,7 +89,8 @@ def astar_anisotropic(
     i_goal = np.argmin(np.abs(x - goal_point[0]))
     j_goal = np.argmin(np.abs(y - goal_point[1]))
 
-    dir_offsets = [(1, 0), (1, 1), (0, 1), (-1, 1), (-1, 0), (-1, -1), (0, -1), (1, -1)]
+    dir_offsets = generate_directions(max_radius)
+    print("Number of directions : ", len(dir_offsets))
     move_costs = precalculate_move_costs(
         v0, vx, vy, dir_offsets, dx, dy, weight_sdf, pow_v0,pow_al
     )
@@ -112,7 +130,7 @@ def astar_anisotropic(
 
         closed_set.add((current_i, current_j))
 
-        for di, dj in dir_offsets:
+        for d_idx,(di, dj) in enumerate(dir_offsets):
             neighbor_i, neighbor_j = current_i + di, current_j + dj
 
             if not (0 <= neighbor_i < nx and 0 <= neighbor_j < ny):
@@ -123,7 +141,7 @@ def astar_anisotropic(
             if (neighbor_i, neighbor_j) in closed_set:
                 continue
 
-            cost = move_costs[current_j, current_i, dir_offsets.index((di, dj))]
+            cost = move_costs[current_j, current_i, d_idx]
             if cost == np.inf:
                 continue
 
@@ -322,6 +340,8 @@ def plot_different_path(files_path,label_list,x_new,y_new,sdf_function,vx,vy,v0,
     
     for id,file_path in enumerate(files_path) : 
         path = np.load(file_path)
+        path,distances = resample_path(path, len(path))
+        print(f"{file_path} distances : {distances}")
         visualize_results_a_star(
             x_new, y_new, sdf_function, path, vx, vy,v0,scale,label = label_list[id],color = palette[id]
         )
@@ -351,13 +371,12 @@ if __name__ == "__main__":
     c = 0.4
     # Compute v0,vx and vy on this new domain.
     plt.figure(figsize=(12, 10))
-    weight_sdf = 1
     start_point = (physical_width * 0.98, physical_height * 0.3)
     # goal_point = (goal_point[0] * scale, goal_point[1] * scale)
     # goal_point = (17.095518023108937/20,12.52076514689449/20)
     goal_point =  (5.762615626076424/20,16.142539758719423/20)
     # goal_point=(7.855210513776498,19.169570750237117)
-    # goal_point = ( 8.670006951086492,10.962489435445624)
+    goal_point = (10.79606786617848/20, 12.296130605776128/20)
     goal_point = (physical_width * goal_point[0], physical_height * goal_point[1])
     print('distance between the two points : ',  np.linalg.norm(np.array(goal_point)-np.array(start_point)))
     B = 5
@@ -365,65 +384,70 @@ if __name__ == "__main__":
     pow_v0 = 4
     pow_al = 7
 
-
+    max_radius = 3
     shortest_geo_path = False
     v1 = False
     grid_size = (len(x_phys),len(y_phys))
     v0, vx, vy, _, _ = compute_v(
         x_phys, y_phys, velocity_retina, B, grid_size, ratio, sdf_func, c
     )
-    print("Shape : ")
-    print(v0.shape)
-    print(vx.shape)
-    print(vy.shape)
+    
     if shortest_geo_path: 
         v0 = np.ones_like(v0)
         vx = None
         vy = None
-        h = 0.1
+        h = 0.0
+        max_radius=5
     
     if v1 : 
         v0 = np.ones_like(v0)
-        pow_v0 = 1 
+        pow_v0 = 0
         pow_al = 0
-        h = 0.1
+        h = 0.0
+        max_radius=5
     
         
-        
-    start_time = time.time()
-    # Compute the path
-    path, travel_time = astar_anisotropic(
-        x_phys,
-        y_phys,
-        v0,
-        vx,
-        vy,
-        start_point,
-        goal_point,
-        sdf_func,
-        heuristic_weight=h,
-        pow_v0=pow_v0,
-        pow_al=pow_al
-    )
-    # path = shortcut_path(path,is_collision_free,sdf_interpolator)
-    print("Travel time :", travel_time)
+    for pow_v0 in np.linspace(0,10,5):
+        start_time = time.time()
+        # Compute the path
+        path, travel_time = astar_anisotropic(
+            x_phys,
+            y_phys,
+            v0,
+            vx,
+            vy,
+            start_point,
+            goal_point,
+            sdf_func,
+            heuristic_weight=h,
+            pow_v0=pow_v0,
+            pow_al=pow_al,
+            max_radius=max_radius
+        )
+        # path = shortcut_path(path,is_collision_free,sdf_interpolator)
+        print("Travel time :", travel_time)
 
-    path = np.array(path)  # de forme (N, 2)
-    dist = np.array([abs(path[i + 1] - path[i]) for i in range(len(path) - 1)])
-    print("path before resampling :", len(path))
-    n = ceil(np.max(dist) / (5 * 1e-3))
-    if n > 1:
-        path,distances = resample_path(path, len(path) * n)
-    print("after resampling : ", len(path))
-    smoothed_x = gaussian_filter1d(path[:, 0], sigma=30)
-    smoothed_y = gaussian_filter1d(path[:, 1], sigma=30)
-    path = np.stack([smoothed_x, smoothed_y], axis=1)
-    print("Path length : ",distances)
-    X, Y = np.meshgrid(x_phys, y_phys)
-    visualize_results_a_star(
-        X, Y, sdf_func, path, vx, vy,v0,scale,label = 'path'
-    )
-    plot_velocity(6,vx,vy,v0,X,Y)
+        path = np.array(path)  # de forme (N, 2)
+        dist = np.array([abs(path[i + 1] - path[i]) for i in range(len(path) - 1)])
+        print("path before resampling :", len(path))
+        n = ceil(np.max(dist) / (5 * 1e-3))
+        if n > 1:
+            path,distances = resample_path(path, len(path) * n)
+        print("after resampling : ", len(path))
+        smoothed_x = gaussian_filter1d(path[:, 0], sigma=30)
+        smoothed_y = gaussian_filter1d(path[:, 1], sigma=30)
+        path = np.stack([smoothed_x, smoothed_y], axis=1)
+        print("Path length : ",distances)
+        X, Y = np.meshgrid(x_phys, y_phys)
+        visualize_results_a_star(
+            X, Y, sdf_func, path, vx, vy,v0,scale,label = f' a : {pow_v0}'
+        )
+        end_time = time.time()
+        elapsed_time = (end_time - start_time) / 60
+        print("Execution time:", elapsed_time, "minutes")
+        
+    if vx is None or vy is None : 
+        plot_velocity(6,vx,vy,v0,X,Y)
     plt.legend()
     current_time = datetime.now().strftime("%m-%d_%H-%M-%S")
     plt.gca().set_aspect("equal", adjustable="box")
@@ -434,13 +458,10 @@ if __name__ == "__main__":
     plt.close()
 
     
-    save_path_path = f"data/retina2D_path_time_4_v1_bg.npy"
-    np.save(save_path_path, path, allow_pickle=False)
+    # save_path_path = f"data/retina2D_path_time_4_v1_bg.npy"
+    # np.save(save_path_path, path, allow_pickle=False)
 
     
-    end_time = time.time()
-    elapsed_time = (end_time - start_time) / 60
-    print("Execution time:", elapsed_time, "minutes")
     # files_path = ['data/retina2D_path_time_4_free_bg.npy','data/retina2D_path_time_4_v1_bg.npy','data/retina2D_path_time_4_v2_bg.npy']
     # label_list = ['Shortest geometrical path','Algorithm 1', 'Algorithm 2']
     # plot_different_path(files_path,label_list,x_phys,y_phys,sdf_func,vx,vy,v0,scale)

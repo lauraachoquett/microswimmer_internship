@@ -21,35 +21,31 @@ class MicroSwimmer(gym.Env):
         bounce_thr=0,
         in_3D = False,
     ):
-    if in_3D :
-        dim = 3
-    else :
-        dim = 2
-        
-    super(MicroSwimmer, self).__init__()
-    self.n_lookahead = n_lookahead
-    self.action_space = gym.spaces.Box(
-        shape=(dim,), low=-np.inf, high=np.inf, dtype=np.float32
-    )
-    if velocity_bool:
-        base = 1 + 1 #Position and velocity
-        if velocity_ahead:
-            base += 2 * self.n_lookahead #Velocity and Position of points ahead
+        super(MicroSwimmer, self).__init__()
+        self.n_lookahead = n_lookahead
+        dim=2
+        self.action_space = gym.spaces.Box(
+            shape=(dim,), low=-np.inf, high=np.inf, dtype=np.float32
+        )
+        if velocity_bool:
+            base = 1 + 1 #Position and velocity
+            if velocity_ahead:
+                base += 2 * self.n_lookahead #Velocity and Position of points ahead
+            else:
+                base += self.n_lookahead  # Position of points ahead
+            if add_action:
+                base += 1 #Past action in the state
         else:
-            base += self.n_lookahead  # Position of points ahead
-        if add_action:
-            base += 1 #Past action in the state
-    else:
-        base = 1 + self.n_lookahead #Current position and points ahead
+            base = 1 + self.n_lookahead #Current position and points ahead
 
 
-        
-    self.observation_space = gym.spaces.Box(
-        shape=(dim * base,),
-        low=-np.inf,
-        high=np.inf,
-        dtype=np.float32,
-    )
+            
+        self.observation_space = gym.spaces.Box(
+            shape=(dim * base,),
+            low=-np.inf,
+            high=np.inf,
+            dtype=np.float32,
+        )
 
         self.x = x_0
         self.x_0 = x_0
