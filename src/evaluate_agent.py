@@ -34,6 +34,7 @@ def evaluate_agent(
     velocity_func_l=None,
     video=False
 ):
+    dim=2
     config = copy.deepcopy(config)
     parameters = copy.deepcopy(parameters)
     rewards_per_episode = []
@@ -224,7 +225,6 @@ def evaluate_agent(
                 norm,
                 plot_background,
                 type=type,
-                dim=dim,
             )
 
             ax.set_aspect("equal")
