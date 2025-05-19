@@ -94,6 +94,7 @@ def astar_anisotropic(
     move_costs = precalculate_move_costs(
         v0, vx, vy, dir_offsets, dx, dy, weight_sdf, pow_v0,pow_al
     )
+    print("Cost computed")
     if sdf_function(goal_point)>0 or sdf_function(start_point)>0:
         print("Invalid points")
         print(sdf_function(goal_point))
@@ -222,7 +223,7 @@ def heuristic(i1, j1, i2, j2, dx, dy):
     return distance / v_max
 
 def plot_velocity(step,vx,vy,v0,X,Y):
-    step = 8
+    step = 6
 
     X_sub = X[::step, ::step]
     Y_sub = Y[::step, ::step]
@@ -236,13 +237,13 @@ def plot_velocity(step,vx,vy,v0,X,Y):
     Y_masked = Y_sub[mask]
     vx_masked = vx_sub[mask]
     vy_masked = vy_sub[mask]
-    plt.imshow(
-        v0,
-        extent=[X.min(), X.max(), Y.min(), Y.max()],
-        origin='lower',
-        cmap='Reds',
-        alpha=0.7
-    )
+    # plt.imshow(
+    #     v0,
+    #     extent=[X.min(), X.max(), Y.min(), Y.max()],
+    #     origin='lower',
+    #     cmap='Reds',
+    #     alpha=0.7
+    # )
     plt.colorbar(label='v0')
 
     plt.quiver(
@@ -383,7 +384,7 @@ if __name__ == "__main__":
     print('distance between the two points : ',  np.linalg.norm(np.array(goal_point)-np.array(start_point)))
     B = 5
     h = 0
-    pow_v0 = 1
+    pow_v0 = 5
     pow_al = 0
 
     max_radius = 3
@@ -409,7 +410,7 @@ if __name__ == "__main__":
         max_radius=5
     
         
-    for pow_v0 in np.linspace(0,10,5):
+    for pow_al in np.linspace(0,10,5):
         start_time = time.time()
         # Compute the path
         path, travel_time = astar_anisotropic(
@@ -442,13 +443,13 @@ if __name__ == "__main__":
         print("Path length : ",distances)
         X, Y = np.meshgrid(x_phys, y_phys)
         visualize_results_a_star(
-            X, Y, sdf_func, path, vx, vy,v0,scale,label = f' a : {pow_v0}'
+            X, Y, sdf_func, path, vx, vy,v0,scale,label = f' b : {pow_al}'
         )
         end_time = time.time()
         elapsed_time = (end_time - start_time) / 60
         print("Execution time:", elapsed_time, "minutes")
         
-    if vx is None or vy is None : 
+    if vx is not None and vy is not None : 
         plot_velocity(6,vx,vy,v0,X,Y)
     plt.legend()
     current_time = datetime.now().strftime("%m-%d_%H-%M-%S")
