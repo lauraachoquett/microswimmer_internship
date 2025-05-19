@@ -70,6 +70,7 @@ def evaluate_after_training(
     title_add="",
     list_config_paths=[],
     sigma=10,
+    file_path_result=None,
     ):
     np.random.seed(seed)
     random.seed(seed)
@@ -79,9 +80,10 @@ def evaluate_after_training(
 
     uniform_bg = False
     rankine_bg = False
-    file_path_result_global = "grid_search"
-    file_path_result = str(create_numbered_run_folder(file_path_result_global))
-    os.makedirs(file_path_result, exist_ok=True)
+    if file_path_result is None :
+        file_path_result_global = "grid_search"
+        file_path_result = str(create_numbered_run_folder(file_path_result_global))
+        os.makedirs(file_path_result, exist_ok=True)
 
     file_name_result = os.path.join(
         file_path_result, f"result_evaluation_{obstacle_type}_{title_add}.json"
@@ -127,6 +129,7 @@ def evaluate_after_training(
             if agent_name in results.keys():
                 results_per_config = results[agent_name]["results_per_config"]
                 if path_to_config in results[agent_name]["results_per_config"]:
+                    print('already evaluated')
                     continue
             else:
                 results_per_config = {}
@@ -142,6 +145,7 @@ def evaluate_after_training(
                 ratio,
                 parameters,
             ) = load_config_path(path_to_config)
+            print("Path length  : ",len(path))
             if len(path) == 0 :
                 print("Path empty : ", path_config['path_path'])
                 continue
@@ -363,6 +367,7 @@ def obstacle_and_path(
     res_factor = config_par_path['res_factor']
     weight_sdf = config_par_path['weight_sdf']
     max_radius = config_par_path['max_radius']
+    ratio = config_par_path['ratio']
     
     current_time = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
     if path_to_config_path is not None:
@@ -391,6 +396,7 @@ def obstacle_and_path(
             "c": c,
             "pow_v0": pow_v0,
             "pow_al": pow_al,
+            "max_radius":max_radius,
             "method": path_method,
             "current_time": current_time,
             "type" : type,
@@ -442,7 +448,7 @@ def obstacle_and_path(
         config_path_a["path_path"] = save_path_path
         config_path_a["path_phi"] = save_path_phi
         config_path_a["path_flow"] = save_path_flow
-        config_path_a['distances'] = distances
+        config_path_a['distances'] = tuple(float(x) for x in distanes)
         config_path_a = {k: float(v) if isinstance(v, np.float32) else v for k, v in config_path_a.items()}
 
         np.save(save_path_path, path, allow_pickle=False)
@@ -568,16 +574,16 @@ if __name__ == "__main__":
     # file_to_config_path_g = f"config_path/velocity_ratio_{ratio}"
     # file_to_config_path = str(create_numbered_run_folder(file_to_config_path_g))
     file_to_config_path = 'config_path/velocity_ratio_5/42'
-    types = ['']
+    # types = ['']
     
-    for type in types :
-        obstacle_and_path(
-            config_par_path,
-            goal_point = (10.79606786617848/20,12.296130605776128/20),
-            path_method="astar",
-            file_to_config_path=file_to_config_path,
-            type = type,
-        )
+    # for type in types :
+    #     obstacle_and_path(
+    #         config_par_path,
+    #         goal_point = (10.79606786617848/20,12.296130605776128/20),
+    #         path_method="astar",
+    #         file_to_config_path=file_to_config_path,
+    #         type = type,
+    #     )
         
     start_time_eva = time.time()
     list_config_paths = []
@@ -600,6 +606,7 @@ if __name__ == "__main__":
         sdf_func=sdf_func,
         list_config_paths=list_config_paths,
         sigma= config_par_path['sigma'],
+        file_path_result = None,
     )
     end_time_eva = time.time()
     elapsed_time = (end_time_eva - start_time_eva) / 60

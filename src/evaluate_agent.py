@@ -216,7 +216,6 @@ def evaluate_agent(
                 norm,
                 plot_background,
                 type=type,
-                dim=dim,
             )
 
             ax.set_aspect("equal")

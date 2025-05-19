@@ -200,9 +200,11 @@ def precalculate_move_costs(v0, vx, vy, dir_offsets, dx, dy, weight_sdf, pow_v0,
                         alignment = 1
                     alignment = alignment ** (pow_al)
                     effective_speed = flow_component * alignment
-                    effective_speed = v0[j, i] ** (pow_v0) * max(effective_speed, 0.001)
+                    neighbor_i = min(nx-1,max(0,i+di))
+                    neighbor_j = min(ny-1,max(0,j+dj))
+                    effective_speed = v0[neighbor_j,neighbor_i] ** (pow_v0) * max(effective_speed, 0.001)
                     if pow_al > 0  or pow_v0 > 0:
-                        if v_l @ d > 0 and v0[j, i] > 0:
+                        if v_l @ d > 0 and v0[neighbor_j,neighbor_i] > 0:
                             move_costs[j, i, d_idx] = distance / effective_speed
                     else : 
                         if flow_component > 0:
@@ -380,9 +382,9 @@ if __name__ == "__main__":
     goal_point = (physical_width * goal_point[0], physical_height * goal_point[1])
     print('distance between the two points : ',  np.linalg.norm(np.array(goal_point)-np.array(start_point)))
     B = 5
-    h = 2
-    pow_v0 = 4
-    pow_al = 7
+    h = 0
+    pow_v0 = 1
+    pow_al = 0
 
     max_radius = 3
     shortest_geo_path = False
