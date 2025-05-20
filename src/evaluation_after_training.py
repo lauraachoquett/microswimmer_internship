@@ -243,24 +243,58 @@ if __name__ == "__main__":
     # offset=0.2
     # compare_p_line(agent_name,config_eval_comp,'comparison_north_02',save_path_eval,u_bg,'',offset)
 
-    agents_file = [
-        agent_name,
-        'agents/agent_TD3_2025-05-16_15-12',
-        'agents/agent_TD3_2025-05-16_16-11'
-    ]
+    print("Agents files : ", agents_file)
+    types = ["ondulating", "line"]
+    title_add = "rankine_a_05__cir_3_center_1_075"
+    print("--------------------- Evaluation with rankine bg ---------------------")
+    for type in types:
+        a = 0.5
+        cir = 2
+        center = np.array([1, 3 / 4])
+        results = evaluate_after_training(
+            agents_file,
+            type=type,
+            p_target=[2, 0],
+            p_0=[0, 0],
+            title_add=title_add,
+            a=a,
+            center=center,
+            cir=cir,
+        )
+        rank_agents_by_rewards(results)
 
-    # directory_path = Path("agents/")
+    print("--------------------- Evaluation with no bg ---------------------")
+    title_add = "free"
+    for type in types:
+        results = evaluate_after_training(
+            agents_file,
+            type=type,
+            p_target=[2, 0],
+            p_0=[0, 0],
+            title_add=title_add,
+        )
+        rank_agents_by_rewards(results)
 
-    # for item in directory_path.iterdir():
-    #     if item.is_dir() and "agent_TD3" in item.name:
-    #         if "2025-04-23" in item.name or "2025-04-22" in item.name:
-    #             agents_file.append(os.path.join(directory_path, item.name))
+    norm = 0.5
+    dict = {
+        "east_05": np.array([1, 0]),
+        "west_05": np.array([-1, 0]),
+        "north_05": np.array([0, 1]),
+        "south_05": np.array([0, -1]),
+    }
+    print("---------------------Evaluation with uniform bg---------------------")
+    for type in types:
+        for title_add, dir in dict.items():
+            results = evaluate_after_training(
+                agents_file,
+                type=type,
+                p_target=[2, 0],
+                p_0=[0, 0],
+                title_add=title_add,
+                dir=dir,
+                norm=norm,
+            )
+            rank_agents_by_rewards(results)
 
-    
-    results = evaluate_after_training(
-        agents_file,
-        type= 'helix',
-    )
-    rank_agents_by_rewards(results)
 
 

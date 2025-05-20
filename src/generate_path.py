@@ -112,9 +112,9 @@ if __name__ == "__main__":
     p_target = np.array([2, 0])
     nb_points = 200
     # plot_path(p_0,p_target,nb_points,'line')
-    A = 2
+    A = 1
     N = 400
-    f = 4
+    f = 2
     n_values = np.linspace(1, 700, 700, dtype=int)
     output = [func_k_max(A, N, f, n) for n in n_values]
     nb_points = 700

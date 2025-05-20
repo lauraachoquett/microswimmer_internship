@@ -170,7 +170,6 @@ if __name__ == "__main__":
         return(sdf_interp_phys(point[::-1]))
     
     print("Shape new sdf:", sdf_phys.shape)
-    print("Min new sdf:", np.min(sdf_phys))
     
     plt.figure(figsize=(8, 6))
     contour = plt.contourf(X_phys, Y_phys, sdf_phys, levels=100, cmap="Reds")
@@ -181,8 +180,8 @@ if __name__ == "__main__":
     start_point = (physical_width * 0.98, physical_height * 0.3)
     goal_point = (physical_width * 0.54, physical_height * 0.675)
     
-    print(sdf_func_phys(start_point))
-    print(sdf_func_phys(goal_point))
+    # print(sdf_func_phys(start_point))
+    # print(sdf_func_phys(goal_point))
     
     
     plt.scatter(goal_point[0], goal_point[1], color="black", s=5)

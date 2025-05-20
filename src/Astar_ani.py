@@ -231,7 +231,7 @@ def plot_velocity(step,vx,vy,v0,X,Y):
     vy_sub = vy[::step, ::step]
     v0_sub = v0[::step, ::step]
     print(v0_sub.shape)
-    mask = ((vx_sub != 0) | (vy_sub != 0))  & (v0_sub>0.2)
+    mask = ((vx_sub != 0) | (vy_sub != 0))  & (v0_sub>0.15)
 
     X_masked = X_sub[mask]
     Y_masked = Y_sub[mask]
@@ -244,14 +244,14 @@ def plot_velocity(step,vx,vy,v0,X,Y):
     #     cmap='Reds',
     #     alpha=0.7
     # )
-    plt.colorbar(label='v0')
+    # plt.colorbar(label='v0')
 
     plt.quiver(
         X_masked,
         Y_masked,
         vx_masked,
         vy_masked,
-        color="darkred",
+        color="grey",
         scale=80,
         alpha=0.5,
     )
@@ -383,11 +383,11 @@ if __name__ == "__main__":
     goal_point = (physical_width * goal_point[0], physical_height * goal_point[1])
     print('distance between the two points : ',  np.linalg.norm(np.array(goal_point)-np.array(start_point)))
     B = 5
-    h = 0
-    pow_v0 = 5
-    pow_al = 0
-
+    h = 2
+    pow_v0 = 7
+    pow_al = 5
     max_radius = 3
+    
     shortest_geo_path = False
     v1 = False
     grid_size = (len(x_phys),len(y_phys))
@@ -410,44 +410,43 @@ if __name__ == "__main__":
         max_radius=5
     
         
-    for pow_al in np.linspace(0,10,5):
-        start_time = time.time()
-        # Compute the path
-        path, travel_time = astar_anisotropic(
-            x_phys,
-            y_phys,
-            v0,
-            vx,
-            vy,
-            start_point,
-            goal_point,
-            sdf_func,
-            heuristic_weight=h,
-            pow_v0=pow_v0,
-            pow_al=pow_al,
-            max_radius=max_radius
-        )
-        # path = shortcut_path(path,is_collision_free,sdf_interpolator)
-        print("Travel time :", travel_time)
+    start_time = time.time()
+    # Compute the path
+    path, travel_time = astar_anisotropic(
+        x_phys,
+        y_phys,
+        v0,
+        vx,
+        vy,
+        start_point,
+        goal_point,
+        sdf_func,
+        heuristic_weight=h,
+        pow_v0=pow_v0,
+        pow_al=pow_al,
+        max_radius=max_radius
+    )
+    # path = shortcut_path(path,is_collision_free,sdf_interpolator)
+    print("Travel time :", travel_time)
 
-        path = np.array(path)  # de forme (N, 2)
-        dist = np.array([abs(path[i + 1] - path[i]) for i in range(len(path) - 1)])
-        print("path before resampling :", len(path))
-        n = ceil(np.max(dist) / (5 * 1e-3))
-        if n > 1:
-            path,distances = resample_path(path, len(path) * n)
-        print("after resampling : ", len(path))
-        smoothed_x = gaussian_filter1d(path[:, 0], sigma=30)
-        smoothed_y = gaussian_filter1d(path[:, 1], sigma=30)
-        path = np.stack([smoothed_x, smoothed_y], axis=1)
-        print("Path length : ",distances)
-        X, Y = np.meshgrid(x_phys, y_phys)
-        visualize_results_a_star(
-            X, Y, sdf_func, path, vx, vy,v0,scale,label = f' b : {pow_al}'
-        )
-        end_time = time.time()
-        elapsed_time = (end_time - start_time) / 60
-        print("Execution time:", elapsed_time, "minutes")
+    path = np.array(path)  # de forme (N, 2)
+    dist = np.array([abs(path[i + 1] - path[i]) for i in range(len(path) - 1)])
+    print("path before resampling :", len(path))
+    n = ceil(np.max(dist) / (5 * 1e-3))
+    if n > 1:
+        path,distances = resample_path(path, len(path) * n)
+    print("after resampling : ", len(path))
+    smoothed_x = gaussian_filter1d(path[:, 0], sigma=30)
+    smoothed_y = gaussian_filter1d(path[:, 1], sigma=30)
+    path = np.stack([smoothed_x, smoothed_y], axis=1)
+    print("Path length : ",distances)
+    X, Y = np.meshgrid(x_phys, y_phys)
+    visualize_results_a_star(
+        X, Y, sdf_func, path, vx, vy,v0,scale,label = f'path'
+    )
+    end_time = time.time()
+    elapsed_time = (end_time - start_time) / 60
+    print("Execution time:", elapsed_time, "minutes")
         
     if vx is not None and vy is not None : 
         plot_velocity(6,vx,vy,v0,X,Y)
@@ -457,7 +456,7 @@ if __name__ == "__main__":
     plt.axis("off")
     plt.title("Path")
     plt.tight_layout()
-    plt.savefig(f"fig/Astar_ani_test_{current_time}.png", dpi=300, bbox_inches="tight")
+    plt.savefig(f"fig/Astar_ani_test_{current_time}_pow_al_0.png", dpi=300, bbox_inches="tight")
     plt.close()
 
     
