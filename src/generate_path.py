@@ -6,6 +6,13 @@ from scipy.interpolate import CubicSpline
 
 # from .utils import courbures
 
+def random_radius_pitch(n,nb_episodes):
+    R_max = 1/8 + (2-1/8) * n / nb_episodes
+    pitch_min = 2.5 + (1/8-2.5) * n / nb_episodes
+    R = np.random.uniform(1/8, R_max)
+    pitch = np.random.uniform(pitch_min, 2.5)
+    return R, pitch
+
 
 def generate_simple_line(p_0, p_target, nb_points):
     t = np.linspace(0, 1, nb_points)

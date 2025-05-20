@@ -12,7 +12,7 @@ colors = plt.cm.tab10.colors
 import copy
 
 from src.generate_path import generate_curve
-from src.plot import plot_trajectories,video_trajectory,plot_trajectories_3D
+from src.plot import plot_trajectories,video_trajectory,plot_trajectories_3D,plot_html_3d
 
 
 def evaluate_agent(
@@ -34,36 +34,42 @@ def evaluate_agent(
     velocity_func_l=None,
     video=False
 ):
-    dim=2
     config = copy.deepcopy(config)
     parameters = copy.deepcopy(parameters)
-    rewards_per_episode = []
-    t_max = config["t_max"]
+    
+    dim =  config['dim']
+    
+    p_0 = config["p_0"]
     p_target = config["p_target"]
-    steps_per_action = config["steps_per_action"]
+    
     t_max = config["t_max"]
+    steps_per_action = config["steps_per_action"]
     Dt_action = config["Dt_action"]
     Dt_sim = Dt_action / steps_per_action
-    p_0 = config["p_0"]
     beta = config["beta"]
-    dim =  config['dim']
+    D = config["D"]
+    threshold = config["threshold"]
+    x = config["x_0"]
+    
     iter = 0
     episode_num = 0
     episode_reward = 0
     episode_rew_t = 0
     episode_rew_d = 0
+    rewards_per_episode = []
     rewards_t_per_episode = []
     rewards_d_per_episode = []
-
     states_episode = []
     states_list_per_episode = []
-    u_bg = config["u_bg"]
-    D = config["D"]
-    type = ""
-    threshold = config["threshold"]
-    x = config["x_0"]
     count_succes = 0
     v_hist = []
+
+    
+    u_bg = np.zeros(dim)
+    velocity_func = lambda x: u_bg
+    
+    type = ""
+    
     if random_parameters:
         dir, norm, center, a, cir = random_bg_parameters()
     else:
@@ -72,13 +78,13 @@ def evaluate_agent(
                 dir, norm = parameters
                 dir = np.array(dir)
                 type = "uniform"
-                center, a, cir = np.zeros(2), 0, 0
+                center, a, cir = np.zeros(dim), 0, 0
             if config["rankine_bg"]:
                 type = "rankine"
                 center, a, cir = parameters
-                dir, norm = np.zeros(2), 0
+                dir, norm = np.zeros(dim), 0
         else:
-            dir, norm, center, a, cir = np.zeros(2), 0, np.zeros(2), 0, 0
+            dir, norm, center, a, cir = np.zeros(dim), 0, np.zeros(dim), 0, 0
 
     if u_bg.any() != 0:
         type = "uniform"
@@ -86,11 +92,13 @@ def evaluate_agent(
         dir = np.array(u_bg / norm)
         plot_background = True
     velocity_func = None
+    
     if velocity_func_l is not None:
         velocity_func = lambda x: velocity_func_l(x).squeeze()
 
     if config["uniform_bg"]:
         velocity_func = lambda x: uniform_velocity(dir, norm)
+        
     elif config["rankine_bg"]:
         velocity_func = lambda x: rankine_vortex(x, a, center, cir)
 
@@ -147,7 +155,6 @@ def evaluate_agent(
             states_list_per_episode.append([np.array(states_episode), iter])
             iter = 0
             episode_num += 1
-            x = p_0
             states_episode = []
             rewards_per_episode.append(episode_reward)
             rewards_t_per_episode.append(episode_rew_t)
@@ -155,7 +162,12 @@ def evaluate_agent(
             episode_reward = 0
             episode_rew_t = 0
             episode_rew_d = 0
+            
+            ## Other path ##
             path, tree = list_of_path_tree[episode_num % nb_of_path]
+            p_0 = path[0]
+            p_target = path[-1]
+            x = p_0
             T,N,B = compute_frenet_frame(path,dim)
             ## Reset ##
             state, done = env.reset(tree, path,T, velocity_func,N,B), False
@@ -168,16 +180,15 @@ def evaluate_agent(
             ax.scatter(
                 obstacle_contour[:, 0], obstacle_contour[:, 1], color="black", s=0.2
             )
-        for elt in list_of_path_tree:
-            path, _ = elt
-            ax.plot(
-                path[:, 0],
-                path[:, 1],
-                label="path",
-                color="firebrick",
-                linewidth=1,
-                zorder=0,
-            )
+        path = list_of_path_tree[0][0]
+        ax.plot(
+            path[:, 0],
+            path[:, 1],
+            label="path",
+            color="firebrick",
+            linewidth=1,
+            zorder=0,
+        )
         ylim = ax.get_ylim()
         if ylim[1] - ylim[0] < 1 / 3:
             ax.set_ylim(top=1.0, bottom=-1)
@@ -198,7 +209,7 @@ def evaluate_agent(
 
     if plot:
         path_save_fig = os.path.join(save_path_result_fig, file_name)
-
+        save_path_html = os.path.join(save_path_result_fig, file_name+"_3D.html")
         if dim == 2:
             fig, ax = plt.subplots(figsize=(10, 8))
 
@@ -207,7 +218,7 @@ def evaluate_agent(
 
             for elt in list_of_path_tree:
                 path, _ = elt
-                ax.plot(path[:, 0], path[:, 1], label="path", color="firebrick", linewidth=1, zorder=0)
+                ax.plot(path[:, 0], path[:, 1], label="path", color="balck", linewidth=1, zorder=0)
 
             ylim = ax.get_ylim()
             if ylim[1] - ylim[0] < 1 / 3:
@@ -236,7 +247,7 @@ def evaluate_agent(
 
             for elt in list_of_path_tree:
                 path, _ = elt
-                ax.plot(path[:, 0], path[:, 1], path[:, 2], color="firebrick", linewidth=1)
+                ax.plot(path[:, 0], path[:, 1], path[:, 2], color="black", linewidth=1)
 
             plot_trajectories_3D(
                 ax,
@@ -253,6 +264,10 @@ def evaluate_agent(
 
         fig.savefig(path_save_fig, dpi=400, bbox_inches="tight")
         plt.close(fig)
+        
+        if dim ==3:
+            list_of_path = [x[0] for x in list_of_path_tree]
+            plot_html_3d(states_list_per_episode[-4:],save_path_html,list_of_path)
 
         
     # print(mean(v_hist))

@@ -33,7 +33,7 @@ def format_sci(x):
     return "{:.3e}".format(x)
 
 
-def load_agent_config(agent, eval_freq, random_curve, uniform_bg, rankine_bg):
+def load_agent_config(agent, eval_freq, random_helix, uniform_bg, rankine_bg):
     policy_file = os.path.join(config["load_model"], "models/agent")
     agent.load(policy_file)
     path_config = os.path.join(config["load_model"], "config.pkl")
@@ -42,30 +42,33 @@ def load_agent_config(agent, eval_freq, random_curve, uniform_bg, rankine_bg):
     print("Policy loaded !")
     config["episode_start_update"] = eval_freq * 2
     config["episode_update"] = 2
-    config["random_curve"] = random_curve
+    config["random_helix"] = random_helix
     config["uniform_bg"] = uniform_bg
     config["rankine_bg"] = rankine_bg
     return agent, config
 
 
-def varying_curve_init(config):
-    print("Random curve")
+# def varying_curve_init(config):
+#     print("Random curve")
 
-    p_0 = config["p_0"]
-    p_target = config["p_target"]
-    curve_path_plus = generate_curve(p_0, p_target, 1, config["nb_points_path"])
-    curve_path_minus = generate_curve(p_0, p_target, -1, config["nb_points_path"])
-    curve_tree_plus = KDTree(curve_path_plus)
-    curve_tree_minus = KDTree(curve_path_minus)
-    list_of_path_tree = [
-        [curve_path_plus, curve_tree_plus],
-        [curve_path_minus, curve_tree_minus],
-    ]
-    line_path, _ = generate_simple_line(p_0, p_target, config["nb_points_path"])
-    line_tree = KDTree(line_path)
-    config["path"] = line_path
-    config["tree"] = line_tree
-    return list_of_path_tree
+#     p_0 = config["p_0"]
+#     p_target = config["p_target"]
+#     curve_path_plus = generate_curve(p_0, p_target, 1/2, config["nb_points_path"])
+#     curve_path_minus = generate_curve(p_0, p_target, -1/2, config["nb_points_path"])
+#     curve_path_plus_3d = np.hstack([curve_path_plus, np.zeros((curve_path_plus.shape[0], 1))])
+#     curve_path_minus_3d = np.hstack([curve_path_minus, np.zeros((curve_path_minus.shape[0], 1))])
+#     curve_tree_plus = KDTree(curve_path_plus_3d)
+#     curve_tree_minus = KDTree(curve_path_minus_3d)
+#     list_of_path_tree = [
+#         [curve_path_plus_3d, curve_tree_plus],
+#         [curve_path_minus_3d, curve_tree_minus],
+#     ]
+#     # line_path, _ = generate_simple_line(p_0, p_target, config["nb_points_path"])
+#     # line_path = np.hstack([line_path, np.zeros((line_path.shape[0], 1))])
+#     # line_tree = KDTree(line_path)
+#     # config["path"] = line_path
+#     # config["tree"] = line_tree
+#     return list_of_path_tree
 
 
 def run_expe(config, agent_file="agents"):
@@ -76,6 +79,7 @@ def run_expe(config, agent_file="agents"):
     os.makedirs(file_name, exist_ok=True)
     with open(os.path.join(file_name, "config.pkl"), "wb") as f:
         pickle.dump(config, f)
+        
 
     ## Path ##
     dim = config['dim']
@@ -87,15 +91,13 @@ def run_expe(config, agent_file="agents"):
     print(f"Target point : {path[-1]}")
     x = p_0
     T,N,B = compute_frenet_frame(path,dim)
-    print(T[1])
-    print(N[1])
-    print(B[1])
+
 
     ## Background flow ##
     uniform_bg = config["uniform_bg"]
     rankine_bg = config["rankine_bg"]
     both_rankine_and_uniform = config["uniform_bg"] and config["rankine_bg"]
-    random_curve = config["random_curve"]
+    random_helix = config["random_helix"]
     u_bg = np.zeros(dim)
     velocity_func = lambda x: u_bg
 
@@ -106,7 +108,7 @@ def run_expe(config, agent_file="agents"):
     Dt_action = config["Dt_action"]
     Dt_sim = Dt_action / steps_per_action
     n_lookahead = config["n_lookahead"]
-    env = MicroSwimmer(x_0, C, Dt_sim, config["velocity_bool"], n_lookahead,config['velocity_ahead'],config['add_action'],dim = config['dim'])
+    env = MicroSwimmer(x_0 = x_0, C = C, Dt = Dt_sim, velocity_bool  = config["velocity_bool"], n_lookahead = n_lookahead,velocity_ahead = config['velocity_ahead'],add_action = config['add_action'],dim = config['dim'])
 
     ## Environnement parameters ##
     t_max = config["t_max"]
@@ -147,7 +149,7 @@ def run_expe(config, agent_file="agents"):
 
     if agent_to_load != "":
         agent, config = load_agent_config(
-            agent, eval_freq, random_curve, uniform_bg, rankine_bg
+            agent, eval_freq, random_helix, uniform_bg, rankine_bg
         )
 
     ## Training variables ##
@@ -167,12 +169,19 @@ def run_expe(config, agent_file="agents"):
     config_eval_bis["uniform_bg"] = False
     config_eval_bis["rankine_bg"] = False
     
-    if config["random_curve"]:
-        list_of_path_tree = varying_curve_init(config)
-        A = 2
-        f = 4
-        N_k = nb_episode / 2
-
+    if config['random_helix']:
+        path =  generate_helix(2000, radius = 1/8, pitch = 2.5,turns=1,clockwise = False)
+        p_0 = path[0]
+        p_target = path[-1]
+        tree = KDTree(path)
+        config_eval_bis['path']=path
+        config_eval_bis['tree']=tree
+        config_eval_bis['p_0']=p_0
+        config_eval_bis['p_target']=p_target
+    
+    
+        
+        
     print("Both pertubations : ", config["uniform_bg"] and config["rankine_bg"])
 
     ########### TRAINING LOOP ###########
@@ -231,16 +240,6 @@ def run_expe(config, agent_file="agents"):
                     parameters=[],
                     plot_background=False,
                 )
-                # visualize_streamline(
-                #     agent,
-                #     config_eval_bis,
-                #     f"eval_during_training_streamline_{beta:.3f}.png",
-                #     save_path_result_fig,
-                #     type="line",
-                #     title="",
-                #     k=0,
-                #     parameters=[],
-                # )
                 eval_rew = mean(eval_rew)
                 eval_list.append(eval_rew)
                 print(f"Eval result : {eval_rew:.3f}")
@@ -284,18 +283,19 @@ def run_expe(config, agent_file="agents"):
             iter = 0
             episode_reward = 0
             episode_num += 1
-            dir, norm, center, a, cir = random_bg_parameters()
+            dir, norm, center, a, cir = random_bg_parameters(dim)
             
             if both_rankine_and_uniform:
-                velocity_func = lambda x: uniform_velocity(dir, norm) if episode_num % 2 == 0 else rankine_vortex(x, a, center, cir)
+                velocity_func = lambda x: uniform_velocity(dir, norm) if episode_num % 2 == 0 else rankine_vortex(x, a, center, cir,dim)
             elif uniform_bg:
                 velocity_func = lambda x: uniform_velocity(dir, norm)
             elif rankine_bg:
-                velocity_func = lambda x: rankine_vortex(x, a, center, cir)
+                velocity_func = lambda x: rankine_vortex(x, a, center, cir,dim)
 
-            if config["random_curve"] and episode_num > 10:
-                k = func_k_max(A, N_k, f, episode_num)
-                path = generate_curve(p_0, p_target, k, config["nb_points_path"])
+            if config["random_helix"] and episode_num > 10:
+                radius,pitch = random_radius_pitch(episode_num,nb_episode)
+                clockwise = True if episode_num % 2 == 0 else False
+                path = generate_helix(2000, radius = radius, pitch = pitch,turns=1, clockwise=clockwise)
                 tree = KDTree(path)
                 config["path"] = path
                 config["tree"] = tree
@@ -316,16 +316,16 @@ def set_parameters_training(threshold,maximum_curv):
 
 if __name__ == "__main__":
 
-    # p_target = np.array([2,0, 0])
+    # p_target = np.array([2,0,0])
     # p_0 = np.zeros(3)
-    # nb_points_path = 500
+    # nb_points_path = 2000
     # path, d = generate_simple_line(p_0, p_target, nb_points_path)
     # print(
     #     "Distance path points:      ",
     #     format_sci(np.linalg.norm(path[1, :] - path[0, :])),
     # )
     
-    path =  generate_helix(2000, 1/2, 2,1,False)
+    path =  generate_helix(2000, radius = 1/2, pitch = 2.5,turns=1,clockwise = False)
     p_0 = path[0]
     p_target = path[-1]
     
@@ -372,13 +372,13 @@ if __name__ == "__main__":
         "episode_per_update": 3,
         "discount_factor": 1,
         "beta": 0.4,
-        "uniform_bg": False,  # Random uniform background flow during the training
-        "rankine_bg": False,  # Random rankine vortex during the training
-        "pertubation_after_episode": 20,  # Background flow add in the training after this episode
-        "random_curve": False,  # To train on varying curve (no longer random)
+        "uniform_bg": True,  # Random uniform background flow during the training
+        "rankine_bg": True,  # Random rankine vortex during the training
+        "pertubation_after_episode": 1,  # Background flow add in the training after this episode
+        "random_helix": False,  # To train on varying curve (no longer random)
         "nb_points_path": 500,  # Discretization of the path
         "Dt_action": Dt_action,
-        "velocity_bool": False,  # Add the velocity in the state or not
+        "velocity_bool": True,  # Add the velocity in the state or not
         "n_lookahead": 5,  # Number of points in the lookahead
         "velocity_ahead":  False,
         'add_action' : True,

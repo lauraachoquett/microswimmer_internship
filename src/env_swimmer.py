@@ -32,9 +32,8 @@ class MicroSwimmer(gym.Env):
         
         if add_action:
             base +=1 # Past_action
-        
         if velocity_bool:
-            base = +1 # Velocity of the agent
+            base +=1 # Velocity of the agent
             
         if velocity_ahead:
                 base +=2 * self.n_lookahead #Velocity and Position of points ahead
@@ -42,7 +41,7 @@ class MicroSwimmer(gym.Env):
             base += self.n_lookahead  # Position of points ahead
            
 
-
+        print("Base: ",base)
 
             
         self.observation_space = gym.spaces.Box(

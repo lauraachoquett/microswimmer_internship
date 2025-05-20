@@ -40,13 +40,16 @@ class ReplayBuffer(object):
         )
 
 
-def random_bg_parameters():
-    dir = np.random.uniform(-1, 1, 2)
+def random_bg_parameters(dim):
+    dir = np.random.uniform(-1, 1, dim)
     dir = dir / np.linalg.norm(dir)
     norm = np.random.rand() * 0.6
 
     a = np.random.rand()
-    center = [np.random.rand() * 2, np.random.rand()]
+    if dim ==3 :
+        center = [np.random.rand(), 2*np.random.rand(),np.random.rand() ]
+    else :
+        center = [2*np.random.rand(), np.random.rand()]
     cir = (np.random.rand() - 0.5) * 2
     return dir, norm, center, a, cir
 

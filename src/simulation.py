@@ -20,11 +20,17 @@ def solver(x, U, p, Dt, D, u_bg=np.zeros(2), rng=None, bounce_thr=0.0, sdf=None,
     return next_x
 
 
-def rankine_vortex(pos, a, center, cir):
-    x, y = pos
-    cx, cy = center
+def rankine_vortex(pos, a, center, cir,dim):
+    if dim == 3: 
+        x,y,z = pos
+        cx, cy,cz  = center
+        
+    else :
+        x, y = pos
+        cx, cy  = center
     dx = x - cx
     dy = y - cy
+    
     r = np.sqrt(dx**2 + dy**2)
     if r == 0:
         return np.array([0.0, 0.0])
@@ -36,7 +42,12 @@ def rankine_vortex(pos, a, center, cir):
     alpha = np.arctan2(dy, dx)
     v_x = -v_theta * np.sin(alpha)
     v_y = v_theta * np.cos(alpha)
-    return np.array([v_x, v_y])
+    if dim == 3:
+        v_z = 0
+        return np.array([v_x, v_y, v_z])
+    else:
+        return np.array([v_x, v_y])
+
 
 
 def uniform_velocity(dir, norm):
