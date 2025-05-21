@@ -158,11 +158,12 @@ if __name__ == "__main__":
     points = np.vstack([Y_norm.ravel(), X_norm.ravel()]).T
     
     
-    sdf_interp = sdf_interpolator(points).reshape(Y_phys.shape)
-    
-    
+    sdf_interp = sdf_interpolator(points)
+    sdf_interp = sdf_interp.reshape(Y_phys.shape)
     sdf_phys = sdf_interp * scale
-    
+    print(sdf_phys.shape)
+    print(x_phys.shape)
+    print(y_phys.shape)
     sdf_interp_phys = RegularGridInterpolator(
         (y_phys, x_phys), sdf_phys, bounds_error=False, fill_value=None
     )
