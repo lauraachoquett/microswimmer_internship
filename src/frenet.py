@@ -1,7 +1,8 @@
-import numpy as np
 import matplotlib.pyplot as plt
+import numpy as np
+from matplotlib.animation import FFMpegWriter, FuncAnimation
 from mpl_toolkits.mplot3d import Axes3D
-from matplotlib.animation import FuncAnimation, FFMpegWriter
+
 
 # Courbe : hélice
 # t = np.linspace(0, 4 * np.pi, 200)
@@ -36,6 +37,7 @@ def compute_frenet_frame_bis(path, dim):
         B_norm = np.linalg.norm(B, axis=1, keepdims=True)
         B[B_norm > 0] /= B_norm[B_norm > 0]  # évite les divisions par 0
         return T, N, B
+
 
 def compute_frenet_frame(path, dim):
     dt = np.gradient(path, axis=0)
@@ -77,7 +79,8 @@ def compute_frenet_frame(path, dim):
                 B[i] = B[i - 1]
 
         return T, N, B
-    
+
+
 # dim=3
 # T, N, B = compute_frenet_frame_bis(curve,dim)
 

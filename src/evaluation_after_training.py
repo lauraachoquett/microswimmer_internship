@@ -23,15 +23,12 @@ from src.analytic_solution_line import find_next_v
 from src.distance_to_path import min_dist_closest_point
 from src.evaluate_agent import evaluate_agent
 from src.invariant_state import coordinate_in_global_ref
-from src.plot import plot_action, plot_trajectories,plot_trajectories_3D,plot_html_3d
+from src.plot import (plot_action, plot_html_3d, plot_trajectories,
+                      plot_trajectories_3D)
 from src.rank_agents import rank_agents_by_rewards
 from src.simulation import solver
-from src.visualize import (
-    plot_robust_D,
-    plot_robust_u_bg_rankine,
-    plot_robust_u_bg_uniform,
-    visualize_streamline,
-)
+from src.visualize import (plot_robust_D, plot_robust_u_bg_rankine,
+                           plot_robust_u_bg_uniform, visualize_streamline)
 
 
 def format_sci(x):
@@ -51,20 +48,18 @@ def evaluate_after_training(
     title_add="",
 ):
 
-
-
     nb_points_path = 2000
     if helix_par is None:
-        radius = 1/2
+        radius = 1 / 2
         pitch = -2
         turns = 1
         clockwise = False
-    else :
+    else:
         radius = helix_par[0]
         pitch = helix_par[1]
         turns = helix_par[2]
         clockwise = helix_par[3]
-    path =  generate_helix(2000, radius, pitch,turns,clockwise)
+    path = generate_helix(2000, radius, pitch, turns, clockwise)
     tree = KDTree(path)
     p_0 = path[0]
     p_target = path[-1]
@@ -99,7 +94,7 @@ def evaluate_after_training(
 
     for agent_name in agent_files:
 
-        config_eval = initialize_parameters(agent_name, p_target, p_0,nb_points_path)
+        config_eval = initialize_parameters(agent_name, p_target, p_0, nb_points_path)
         config_eval = copy.deepcopy(config_eval)
         training_type = {
             "rankine_bg": config_eval["rankine_bg"],
@@ -117,6 +112,8 @@ def evaluate_after_training(
             print(f"Agent {agent_name} already evaluated.")
             continue
         print("Agent name : ", agent_name)
+        
+        ## Same config for all agent during evaluation time ##
         config_eval["uniform_bg"] = uniform_bg
         config_eval["rankine_bg"] = rankine_bg
         config_eval["random_helix"] = False
@@ -130,13 +127,13 @@ def evaluate_after_training(
         config_eval["path"] = path
         config_eval["tree"] = tree
         env = MicroSwimmer(
-            x_0 = config_eval["x_0"],
-            C = config_eval["C"],
-            Dt = Dt_sim,
-            velocity_bool = config_eval["velocity_bool"],
-            n_lookahead = config_eval["n_lookahead"],
-            velocity_ahead  = config_eval["velocity_ahead"],
-            add_action =config_eval["add_action"],
+            x_0=config_eval["x_0"],
+            C=config_eval["C"],
+            Dt=Dt_sim,
+            velocity_bool=config_eval["velocity_bool"],
+            n_lookahead=config_eval["n_lookahead"],
+            velocity_ahead=config_eval["velocity_ahead"],
+            add_action=config_eval["add_action"],
             dim=config_eval["dim"],
         )
 
@@ -185,7 +182,6 @@ def evaluate_after_training(
         print("Mean rewards d : ", format_sci(mean(rewards_d_per_episode)))
         print("-----------------------------------------------")
 
-
     with open(file_name_result, "w") as f:
         json.dump(results, f, indent=4)
 
@@ -196,13 +192,12 @@ def evaluate_after_training(
     return results
 
 
-
-
-def initialize_parameters(agent_file, p_target, p_0,nb_points_path):
+def initialize_parameters(agent_file, p_target, p_0, nb_points_path):
     path_config = os.path.join(agent_file, "config.pkl")
     with open(path_config, "rb") as f:
         config = pickle.load(f)
     config_eval = copy.deepcopy(config)
+
     config_eval["random_helix"] = (
         config["random_helix"] if "random_helix" in config else False
     )
@@ -236,39 +231,36 @@ def initialize_parameters(agent_file, p_target, p_0,nb_points_path):
 
 if __name__ == "__main__":
     agent_name = "agents/agent_TD3_2025-05-16_14-56"
-    # p_target = np.array([2,0])
-    # p_0 = np.array([0,0])
-    # u_bg = np.array([0.0,0.2])
-    # config_eval_comp = initialize_parameters(agent_name,p_target,p_0)
-    # save_path_eval = os.path.join(agent_name,'eval_bg/')
-    # os.makedirs(save_path_eval, exist_ok=True)
-    # offset=0.2
-    # compare_p_line(agent_name,config_eval_comp,'comparison_north_02',save_path_eval,u_bg,'',offset)
 
     agents_file = [
         agent_name,
         "agents/agent_TD3_2025-05-16_15-12",
         "agents/agent_TD3_2025-05-20_17-07",
         "agents/agent_TD3_2025-05-20_13-19",
-        "agents/agent_TD3_2025-05-20_12-51"
+        "agents/agent_TD3_2025-05-20_12-51",
+        "agents/agent_TD3_2025-05-20_17-16",
+        "agents/agent_TD3_2025-05-20_17-37",
+        "agents/agent_TD3_2025-05-21_11-27",
+        "agents/agent_TD3_2025-05-21_16-55",
+        "agents/agent_TD3_2025-05-21_17-33"
     ]
 
     # directory_path = Path("agents/")
 
     # for item in directory_path.iterdir():
     #     if item.is_dir() and "agent_TD3" in item.name:
-    #         if "2025-04-23" in item.name or "2025-04-22" in item.name:
-    #             agents_file.append(os.path.join(directory_path, item.name))
+    #         agents_file.append(os.path.join(directory_path, item.name))
 
-    types=['helix','counter_helix']
+    types = ["helix", "counter_helix","hard_helix"]
     helix_par = [1/2, 2, 1, False]
     helix_par_1 = [1/2, -2, 1, False]
-    helix_par_list = [helix_par, helix_par_1]
+    helix_par_2= [1/4, 3/4, 1, True]
+    helix_par_list = [helix_par, helix_par_1,helix_par_2]
     print("Agents files : ", agents_file)
     title_add = "free"
-    
+
     print("--------------------- Evaluation with helix Free  ---------------------")
-    for id,type in enumerate(types):
+    for id, type in enumerate(types):
         print("Type : ", type)
         results = evaluate_after_training(
             agents_file,
@@ -279,21 +271,54 @@ if __name__ == "__main__":
         rank_agents_by_rewards(results)
     norm = 0.5
     dict = {
-        "dir1_05": np.array([1, 0,0]),
-        "dir2_05": np.array([-1, 0,0]),
-        "dir3_05": np.array([0, 1,0]),
-        "dir4_05": np.array([0, -1,0]),
-        "dir5_05": np.array([0, 0,1]),
-        "dir6_05": np.array([0, 0,-1]),
+        "dir1_05": np.array([1, 0, 0]),
+        "dir2_05": np.array([-1, 0, 0]),
+        "dir3_05": np.array([0, 1, 0]),
+        "dir4_05": np.array([0, -1, 0]),
+        "dir5_05": np.array([0, 0, 1]),
+        "dir6_05": np.array([0, 0, -1]),
     }
     print("---------------------Evaluation with uniform bg---------------------")
-    for type in types:
-        for title_add, dir in dict.items():
+    for title_add, dir in dict.items():
+        for id, type in enumerate(types):
             results = evaluate_after_training(
                 agents_file,
+                helix_par=helix_par_list[id],
                 type=type,
                 title_add=title_add,
                 dir=dir,
                 norm=norm,
             )
             rank_agents_by_rewards(results)
+
+    title_add = "rankine_a_025__cir_3_center_0_06_02"
+    print("---------------------Evaluation with rankine bg---------------------")
+    for id, type in enumerate(types):
+        if type == 'counter_helix':
+            a = 0.25
+            cir = 2
+            center = np.array([0, -0.6, 0.2])
+            results = evaluate_after_training(
+                agents_file,
+                helix_par=helix_par_list[id],
+                type=type,
+                title_add=title_add,
+                a=a,
+                center=center,
+                cir=cir,
+            )
+        else:
+            a = 0.25
+            cir = 2
+            center = np.array([0,0.6, 0.2])
+            results = evaluate_after_training(
+                agents_file,
+                helix_par=helix_par_list[id],
+                type=type,
+                title_add=title_add,
+                a=a,
+                center=center,
+                cir=cir,
+            )
+        rank_agents_by_rewards(results)
+        

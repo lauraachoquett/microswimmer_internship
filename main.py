@@ -162,7 +162,7 @@ def run_expe(config, agent_file="agents"):
     count_reach_target = 0
 
     ## Reset ##
-    state, done = env.reset(tree, path,T,None,N,B), False
+    state, done = env.reset(tree=tree, path=path,T=T,velocity_func=None,N=N,B=B), False
 
     ## Config for evaluation ##
     config_eval_bis = copy.deepcopy(config)
@@ -170,14 +170,16 @@ def run_expe(config, agent_file="agents"):
     config_eval_bis["rankine_bg"] = False
     
     if config['random_helix']:
-        path =  generate_helix(2000, radius = 1/8, pitch = 2.5,turns=1,clockwise = False)
+        path =  generate_helix(2000, radius = 1/5, pitch = 2,turns=1,clockwise = False)
         p_0 = path[0]
         p_target = path[-1]
         tree = KDTree(path)
         config_eval_bis['path']=path
         config_eval_bis['tree']=tree
         config_eval_bis['p_0']=p_0
+        config_eval_bis['x_0']=p_0
         config_eval_bis['p_target']=p_target
+        list_of_path_tree=[[path,tree]]
     
     
         
@@ -297,11 +299,16 @@ def run_expe(config, agent_file="agents"):
                 clockwise = True if episode_num % 2 == 0 else False
                 path = generate_helix(2000, radius = radius, pitch = pitch,turns=1, clockwise=clockwise)
                 tree = KDTree(path)
+                p_0 = path[0]
+                p_target = path[-1]
                 config["path"] = path
                 config["tree"] = tree
+                config["p_0"] = p_0
+                config["x_0"] = p_0
+                config["p_target"] = p_target
                 T,N,B = compute_frenet_frame(path,dim)
 
-            state, done = env.reset(tree, path,T,velocity_func,N,B), False
+            state, done = env.reset(x_0=config['x_0'],tree=tree, path=path,T=T,velocity_func=velocity_func,N=N,B=B), False
             
     ## Save evaluation returns ##
     file_reward_eval = os.path.join(save_path_result, "rewards_eval")
@@ -375,7 +382,7 @@ if __name__ == "__main__":
         "uniform_bg": True,  # Random uniform background flow during the training
         "rankine_bg": True,  # Random rankine vortex during the training
         "pertubation_after_episode": 1,  # Background flow add in the training after this episode
-        "random_helix": False,  # To train on varying curve (no longer random)
+        "random_helix": True,  # To train on varying curve (no longer random)
         "nb_points_path": 500,  # Discretization of the path
         "Dt_action": Dt_action,
         "velocity_bool": True,  # Add the velocity in the state or not

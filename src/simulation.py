@@ -4,14 +4,14 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 
-def dW(delta_t, rng=None,dim=2):
+def dW(delta_t, rng=None, dim=2):
     return rng.normal(loc=0.0, scale=np.sqrt(delta_t), size=(dim))
 
 
-def solver(x, U, p, Dt, D, u_bg=np.zeros(2), rng=None, bounce_thr=0.0, sdf=None,dim=2):
+def solver(x, U, p, Dt, D, u_bg=np.zeros(2), rng=None, bounce_thr=0.0, sdf=None, dim=2):
     if rng is None:
         rng = np.random.default_rng()
-    dW_t = dW(Dt, rng,dim)
+    dW_t = dW(Dt, rng, dim)
     next_x = x + u_bg * Dt + U * p * Dt + sqrt(D) * dW_t
 
     if sdf is not None:
@@ -20,17 +20,17 @@ def solver(x, U, p, Dt, D, u_bg=np.zeros(2), rng=None, bounce_thr=0.0, sdf=None,
     return next_x
 
 
-def rankine_vortex(pos, a, center, cir,dim):
-    if dim == 3: 
-        x,y,z = pos
-        cx, cy,cz  = center
-        
-    else :
+def rankine_vortex(pos, a, center, cir, dim):
+    if dim == 3:
+        x, y, z = pos
+        cx, cy, cz = center
+
+    else:
         x, y = pos
-        cx, cy  = center
+        cx, cy = center
     dx = x - cx
     dy = y - cy
-    
+
     r = np.sqrt(dx**2 + dy**2)
     if r == 0:
         return np.array([0.0, 0.0])
@@ -47,7 +47,6 @@ def rankine_vortex(pos, a, center, cir,dim):
         return np.array([v_x, v_y, v_z])
     else:
         return np.array([v_x, v_y])
-
 
 
 def uniform_velocity(dir, norm):

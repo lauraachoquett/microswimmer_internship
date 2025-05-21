@@ -16,12 +16,9 @@ from statistics import mean, stdev
 from scipy.spatial import KDTree
 
 from src.env_swimmer import MicroSwimmer
-from src.generate_path import (
-    generate_curve,
-    generate_demi_circle_path,
-    generate_random_ondulating_path,
-    generate_simple_line,
-)
+from src.generate_path import (generate_curve, generate_demi_circle_path,
+                               generate_random_ondulating_path,
+                               generate_simple_line)
 from src.plot import plot_background_velocity, plot_trajectories
 
 
@@ -31,7 +28,7 @@ def format_sci(x):
 
 def plot_robust_D(
     config_eval, file_name_or, agent, env, save_path_eval, nb_D, threshold
-    ):
+):
     save_path_eval_D = os.path.join(save_path_eval, "robust_D_bis/")
     if not os.path.exists(save_path_eval_D):
         os.makedirs(save_path_eval_D)
@@ -92,7 +89,7 @@ def plot_robust_D(
 
 def plot_robust_u_bg_uniform(
     config_eval, file_name_or, agent, env, save_path_eval, nb_norm, threshold
-    ):
+):
     dir_d = {
         "North": np.array([0, 1]),
         "West": np.array([-1, 0]),
@@ -156,7 +153,7 @@ def plot_robust_u_bg_uniform(
 
 def plot_robust_u_bg_rankine(
     config_eval, file_name_or, agent, env, save_path_eval, nb_cir, threshold
-    ):
+):
     center = [1, 1.5]
     a = 0.5
     cir_values = np.linspace(-3, 3, nb_cir)

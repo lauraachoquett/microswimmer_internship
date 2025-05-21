@@ -46,10 +46,10 @@ def random_bg_parameters(dim):
     norm = np.random.rand() * 0.6
 
     a = np.random.rand()
-    if dim ==3 :
-        center = [np.random.rand(), 2*np.random.rand(),np.random.rand() ]
-    else :
-        center = [2*np.random.rand(), np.random.rand()]
+    if dim == 3:
+        center = [np.random.rand(), 2 * np.random.rand(), np.random.rand()]
+    else:
+        center = [2 * np.random.rand(), np.random.rand()]
     cir = (np.random.rand() - 0.5) * 2
     return dir, norm, center, a, cir
 
