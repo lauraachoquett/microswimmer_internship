@@ -185,46 +185,96 @@ if __name__ == "__main__":
     # ix, iy, iz =530, Ny // 4, Nz // 2
     # X, Y,Z = np.meshgrid(x_phys, y_phys,z_phys)
     # plot_sdf_slices(sdf_phys,X,Y,Z,ix,iy,iz,goal_point,start_point,'slices')
-    ratio = 1
-    sdf_func_phys,sdf_phys,velocity_retina,x_phys,y_phys,z_phys,physical_depth,physical_width,physical_height,scale = load_sim_sdf(ratio)
-    grid_size = (len(x_phys), len(y_phys),len(z_phys))
+    # ratio = 5
+    # sdf_func_phys,sdf_phys,velocity_retina,x_phys,y_phys,z_phys,physical_depth,physical_width,physical_height,scale = load_sim_sdf(ratio)
+    # grid_size = (len(x_phys), len(y_phys),len(z_phys))
     
     import pyvista as pv
-    print(pv.__version__)
     import numpy as np
-    save_path_flow = f"data/velocity_flow/grid_size_{grid_size[0]}_{grid_size[1]}_{grid_size[2]}_phi_3d/"
-    if os.path.exists(save_path_flow):
-        flow_strength = ratio * np.load(
-            os.path.join(save_path_flow, "flow_strength.npy")
-        )
-        flow_direction_x = np.load(
-            os.path.join(save_path_flow, "flow_direction_x.npy")
-        )
-        flow_direction_y = np.load(
-            os.path.join(save_path_flow, "flow_direction_y.npy")
-        )
-        flow_direction_z = np.load(
-            os.path.join(save_path_flow, "flow_direction_z.npy")
-        )
-    vx = flow_direction_x * flow_strength
-    vy = flow_direction_y * flow_strength
-    vz = flow_direction_z * flow_strength
+    # === Lecture des fichiers ===
+    path_vel = "data/vel.sdf"
+    N, h, vel = vel_read(path_vel)  # vel.shape = (Nx, Ny, Nz, 4)
+    v = vel[:, :, :, :3]            # On garde uniquement vx, vy, vz
+    vx, vy, vz = v[:, :, :, 0].T, v[:, :, :, 1].T, v[:, :, :, 2].T
+    _, _, sdf = sdf_read('data/retina.sdf')  # sdf.shape doit être (Nx, Ny, Nz)
+    sdf=sdf.T
+    N=vx.shape
+    print(N)
+    # === Statistiques initiales ===
+    for name, arr in zip(["vx", "vy", "vz"], [vx, vy, vz]):
+        print(f"{name}: min={arr.min():.3e}, max={arr.max():.3e}, mean={arr.mean():.3e}, std={arr.std():.3e}")
 
-    # Création de la grille uniforme
-    grid = pv.UniformGrid(
-        dimensions=(nx, ny, nz),
-        spacing=(dx, dy, dz),
-        origin=(0, 0, 0)
-    )
+    speed = np.sqrt(vx**2 + vy**2 + vz**2)
+    print(f"Speed: min={speed.min():.3e}, max={speed.max():.3e}, mean={speed.mean():.3e}, std={speed.std():.3e}")
 
+    # === Analyse des vitesses élevées ===
+    threshold = 100  # à adapter selon le cas
+    outliers = np.argwhere(speed > threshold)
+    print(f"Nb points avec vitesse > {threshold:.2f} : {len(outliers)}")
+
+    # === Histogramme de la vitesse ===
+    os.makedirs("fig", exist_ok=True)
+    plt.hist(speed.flatten(), bins=100)
+    plt.yscale("log")
+    plt.title("Histogramme des vitesses")
+    plt.xlabel("||v||")
+    plt.ylabel("Fréquence (log)")
+    plt.savefig('fig/hist_v')
+    plt.close()
+
+    # === Filtrage des vitesses trop élevées ===
+    mask = speed > 10  # ou < threshold si tu préfères être cohérente
+    vx[mask] = 0
+    vy[mask] = 0
+    vz[mask] = 0
+
+    
+    # === Affichage des shapes filtrées ===
+    
+    nx,ny,nz = N
+    grid = pv.ImageData()
+    grid.dimensions = (nx, ny, nz)
+    grid.spacing = (1, 1, 1)
+    grid.origin = (0, 0, 0)
     # Ajout des champs
-    grid["SDF"] = sdf_phys.flatten(order="F")
+    print("shape:")
+    print(N)
+    print(vx.shape)
+    print(vy.shape)
+    print(vz.shape)
+    print(sdf.shape)
+    print(nx*ny*nz)
+    grid["SDF"] = sdf.flatten(order="F")
     velocity_vectors = np.stack([vx, vy, vz], axis=-1)
     grid["velocity"] = velocity_vectors.reshape(-1, 3, order="F")
-
+    print(grid["velocity"].shape)  # doit être (nx * ny * nz, 3)
     # Sauvegarde
     output_path = "velocity_with_sdf.vti"
     grid.save(output_path)
     print(f"Fichier sauvegardé dans : {output_path}")
+    
+    
+    
+    
+    
+    # # Création de la grille uniforme physique
+    # dx = x_phys[1] - x_phys[0]
+    # dy = y_phys[1] - y_phys[0]
+    # dz = z_phys[1] - z_phys[0]
+    # grid = pv.ImageData()
+    # grid.dimensions = (nx, ny, nz)
+    # grid.spacing = (dx, dy, dz)
+    # grid.origin = (0, 0, 0)
+
+    # # Ajout des champs
+    # grid["SDF"] = sdf_phys.flatten(order="F")
+    # velocity_vectors = np.stack([vx, vy, vz], axis=-1)
+    # print(velocity_vectors.shape)
+    # grid["velocity"] = velocity_vectors.reshape(-1, 3, order="F")
+    # print(grid["velocity"].shape)  # doit être (nx * ny * nz, 3)
+    # # Sauvegarde
+    # output_path = "velocity_with_sdf.vti"
+    # grid.save(output_path)
+    # print(f"Fichier sauvegardé dans : {output_path}")
         
     
