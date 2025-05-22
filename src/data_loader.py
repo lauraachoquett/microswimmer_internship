@@ -1,7 +1,7 @@
 import matplotlib.colors as mcolors
 import numpy as np
 from scipy.interpolate import RegularGridInterpolator
-
+import os
 
 def sdf_read(path):
     with open(path, "rb") as f:
@@ -119,6 +119,7 @@ def load_sim_sdf(ratio):
 
     return (
         sdf_func_phys,
+        sdf_phys,
         velocity_retina,
         x_phys,
         y_phys,
@@ -130,47 +131,100 @@ def load_sim_sdf(ratio):
     )
 
 
+def plot_sdf_slices(sdf_phys,X,Y,Z,ix,iy,iz,target_point,start_point,name_fig):
+
+
+    fig, axes = plt.subplots(1, 3, figsize=(15, 5))
+    
+    axes[0].imshow(sdf_phys[:, :, iz].T,extent=[X.min(), X.max(), Y.min(), Y.max()],origin='lower', cmap='Reds')
+    axes[0].contour(sdf_phys[:,:,iz].T, extent=[X.min(), X.max(), Y.min(), Y.max()],levels=[0], colors='black')
+    axes[0].scatter(target_point[0],target_point[1],label='target',color='blue',s=4)
+    axes[0].scatter(start_point[0],start_point[1],label='start',color='green',s=4)
+    axes[0].set_title(f'Plan Z = {iz} (XY)')
+    
+    axes[1].imshow(sdf_phys[ix, :, :].T, extent=[Y.min(), Y.max(), Z.min(), Z.max()],origin='lower', cmap='Reds')
+    axes[1].contour(sdf_phys[ix,:,:].T,  extent=[Y.min(), Y.max(), Z.min(), Z.max()],levels=[0], colors='black')
+    axes[1].scatter(target_point[1],target_point[2],label='target',color='blue',s=4)
+    # axes[1].scatter(start_point[1],start_point[2],label='start',color='green',s=4)
+    axes[1].set_title(f'Plan X = {ix} (YZ)')
+    
+    axes[2].imshow(sdf_phys[:, iy, :].T,extent=[X.min(), X.max(), Z.min(), Z.max()], origin='lower', cmap='Reds')
+    axes[2].contour(sdf_phys[:,iy,:].T, extent=[X.min(), X.max(), Z.min(), Z.max()],levels=[0], colors='black')
+    axes[2].scatter(target_point[0],target_point[2],label='target',color='blue',s=4)
+    # axes[2].scatter(start_point[1],start_point[2],label='start',color='green',s=4)
+    axes[2].set_title(f'Plan Y = {iy} (XZ)')
+    
+    
+    for ax in axes:
+        ax.axis('off')
+        
+    fig.legend(
+        handles=[
+            plt.Line2D([0], [0], marker='o', color='w', label='target',
+                    markerfacecolor='blue', markersize=5),
+            plt.Line2D([0], [0], marker='o', color='w', label='start',
+                    markerfacecolor='green', markersize=5)
+        ],
+        loc='upper center',
+        ncol=2,
+        frameon=False
+    )
+    plt.tight_layout()
+    save_path_fig = os.path.join('fig',name_fig)
+    plt.savefig(save_path_fig,dpi=300,bbox_inches='tight')
+    plt.close(fig)
+    
+    
 if __name__ == "__main__":
-    ratio = 5
-    sdf_func_phys,velocity_retina,x_phys,y_phys,z_phys,physical_depth,physical_width,physical_height,scale = load_sim_sdf(ratio)
-    print(z_phys[len(z_phys)//2])
-    start_point = (physical_width * 0.98, physical_height * 0.3,physical_depth*0.5)
-    start_point = (physical_width * 0.98, physical_height * 0.3,physical_depth*0.5)
-    print(sdf_func_phys(start_point))
-    # fig, axes = plt.subplots(ncols=2, figsize=(14, 6))
+    # ratio = 5
+    # print(z_phys[len(z_phys)//2])
+    # start_point = (physical_width * 0.98, physical_height * 0.3,physical_depth*0.5)
+    # goal_point = (physical_width*0.3 , physical_height *0.8, physical_depth* 0.5)
+    # print(sdf_func_phys(start_point))
+    # Nx, Ny, Nz = sdf_phys.shape
+    # ix, iy, iz =530, Ny // 4, Nz // 2
+    # X, Y,Z = np.meshgrid(x_phys, y_phys,z_phys)
+    # plot_sdf_slices(sdf_phys,X,Y,Z,ix,iy,iz,goal_point,start_point,'slices')
+    ratio = 1
+    sdf_func_phys,sdf_phys,velocity_retina,x_phys,y_phys,z_phys,physical_depth,physical_width,physical_height,scale = load_sim_sdf(ratio)
+    grid_size = (len(x_phys), len(y_phys),len(z_phys))
+    
+    import pyvista as pv
+    print(pv.__version__)
+    import numpy as np
+    save_path_flow = f"data/velocity_flow/grid_size_{grid_size[0]}_{grid_size[1]}_{grid_size[2]}_phi_3d/"
+    if os.path.exists(save_path_flow):
+        flow_strength = ratio * np.load(
+            os.path.join(save_path_flow, "flow_strength.npy")
+        )
+        flow_direction_x = np.load(
+            os.path.join(save_path_flow, "flow_direction_x.npy")
+        )
+        flow_direction_y = np.load(
+            os.path.join(save_path_flow, "flow_direction_y.npy")
+        )
+        flow_direction_z = np.load(
+            os.path.join(save_path_flow, "flow_direction_z.npy")
+        )
+    vx = flow_direction_x * flow_strength
+    vy = flow_direction_y * flow_strength
+    vz = flow_direction_z * flow_strength
 
-    # # Add contours for the signed distance function (SDF) on both subplots
-    # axes[0].contour(
-    #     X_phys, Y_phys, sdf_phys, levels=[0], colors="black", linewidths=1, zorder=10
-    # )
-    # axes[1].contour(
-    #     X_phys, Y_phys, sdf_phys, levels=[0], colors="black", linewidths=1, zorder=10
-    # )
+    # Création de la grille uniforme
+    grid = pv.UniformGrid(
+        dimensions=(nx, ny, nz),
+        spacing=(dx, dy, dz),
+        origin=(0, 0, 0)
+    )
 
-    # # Plot velocity components as filled contours
-    # vxmin = np.min(vx_phys)
-    # vxmax = np.max(vx_phys)
-    # normx = mcolors.TwoSlopeNorm(vmin=vxmin, vcenter=0, vmax=vxmax)
-    # vymin = np.min(vy_phys)
-    # vymax = np.max(vy_phys)
-    # normy = mcolors.TwoSlopeNorm(vmin=vymin, vcenter=0, vmax=vymax)
+    # Ajout des champs
+    grid["SDF"] = sdf_phys.flatten(order="F")
+    velocity_vectors = np.stack([vx, vy, vz], axis=-1)
+    grid["velocity"] = velocity_vectors.reshape(-1, 3, order="F")
 
-    # contourx = axes[0].contourf(
-    #     X_phys, Y_phys, vx_phys, levels=100, cmap="RdBu", norm=normx
-    # )
-    # contoury = axes[1].contourf(
-    #     X_phys, Y_phys, vy_phys, levels=100, cmap="RdBu", norm=normy
-    # )
-
-    # # Add colorbars for the velocity components
-    # cbarx = fig.colorbar(contourx, ax=axes[0], orientation="vertical")
-    # cbary = fig.colorbar(contoury, ax=axes[1], orientation="vertical")
-    # axes[0].set_title("Velocity X", fontsize=14)
-    # axes[1].set_title("Velocity Y", fontsize=14)
-
-    # # Remove axes
-    # axes[0].axis("off")
-    # axes[1].axis("off")
-    # plt.tight_layout()
-    # plt.savefig("fig/retina_example_velocity.png", dpi=400, bbox_inches="tight")
-    # plt.close(fig)
+    # Sauvegarde
+    output_path = "velocity_with_sdf.vti"
+    grid.save(output_path)
+    print(f"Fichier sauvegardé dans : {output_path}")
+        
+    
