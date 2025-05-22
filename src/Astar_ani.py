@@ -222,7 +222,7 @@ def heuristic(i1, j1, i2, j2, dx, dy):
     v_max = 1.0
     return distance / v_max
 
-def plot_velocity(step,vx,vy,v0,X,Y):
+def plot_velocity(step,vx,vy,v0,X,Y,grid_size):
     step = 6
 
     X_sub = X[::step, ::step]
@@ -237,24 +237,27 @@ def plot_velocity(step,vx,vy,v0,X,Y):
     Y_masked = Y_sub[mask]
     vx_masked = vx_sub[mask]
     vy_masked = vy_sub[mask]
-    # plt.imshow(
-    #     v0,
-    #     extent=[X.min(), X.max(), Y.min(), Y.max()],
-    #     origin='lower',
-    #     cmap='Reds',
-    #     alpha=0.7
-    # )
-    # plt.colorbar(label='v0')
+    
+    save_path_phi = f"data/phi/grid_size_{grid_size[0]}_{grid_size[1]}_phi_bis.npy"
+    if os.path.exists(save_path_phi):
+        phi = np.load(save_path_phi)
+        
 
-    plt.quiver(
-        X_masked,
-        Y_masked,
-        vx_masked,
-        vy_masked,
-        color="grey",
-        scale=80,
-        alpha=0.5,
-    )
+    # plt.contourf(X, Y, phi, levels=[0, phi.max()], colors='darkred')
+
+    v_norm = np.sqrt(vx**2 + vy**2)
+
+    plt.contourf(X, Y, v_norm, levels=50, cmap="Reds")  # ou autre cmap : 'viridis', 'plasma', etc.
+    plt.colorbar(label='||v||')
+    # plt.quiver(
+    #     X_masked,
+    #     Y_masked,
+    #     vx_masked,
+    #     vy_masked,
+    #     color="darkred",
+    #     scale=80,
+    #     alpha=0.3,
+    # )
 
 def visualize_results_a_star(
     X, Y, sdf_function, path, vx, vy,v0, scale,label = '',color=None
@@ -266,11 +269,11 @@ def visualize_results_a_star(
 
     obstacle_contour = contour_2D(sdf_function, X, Y, scale)
 
-    plt.scatter(obstacle_contour[:, 0], obstacle_contour[:, 1], color="black", s=0.2)
+    plt.scatter(obstacle_contour[:, 0], obstacle_contour[:, 1], color="black", s=0.5)
     palette = sns.color_palette()
 
     path_x, path_y = zip(*path)
-    plt.plot(path_x, path_y, linewidth=2, label=label)
+    plt.plot(path_x, path_y, linewidth=2, label=label,color=color)
     # plt.scatter([path[0][0]], [path[0][1]], s=50)
     # plt.scatter([path[-1][0]], [path[-1][1]], s=20, color = palette[id])
     
@@ -291,9 +294,10 @@ def compute_v(x, y, velocity_retina, B, grid_size, ratio, sdf_function, c):
                 phi[j, i] = a
         os.makedirs(os.path.dirname(save_path_phi), exist_ok=True)
         np.save(save_path_phi, phi)
-
+    print("Shape of phi :",phi.shape)
+    print("X :",len(x))
+    print("Y :",len(y))
     speed = (1.0 / (1.0 + np.exp(B * phi))) - c
-    speed = np.clip(speed, 0.001, 1.0)
 
 
     
@@ -335,12 +339,15 @@ def compute_v(x, y, velocity_retina, B, grid_size, ratio, sdf_function, c):
         print("Flow ready")
         vx = flow_direction_x * flow_strength
         vy = flow_direction_y * flow_strength
+        print("vx shape :",vx.shape)
+        print("vy shape :",vy.shape)
     return speed, vx, vy, save_path_phi, save_path_flow
 
-def plot_different_path(files_path,label_list,x_new,y_new,sdf_function,vx,vy,v0,scale) : 
+def plot_different_path(files_path,label_list,x_new,y_new,sdf_function,vx,vy,v0,scale,grid_size) : 
     path_list = []
-    palette = sns.color_palette()
-    
+    palette = ['cornflowerblue','navy','darkgreen']
+    X, Y = np.meshgrid(x_new, y_new)
+    plot_velocity(6,vx,vy,v0,X,Y,grid_size)
     for id,file_path in enumerate(files_path) : 
         path = np.load(file_path)
         path,distances = resample_path(path, len(path))
@@ -348,14 +355,14 @@ def plot_different_path(files_path,label_list,x_new,y_new,sdf_function,vx,vy,v0,
         visualize_results_a_star(
             x_new, y_new, sdf_function, path, vx, vy,v0,scale,label = label_list[id],color = palette[id]
         )
-
+        
     plt.legend()
     current_time = datetime.now().strftime("%m-%d_%H-%M-%S")
     plt.gca().set_aspect("equal", adjustable="box")
     plt.axis("off")
     plt.title("Path")
     plt.tight_layout()
-    plt.savefig(f"fig/Astar_ani_test_{current_time}.png", dpi=300, bbox_inches="tight")
+    plt.savefig(f"fig/Astar_ani_test_{current_time}.png", dpi=600, bbox_inches="tight")
 
 
 
@@ -395,78 +402,81 @@ if __name__ == "__main__":
         x_phys, y_phys, velocity_retina, B, grid_size, ratio, sdf_func, c
     )
     
-    if shortest_geo_path: 
-        v0 = np.ones_like(v0)
-        vx = None
-        vy = None
-        h = 0.0
-        max_radius=5
+    for name, arr in zip(["vx", "vy","v0"], [vx, vy,v0]):
+        print(f"{name}: min={arr.min():.3e}, max={arr.max():.3e}, mean={arr.mean():.3e}, std={arr.std():.3e}")
     
-    if v1 : 
-        v0 = np.ones_like(v0)
-        pow_v0 = 0
-        pow_al = 0
-        h = 0.0
-        max_radius=5
+    # if shortest_geo_path: 
+    #     v0 = np.ones_like(v0)
+    #     vx = None
+    #     vy = None
+    #     h = 0.0
+    #     max_radius=5
+    
+    # if v1 : 
+    #     v0 = np.ones_like(v0)
+    #     pow_v0 = 0
+    #     pow_al = 0
+    #     h = 0.0
+    #     max_radius=5
     
         
-    start_time = time.time()
-    # Compute the path
-    path, travel_time = astar_anisotropic(
-        x_phys,
-        y_phys,
-        v0,
-        vx,
-        vy,
-        start_point,
-        goal_point,
-        sdf_func,
-        heuristic_weight=h,
-        pow_v0=pow_v0,
-        pow_al=pow_al,
-        max_radius=max_radius
-    )
-    # path = shortcut_path(path,is_collision_free,sdf_interpolator)
-    print("Travel time :", travel_time)
+    # start_time = time.time()
+    # # Compute the path
+    # path, travel_time = astar_anisotropic(
+    #     x_phys,
+    #     y_phys,
+    #     v0,
+    #     vx,
+    #     vy,
+    #     start_point,
+    #     goal_point,
+    #     sdf_func,
+    #     heuristic_weight=h,
+    #     pow_v0=pow_v0,
+    #     pow_al=pow_al,
+    #     max_radius=max_radius
+    # )
+    # # path = shortcut_path(path,is_collision_free,sdf_interpolator)
+    # print("Travel time :", travel_time)
 
-    path = np.array(path)  # de forme (N, 2)
-    dist = np.array([abs(path[i + 1] - path[i]) for i in range(len(path) - 1)])
-    print("path before resampling :", len(path))
-    n = ceil(np.max(dist) / (5 * 1e-3))
-    if n > 1:
-        path,distances = resample_path(path, len(path) * n)
-    print("after resampling : ", len(path))
-    smoothed_x = gaussian_filter1d(path[:, 0], sigma=30)
-    smoothed_y = gaussian_filter1d(path[:, 1], sigma=30)
-    path = np.stack([smoothed_x, smoothed_y], axis=1)
-    print("Path length : ",distances)
-    X, Y = np.meshgrid(x_phys, y_phys)
-    visualize_results_a_star(
-        X, Y, sdf_func, path, vx, vy,v0,scale,label = f'path'
-    )
-    end_time = time.time()
-    elapsed_time = (end_time - start_time) / 60
-    print("Execution time:", elapsed_time, "minutes")
+    # path = np.array(path)  # de forme (N, 2)
+    # dist = np.array([abs(path[i + 1] - path[i]) for i in range(len(path) - 1)])
+    # print("path before resampling :", len(path))
+    # n = ceil(np.max(dist) / (5 * 1e-3))
+    # if n > 1:
+    #     path,distances = resample_path(path, len(path) * n)
+    # print("after resampling : ", len(path))
+    # smoothed_x = gaussian_filter1d(path[:, 0], sigma=30)
+    # smoothed_y = gaussian_filter1d(path[:, 1], sigma=30)
+    # path = np.stack([smoothed_x, smoothed_y], axis=1)
+    # print("Path length : ",distances)
+    # X, Y = np.meshgrid(x_phys, y_phys)
+    # visualize_results_a_star(
+    #     X, Y, sdf_func, path, vx, vy,v0,scale,label = f'path'
+    # )
+    # end_time = time.time()
+    # elapsed_time = (end_time - start_time) / 60
+    # print("Execution time:", elapsed_time, "minutes")
         
-    if vx is not None and vy is not None : 
-        plot_velocity(6,vx,vy,v0,X,Y)
-    plt.legend()
-    current_time = datetime.now().strftime("%m-%d_%H-%M-%S")
-    plt.gca().set_aspect("equal", adjustable="box")
-    plt.axis("off")
-    plt.title("Path")
-    plt.tight_layout()
-    plt.savefig(f"fig/Astar_ani_test_{current_time}_pow_al_0.png", dpi=300, bbox_inches="tight")
-    plt.close()
+    # if vx is not None and vy is not None : 
+    #     plot_velocity(6,vx,vy,v0,X,Y,grid_size)
+    # plt.legend()
+    # current_time = datetime.now().strftime("%m-%d_%H-%M-%S")
+    # plt.gca().set_aspect("equal", adjustable="box")
+    # plt.axis("off")
+    # plt.title("Path")
+    # plt.tight_layout()
+    # plt.savefig(f"fig/Astar_ani_test_{current_time}_pow_al_0.png", dpi=300, bbox_inches="tight")
+    # plt.close()
 
     
     # save_path_path = f"data/retina2D_path_time_4_v1_bg.npy"
     # np.save(save_path_path, path, allow_pickle=False)
 
     
-    # files_path = ['data/retina2D_path_time_4_free_bg.npy','data/retina2D_path_time_4_v1_bg.npy','data/retina2D_path_time_4_v2_bg.npy']
-    # label_list = ['Shortest geometrical path','Algorithm 1', 'Algorithm 2']
-    # plot_different_path(files_path,label_list,x_phys,y_phys,sdf_func,vx,vy,v0,scale)
+    files_path = ['data/retina2D_path_time_4_free_bg.npy','data/retina2D_path_time_4_v1_bg.npy','data/retina2D_path_time_4_v2_bg.npy']
+    label_list = ['Shortest geometrical path','Algorithm 1', 'Algorithm 2']
+    plot_different_path(files_path,label_list,x_phys,y_phys,sdf_func,vx,vy,v0,scale,grid_size)
 
         
     
