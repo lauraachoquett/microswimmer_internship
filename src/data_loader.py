@@ -2,6 +2,8 @@ import matplotlib.colors as mcolors
 import numpy as np
 from scipy.interpolate import RegularGridInterpolator
 import os
+import pyvista as pv
+import numpy as np
 
 def sdf_read(path):
     with open(path, "rb") as f:
@@ -124,6 +126,9 @@ def load_sim_sdf(ratio):
         x_phys,
         y_phys,
         z_phys,
+        vx_phys,
+        vy_phys,
+        vz_phys,
         physical_depth,
         physical_width,
         physical_height,
@@ -189,8 +194,7 @@ if __name__ == "__main__":
     # sdf_func_phys,sdf_phys,velocity_retina,x_phys,y_phys,z_phys,physical_depth,physical_width,physical_height,scale = load_sim_sdf(ratio)
     # grid_size = (len(x_phys), len(y_phys),len(z_phys))
     
-    import pyvista as pv
-    import numpy as np
+
     # === Lecture des fichiers ===
     path_vel = "data/vel.sdf"
     N, h, vel = vel_read(path_vel)  # vel.shape = (Nx, Ny, Nz, 4)
@@ -222,11 +226,11 @@ if __name__ == "__main__":
     plt.savefig('fig/hist_v')
     plt.close()
 
-    # === Filtrage des vitesses trop élevées ===
-    mask = speed > 10  # ou < threshold si tu préfères être cohérente
-    vx[mask] = 0
-    vy[mask] = 0
-    vz[mask] = 0
+    # # === Filtrage des vitesses trop élevées ===
+    # mask = speed > 10  # ou < threshold si tu préfères être cohérente
+    # vx[mask] = 0
+    # vy[mask] = 0
+    # vz[mask] = 0
 
     
     # === Affichage des shapes filtrées ===
@@ -236,6 +240,7 @@ if __name__ == "__main__":
     grid.dimensions = (nx, ny, nz)
     grid.spacing = (1, 1, 1)
     grid.origin = (0, 0, 0)
+
     # Ajout des champs
     print("shape:")
     print(N)
@@ -245,6 +250,8 @@ if __name__ == "__main__":
     print(sdf.shape)
     print(nx*ny*nz)
     grid["SDF"] = sdf.flatten(order="F")
+    print(grid["SDF"].shape)
+    
     velocity_vectors = np.stack([vx, vy, vz], axis=-1)
     grid["velocity"] = velocity_vectors.reshape(-1, 3, order="F")
     print(grid["velocity"].shape)  # doit être (nx * ny * nz, 3)

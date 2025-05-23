@@ -10,6 +10,9 @@ import seaborn as sns
 from matplotlib.colors import LogNorm
 from scipy.interpolate import RegularGridInterpolator, splev, splprep
 from scipy.ndimage import gaussian_filter1d
+from tqdm import tqdm
+import pyvista as pv
+import numpy as np
 
 from src.Astar import resample_path
 from src.data_loader import load_sdf_from_csv, load_sim_sdf, vel_read,plot_sdf_slices
@@ -113,15 +116,21 @@ def astar_anisotropic(
     plot_sdf_slices(sdf_phys,X,Y,Z,i_goal,j_goal,k_goal,goal_point,start_point,'slices_a_star')
 
     dir_offsets = generate_directions_3d(max_radius=max_radius)
-    print("Number of different directions :", len(dir_offsets))
+    print("Number of different directions :", dir_offsets)
+    
+    if sdf_function(goal_point) > 0 or sdf_function(start_point) > 0:
+        raise ValueError(
+            f"Invalid points: sdf(goal_point)={sdf_function(goal_point)}, sdf(start_point)={sdf_function(start_point)}"
+        )
+    if v0[k_goal,j_goal,i_goal]<0:
+        raise ValueError(
+            f"Invalid points: v0(goal_point)={v0[k_goal,j_goal,i_goal]}"
+        )
+        
     move_costs = precalculate_move_costs(
         v0, vx, vy,vz, dir_offsets, dx, dy, dz,weight_sdf, pow_v0, pow_al
     )
     print("Cost computed, move shape :",move_costs.shape)
-    if sdf_function(goal_point) > 0 or sdf_function(start_point) > 0:
-        print("Invalid points")
-        print(sdf_function(goal_point))
-        print(sdf_function(start_point))
 
     closed_set = set()
     open_set = [(0, i_start, j_start,k_start)]
@@ -149,6 +158,7 @@ def astar_anisotropic(
             while (i, j,k) in came_from:
                 i, j,k = came_from[(i, j,k)]
                 path.append((x[i], y[j],z[k]))
+                print("V0 : ", v0[k,j,i]**pow_v0)
             path.reverse()
             return path, travel_time[k_goal,j_goal, i_goal]
 
@@ -194,6 +204,12 @@ import numpy as np
 def precalculate_move_costs(
     v0, vx, vy, vz, dir_offsets, dx, dy, dz, weight_sdf, pow_v0, pow_al
 ):
+    print(
+        "Pow v0 :",pow_v0
+    )
+    print(
+        "Pow al :",pow_al
+    )
     nz, ny, nx = v0.shape
     n_directions = len(dir_offsets)
 
@@ -206,6 +222,7 @@ def precalculate_move_costs(
 
     move_costs = np.full((nz, ny, nx, n_directions), np.inf)
 
+    U=1
     if vx is None or vy is None or vz is None:
         for d_idx in range(n_directions):
             if distances[d_idx] > 0:
@@ -224,7 +241,7 @@ def precalculate_move_costs(
         dist = distances[d_idx]
 
         d_broadcast = d.reshape((1, 1, 1, 3))  # shape (1,1,1,3)
-        v = v_field + d_broadcast  # shape (nz, ny, nx, 3)
+        v = v_field + d_broadcast * U  # shape (nz, ny, nx, 3)
         v_dot_d = np.sum(v * d_broadcast, axis=-1)  # shape (nz, ny, nx)
         v_l = v_field
         v_l_dot_d = np.sum(v_l * d_broadcast, axis=-1)
@@ -235,7 +252,7 @@ def precalculate_move_costs(
             alignment[norm_v_field < 1e-4] = 1.0
 
         alignment = alignment ** pow_al
-        effective_speed = v0 ** pow_v0 * np.maximum(v_dot_d * alignment, 0.001)
+        effective_speed = np.maximum(v0 ** pow_v0 * v_dot_d * alignment,0.000000000000001)
 
         if pow_al > 0 or pow_v0 > 0:
             mask = (v_l_dot_d > 0) & (v0 > 0)
@@ -312,11 +329,10 @@ def visualize_results_a_star(
     # plt.scatter([path[-1][0]], [path[-1][1]], s=20, color = palette[id])
 
 
-def compute_v(x, y,z, velocity_retina, B, grid_size, ratio, sdf_function, c):
+def compute_v(x, y,z, vx_phys,vy_phys,vz_phys, B, grid_size, ratio, sdf_function, c):
 
     if len(x) != grid_size[0] and len(y) != grid_size[1]:
         raise ValueError("x,y are not coherent with the size of the grid")
-    flow_field = velocity_retina
     save_path_phi = f"data/phi/grid_size_{grid_size[0]}_{grid_size[1]}_{grid_size[2]}_phi_3d.npy"
     if os.path.exists(save_path_phi):
         phi = np.load(save_path_phi)
@@ -333,72 +349,85 @@ def compute_v(x, y,z, velocity_retina, B, grid_size, ratio, sdf_function, c):
     phi=phi.T
     # print("Shape of phi :",phi.shape)
     
-    speed = (1.0 / (1.0 + np.exp(B * phi))) - c
-    speed = np.clip(speed, 0.001, 1.0)
+    v0 = (1.0 / (1.0 + np.exp(B * phi))) - c
+    # v0 = np.clip(v0, -0.001, 1.0)
     save_path_flow = f"data/velocity_flow/grid_size_{grid_size[0]}_{grid_size[1]}_{grid_size[2]}_phi_3d/"
-    if flow_field is not None:
-        if os.path.exists(save_path_flow):
-            flow_strength = ratio * np.load(
-                os.path.join(save_path_flow, "flow_strength.npy")
-            )
-            flow_direction_x = np.load(
-                os.path.join(save_path_flow, "flow_direction_x.npy")
-            )
-            flow_direction_y = np.load(
-                os.path.join(save_path_flow, "flow_direction_y.npy")
-            )
-            flow_direction_z = np.load(
-                os.path.join(save_path_flow, "flow_direction_z.npy")
-            )
+    if os.path.exists(save_path_flow):
+        flow_strength = ratio * np.load(
+            os.path.join(save_path_flow, "flow_strength.npy")
+        )
+        flow_direction_x = np.load(
+            os.path.join(save_path_flow, "flow_direction_x.npy")
+        )
+        flow_direction_y = np.load(
+            os.path.join(save_path_flow, "flow_direction_y.npy")
+        )
+        flow_direction_z = np.load(
+            os.path.join(save_path_flow, "flow_direction_z.npy")
+        )
 
-        else:
-            os.makedirs(save_path_flow, exist_ok=True)
-            X, Y, Z = np.meshgrid(x, y, z, indexing='ij')  # Utilisation de l'indexation 'ij'
+    else:
+        os.makedirs(save_path_flow, exist_ok=True)
+        magnitude = np.sqrt(vx_phys**2 + vy_phys**2 + vz_phys**2)
+        mask = magnitude > 0
 
-            flow_strength = np.zeros((grid_size[2], grid_size[1], grid_size[0]))
-            flow_direction_x = np.zeros((grid_size[2], grid_size[1], grid_size[0]))
-            flow_direction_y = np.zeros((grid_size[2], grid_size[1], grid_size[0]))
-            flow_direction_z = np.zeros((grid_size[2], grid_size[1], grid_size[0]))  
+        flow_strength = magnitude
+        flow_direction_x = np.zeros_like(vx_phys)
+        flow_direction_y = np.zeros_like(vy_phys)
+        flow_direction_z = np.zeros_like(vz_phys)
 
-            points = np.vstack([X.ravel(), Y.ravel(), Z.ravel()]).T
+        flow_direction_x[mask] = vx_phys[mask] / magnitude[mask]
+        flow_direction_y[mask] = vy_phys[mask] / magnitude[mask]
+        flow_direction_z[mask] = vz_phys[mask] / magnitude[mask]
 
-            flows = np.array([flow_field(point) for point in points])/ratio
-            vx = flows[:, 0].reshape(X.shape)
-            vy = flows[:, 1].reshape(Y.shape)
-            vz = flows[:, 2].reshape(Z.shape) 
-
-            magnitude = np.sqrt(vx**2 + vy**2 + vz**2)  
-
-            mask = magnitude > 0
-
-            flow_strength = magnitude
-            flow_direction_x = np.zeros_like(vx)
-            flow_direction_y = np.zeros_like(vy)
-            flow_direction_z = np.zeros_like(vz) 
-            
-            flow_direction_x[mask] = vx[mask] / magnitude[mask]
-            flow_direction_y[mask] = vy[mask] / magnitude[mask]
-            flow_direction_z[mask] = vz[mask] / magnitude[mask]
-
-            np.save(os.path.join(save_path_flow, "flow_strength.npy"), flow_strength)
-            np.save(os.path.join(save_path_flow, "flow_direction_x.npy"), flow_direction_x)
-            np.save(os.path.join(save_path_flow, "flow_direction_y.npy"), flow_direction_y)
-            np.save(os.path.join(save_path_flow, "flow_direction_z.npy"), flow_direction_z) 
+        np.save(os.path.join(save_path_flow, "flow_strength.npy"), flow_strength)
+        np.save(os.path.join(save_path_flow, "flow_direction_x.npy"), flow_direction_x)
+        np.save(os.path.join(save_path_flow, "flow_direction_y.npy"), flow_direction_y)
+        np.save(os.path.join(save_path_flow, "flow_direction_z.npy"), flow_direction_z)
 
         print("Flow ready")
-        vx = flow_direction_x * flow_strength
-        vy = flow_direction_y * flow_strength
-        vz = flow_direction_z * flow_strength
-        vx = vx.T
-        vy = vy.T
-        vz = vz.T
-        # print("vx shape :",vx.shape)
-        # print("vy shape :",vy.shape)
-        # print("vz shape :",vz.shape)
-        
-        
-    return speed, vx, vy,vz, save_path_phi, save_path_flow
+    vx = flow_direction_x * flow_strength
+    vy = flow_direction_y * flow_strength
+    vz = flow_direction_z * flow_strength
+    vx = vx.T
+    vy = vy.T
+    vz = vz.T
+    
+    speed = np.sqrt(vx**2 + vy**2 + vz**2)
+    quantile_999 = np.quantile(speed, 0.999)
+    print(f"Seuil 99,9% (quantile) : {quantile_999:.3e}")
 
+    mask = speed <= quantile_999
+
+    vx = np.where(mask, vx, 0.0)
+    vy = np.where(mask, vy, 0.0)
+    vz = np.where(mask, vz, 0.0)
+    print("vx shape :",vx.shape)
+    print("vy shape :",vy.shape)
+    print("vz shape :",vz.shape)
+        
+        
+    return v0, vx, vy,vz, save_path_phi, save_path_flow
+
+def paraview_export(vx,vy,vz,dx,dy,dz,sdf,path,output_save_path):
+    N =vx.shape
+    nx,ny,nz = N
+    grid = pv.ImageData()
+    grid.dimensions = (nx, ny, nz)
+    grid.spacing = (dx, dy, dz)
+    grid.origin = (0, 0, 0)
+    sdf=sdf.T
+    grid["SDF"] = sdf.flatten(order="F")
+    print(grid["SDF"].shape)
+    velocity_vectors = np.stack([vx, vy, vz], axis=-1)
+    grid["velocity"] = velocity_vectors.reshape(-1, 3, order="F")
+    print(grid["velocity"].shape)  # doit être (nx * ny * nz, 3)
+    
+    grid["path"] = path.flatten(order="F")
+    # Sauvegarde
+    grid.save(output_save_path)
+    print(f"Fichier sauvegardé dans : {output_save_path}")
+    
 
 def plot_different_path(
     files_path, label_list, x_new, y_new, sdf_function, vx, vy, v0, scale
@@ -438,26 +467,25 @@ if __name__ == "__main__":
     ratio = 5
 
     # Determine the size of the domain. It maps each point of the domain to each point on the grid.
-    sdf_func,sdf_phys,velocity_retina,x_phys,y_phys,z_phys,physical_depth,physical_width,physical_height,scale = load_sim_sdf(ratio)
+    sdf_func,sdf_phys,velocity_retina,x_phys,y_phys,z_phys,vx_phys,vy_phys,vz_phys,physical_depth,physical_width,physical_height,scale = load_sim_sdf(ratio)
     print("SDF phys :", sdf_phys.shape) ## Convention x,y,z (576,528,24)
     print("x_phys   :", x_phys.shape) ## 576
     print("y_phys   :", y_phys.shape) ## 528
     print("z_phys   :", z_phys.shape) ## 24
     X, Y,Z= np.meshgrid(x_phys, y_phys,z_phys,indexing='ij')
     print("X shape :",X.shape) # (576, 528, 24) 
-    print("Y shape :",Y.shape) # (576, 528, 24)
-    print("Z shape :",Z.shape) # (576, 528, 24)
+    # print("Y shape :",Y.shape) # (576, 528, 24)
+    # print("Z shape :",Z.shape) # (576, 528, 24)
+    
     def sdf_func_2D(point):
         return sdf_func((point[0],point[1],z_phys[len(z_phys)//2]))
     # sdf_function :  Calculate the sdf in any point of the domain py interpolation
     # velocity_retina :  Calculate the velocity in any point of the domain py interpolation
 
-    # Reduce the cell size by a factor : res_factor
 
-    # Compute v0,vx and vy on this new domain.
     plt.figure(figsize=(12, 10))
     weight_sdf = 1
-    start_point = (physical_width * 0.98, physical_height * 0.3,physical_depth*0.5)
+    start_point = (physical_width * 0.8, physical_height * 0.3,physical_depth*0.5)
     goal_point = (0.8,0.6,0.5)
     goal_point = (physical_width * goal_point[0], physical_height * goal_point[1],physical_depth * goal_point[2])
     print(
@@ -467,10 +495,10 @@ if __name__ == "__main__":
     
     print("SDF of goal point : ", sdf_func(goal_point))
     c = 0.5
-    B = 5
+    B = 10
     h = 1
-    pow_v0 = 15
-    pow_al = 0
+    pow_v0 = 0
+    pow_al = 10
     max_radius = 1.5
     # pow_v0 = 0
     # pow_al = 0
@@ -480,12 +508,14 @@ if __name__ == "__main__":
     
     print('Go compute phi')
     grid_size = (len(x_phys), len(y_phys),len(z_phys))
-    v0,vx,vy,vz ,_, _ = compute_v(x_phys, y_phys, z_phys,velocity_retina, B, grid_size, ratio, sdf_func, c)
+    v0,vx,vy,vz ,_, _ = compute_v(x_phys, y_phys, z_phys,vx_phys,vy_phys,vz_phys, B, grid_size, ratio, sdf_func, c)
+
     ## Convention for A* : k,j,i -> z,y,x
-    print("Vx shape : ",vx.shape) #(24, 528, 576) (z,y,x)
-    print("Vy shape : ",vy.shape) #(24, 528, 576)
-    print("Vz shape : ",vz.shape) #(24, 528, 576)
-    print("V0 shape : ",v0.shape) #(24, 528, 576)
+    
+    # print("Vx shape : ",vx.shape) #(24, 528, 576) (z,y,x)
+    # print("Vy shape : ",vy.shape) #(24, 528, 576)
+    # print("Vz shape : ",vz.shape) #(24, 528, 576)
+    # print("V0 shape : ",v0.shape) #(24, 528, 576)
     
     
     
@@ -535,17 +565,17 @@ if __name__ == "__main__":
     print("Path shape : ", path.shape)
     
     print("Path before resampling :", len(path))
-    n = ceil(np.max(dist) / (5 * 1e-3))
-    if n > 1:
-        path, distances = resample_path(path, len(path) * n)
-    print("After resampling : ", len(path))
+    # n = ceil(np.max(dist) / (5 * 1e-3))
+    # if n > 1:
+    #     path, distances = resample_path(path, len(path) * n)
+    # print("After resampling : ", len(path))
+    # print("Path length : ", distances)
     z_coords =path[:,2] 
     
-    smoothed_x = gaussian_filter1d(path[:, 0], sigma=30)
-    smoothed_y = gaussian_filter1d(path[:, 1], sigma=30)
-    smoothed_z = gaussian_filter1d(path[:, 2], sigma=30)
+    smoothed_x = gaussian_filter1d(path[:, 0], sigma=1)
+    smoothed_y = gaussian_filter1d(path[:, 1], sigma=1)
+    smoothed_z = gaussian_filter1d(path[:, 2], sigma=1)
     path = np.stack([smoothed_x, smoothed_y], axis=1)
-    print("Path length : ", distances)
     
     visualize_results_a_star(
         X, Y, sdf_func_2D, path, vx, vy, v0, scale, label=f"B : {B}"
@@ -563,6 +593,14 @@ if __name__ == "__main__":
     plt.hist(z_coords, bins=50, density=True)
     plt.savefig('fig/pathz.png',dpi=100,bbox_inches='tight')
     plt.close()
+    v0  = v0 ** pow_v0
+    plt.hist(v0.flatten(), bins=100)
+    plt.yscale("log")
+    plt.title("Histogramme des vitesses")
+    plt.xlabel("||v0||")
+    plt.ylabel("Frequency (log)")
+    plt.savefig('fig/hist_v0')
+    plt.close()
     # save_path_path = f"data/retina2D_path_time_4_v1_bis_bg.npy"
     # np.save(save_path_path, path, allow_pickle=False)
 
@@ -572,3 +610,9 @@ if __name__ == "__main__":
     # files_path = ['data/retina2D_path_time_4_free_bg.npy','data/retina2D_path_time_4_v1_bis_bg.npy','data/retina2D_path_time_4_v2_bg.npy']
     # label_list = ['Shortest geometrical path','Algorithm 1', 'Algorithm 2']
     # plot_different_path(files_path,label_list,x_phys,y_phys,sdf_func,vx,vy,v0,scale)
+
+    save_output_path_para = f"fig/Astar_path_{current_time}.vti"
+    dx = x_phys[1] - x_phys[0]
+    dy = y_phys[1] - y_phys[0]
+    dz = z_phys[1] - z_phys[0]
+    # paraview_export(vx,vy,vz,dx,dy,dz,sdf_phys,path,save_output_path_para)

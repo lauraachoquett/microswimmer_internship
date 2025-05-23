@@ -48,9 +48,56 @@ if __name__ == '__main__':
     # print(f"Nb points avec vitesse > {threshold:.2f} : {len(outliers)}")
     import matplotlib.pyplot as plt
 
+
+
     plt.hist(speed.flatten(), bins=100)
     plt.yscale("log")
     plt.title("Histogramme des vitesses")
     plt.xlabel("||v||")
     plt.ylabel("Fréquence (log)")
     plt.savefig('fig/hist_v')
+    
+    
+    # # Créer un masque pour ne garder que les vitesses < seuil
+    # mask = (speed <= quantile_999)
+
+    # # Appliquer le masque (remplace les outliers par 0, ou autre valeur neutre)
+
+    # # Masquage
+    # vx[~mask] = 0.0
+    # vy[~mask] = 0.0
+    # vz[~mask] = 0.0
+
+    # # === Statistiques après filtrage ===
+    # filtered_speed = np.sqrt(vx**2 + vy**2 + vz**2)
+    # print(f"After filtering: max={filtered_speed.max():.3e}, min={filtered_speed.min():.3e}, mean={filtered_speed.mean():.3e}, std={filtered_speed.std():.3e}")
+    # for name, arr in zip(["vx", "vy", "vz","sdf"], [vx, vy, vz,sdf]):
+    #     print(f"After filtering {name}:  max={arr.max():.3e}, min={arr.min():.3e}, mean={arr.mean():.3e}, std={arr.std():.3e}")
+    # plt.figure(figsize = (30,8))
+    # plt.subplot(1,3,1)
+    # plt.hist(vx.flatten(), bins=100)
+    # plt.yscale("log")
+    # plt.xlabel("vx")
+    # plt.ylabel("Frequency (log)")
+    # plt.yscale("log")
+    # plt.subplot(1,3,2)
+    # plt.hist(vy.flatten(), bins=100)
+    # plt.xlabel("vy")
+    # plt.ylabel("Frequency (log)")
+    # plt.yscale("log")
+    # plt.subplot(1,3,3)
+    # plt.hist(vz.flatten(), bins=100)
+    # plt.xlabel("vz")
+    # plt.ylabel("Frequency (log)")
+    # plt.yscale("log")
+    # plt.savefig('fig/hist_v_mask')
+    # plt.close()
+    
+    # speed = np.sqrt(vx**2 + vy**2 + vz**2)
+    # plt.hist(speed.flatten(), bins=100)
+    # plt.yscale("log")
+    # plt.title("Histogramme des vitesses")
+    # plt.xlabel("||v||")
+    # plt.ylabel("Frequency (log)")
+    # plt.savefig('fig/hist_v_norm_mask')
+    # plt.close()
