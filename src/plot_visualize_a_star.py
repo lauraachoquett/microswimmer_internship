@@ -106,29 +106,92 @@ def plot_a_star( X, Y, sdf_function, vx, vy, v0, path, scale, current_time,label
     
 
 # Fonction alternative si vous voulez définir les données sur les points
+# Version encore plus simple basée exactement sur votre code
+# Version encore plus simple basée exactement sur votre code
 def paraview_export_points(vx, vy, vz, dx, dy, dz, sdf, path_points, output_save_path):
-    """
-    Version alternative avec données définies sur les points (pas les cellules)
-    """
     nz, ny, nx = vx.shape
     
-    # Pour des données sur les points, dimensions = nombre de points
     grid = pv.ImageData()
     grid.dimensions = (nx, ny, nz)
     grid.spacing = (dx, dy, dz)
     grid.origin = (0, 0, 0)
+
+    grid["SDF"] = sdf.flatten(order="F")
+    velocity_vectors = np.stack([vx, vy, vz], axis=-1)
+    print(f"Velocity vectors shape: {velocity_vectors.shape}")
+    grid["velocity"] = velocity_vectors.reshape(-1, 3, order="F")
+    print(f"Grid velocity shape: {grid['velocity'].shape}")
     
-    # Transposer et assigner aux points
-    sdf_vtk = sdf.transpose(2, 1, 0).flatten()
-    vx_vtk = vx.transpose(2, 1, 0).flatten()
-    vy_vtk = vy.transpose(2, 1, 0).flatten()
-    vz_vtk = vz.transpose(2, 1, 0).flatten()
+    # Ajouter le chemin si fourni (format [i,j,k])
+    if path_points is not None and len(path_points) > 0:
+        try:
+            # Convertir les indices [i,j,k] en coordonnées physiques [x,y,z]
+            path_points_array = np.array(path_points)
+            print(f"Path points shape: {path_points_array.shape}")
+            
+            if path_points_array.shape[1] == 3:  # Format [i,j,k]
+                # Conversion: indices → coordonnées physiques
+                # i → x, j → y, k → z
+                path_physical = np.zeros_like(path_points_array, dtype=float)
+                path_physical[:, 0] = path_points_array[:, 0] * dx  # i → x
+                path_physical[:, 1] = path_points_array[:, 1] * dy  # j → y  
+                path_physical[:, 2] = path_points_array[:, 2] * dz  # k → z
+                
+                print(f"Conversion indices → coordonnées:")
+                print(f"  Premier point: {path_points_array[0]} → {path_physical[0]}")
+                print(f"  Dernier point: {path_points_array[-1]} → {path_physical[-1]}")
+                
+                # Créer le PolyData pour le chemin
+                path_polydata = pv.PolyData(path_physical)
+                
+                # Créer des lignes connectant les points consécutifs
+                if len(path_points) > 1:
+                    lines = []
+                    for i in range(len(path_points) - 1):
+                        lines.extend([2, i, i + 1])  # Format VTK: [nb_points, point1, point2]
+                    path_polydata.lines = np.array(lines)
+                    print(f"Nombre de segments créés: {len(path_points) - 1}")
+                
+                # Sauvegarder le chemin séparément
+                path_output = output_save_path.replace('.vti', '_path.vtp')
+                path_polydata.save(path_output)
+                print(f"Chemin sauvegardé: {path_output}")
+                
+        except Exception as e:
+            print(f"Erreur lors de la création du chemin: {e}")
+            print(f"Format attendu: liste de [i,j,k] où i,j,k sont des indices de grille")
     
-    grid.point_data["SDF"] = sdf_vtk
-    velocity = np.column_stack((vx_vtk, vy_vtk, vz_vtk))
-    grid.point_data["Velocity"] = velocity
-    
-    grid.save(output_save_path)
+    # Sauvegarde avec gestion d'erreurs
+    try:
+        # Vérifier et créer le répertoire si nécessaire
+        import os
+        output_dir = os.path.dirname(output_save_path)
+        if output_dir and not os.path.exists(output_dir):
+            os.makedirs(output_dir, exist_ok=True)
+            print(f"Répertoire créé: {output_dir}")
+        
+        # Vérifier les permissions d'écriture
+        if output_dir and not os.access(output_dir, os.W_OK):
+            raise PermissionError(f"Pas de permission d'écriture dans: {output_dir}")
+        
+        # Sauvegarde de la grille principale
+        print(f"Tentative de sauvegarde: {output_save_path}")
+        grid.save(output_save_path)
+        print(f"✓ Fichier sauvegardé avec succès: {output_save_path}")
+        
+    except Exception as e:
+        print(f"❌ Erreur lors de la sauvegarde: {e}")
+        print(f"   Chemin problématique: {output_save_path}")
+        
+        # Tentative de sauvegarde dans le répertoire courant
+        backup_path = os.path.basename(output_save_path)
+        try:
+            print(f"Tentative de sauvegarde alternative: {backup_path}")
+            grid.save(backup_path)
+            print(f"✓ Sauvegarde alternative réussie: {backup_path}")
+        except Exception as e2:
+            print(f"❌ Échec de la sauvegarde alternative: {e2}")
+            raise
     
     return grid
     

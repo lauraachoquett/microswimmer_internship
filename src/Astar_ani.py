@@ -479,17 +479,14 @@ if __name__ == "__main__":
     # plot_different_path(files_path,label_list,x_phys,y_phys,sdf_func,vx,vy,v0,scale)
 
 
-    save_output_path_para = f"paraview/Astar_path_{current_time}/sdf_vel_path.vti"
-    os.makedirs(save_output_path_para,exist_ok=True)
+    save_output_path_para_file= f"paraview/Astar_path_{current_time}"
+    os.makedirs(save_output_path_para_file,exist_ok=True)
+    save_output_path_para = os.path.join(save_output_path_para_file,'sdf_vel_path.vti')
     dx = x_phys[1] - x_phys[0]
     dy = y_phys[1] - y_phys[0]
     dz = z_phys[1] - z_phys[0]
-    paraview_export_points(vx,vy,vz,dx,dy,dz,sdf_phys.T,path_id,save_output_path_para)
-    
-    
-    
+    grid =  paraview_export_points(vx,vy,vz,dx,dy,dz,sdf_phys.T,path_id,save_output_path_para)
         
-    
     plt.hist(z_coords, bins=50, density=True)
     plt.savefig('fig/pathz.png',dpi=100,bbox_inches='tight')
     plt.close()
