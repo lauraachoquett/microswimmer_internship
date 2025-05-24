@@ -58,15 +58,6 @@ if __name__ == '__main__':
     plt.savefig('fig/hist_v')
     
     
-    # # Créer un masque pour ne garder que les vitesses < seuil
-    # mask = (speed <= quantile_999)
-
-    # # Appliquer le masque (remplace les outliers par 0, ou autre valeur neutre)
-
-    # # Masquage
-    # vx[~mask] = 0.0
-    # vy[~mask] = 0.0
-    # vz[~mask] = 0.0
 
     # # === Statistiques après filtrage ===
     # filtered_speed = np.sqrt(vx**2 + vy**2 + vz**2)

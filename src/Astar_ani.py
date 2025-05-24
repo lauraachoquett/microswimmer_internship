@@ -152,15 +152,18 @@ def astar_anisotropic(
         f, current_i, current_j,current_k = heapq.heappop(open_set)
         # print("f current point :",f)
         if current_i == i_goal and current_j == j_goal and current_k == k_goal:
-
             path = [(x[i_goal], y[j_goal],z[k_goal])]
+            path_id = [[i_goal,j_goal,k_goal]]
             i, j,k = i_goal, j_goal,k_goal
             while (i, j,k) in came_from:
                 i, j,k = came_from[(i, j,k)]
-                path.append((x[i], y[j],z[k]))
+                p = (x[i], y[j],z[k])
+                path.append(p)
+                path_id.append([i,j,k])
                 print("V0 : ", v0[k,j,i]**pow_v0)
+            path_id.reverse()
             path.reverse()
-            return path, travel_time[k_goal,j_goal, i_goal]
+            return path, path_id,travel_time[k_goal,j_goal, i_goal]
 
         closed_set.add((current_i, current_j,current_k))
 
@@ -196,75 +199,115 @@ def astar_anisotropic(
                 open_set, (f_score[neighbor_k,neighbor_j, neighbor_i], neighbor_i, neighbor_j,neighbor_k)
             )
 
-    return [], travel_time
+    return [],[],travel_time
 
 
 import numpy as np
 
-def precalculate_move_costs(
-    v0, vx, vy, vz, dir_offsets, dx, dy, dz, weight_sdf, pow_v0, pow_al
-):
-    print(
-        "Pow v0 :",pow_v0
-    )
-    print(
-        "Pow al :",pow_al
-    )
+def precalculate_move_costs(v0, vx, vy, vz, dir_offsets, dx, dy, dz, weight_sdf, pow_v0, pow_al):
+    """
+    Pré-calcule les coûts de déplacement pour chaque direction à chaque point en 3D.
+    Version vectorisée optimisée.
+
+    Args:
+        v0: tableau 3D (nz, ny, nx) - vitesse de base
+        vx, vy, vz: tableaux 3D (nz, ny, nx) - composantes du champ de vitesse
+        dir_offsets: liste de tuples (di, dj, dk) - directions de déplacement
+        dx, dy, dz: pas spatiaux
+        weight_sdf: poids SDF (non utilisé dans cette version)
+        pow_v0, pow_al: exposants pour v0 et alignement
+
+    Retourne:
+        move_costs: tableau 4D (nz, ny, nx, n_directions) des coûts
+    """
     nz, ny, nx = v0.shape
     n_directions = len(dir_offsets)
-
-    dir_offsets = np.array(dir_offsets)
-    delta_xyz = dir_offsets * np.array([dz, dy, dx])  # shape (n_directions, 3)
-    distances = np.linalg.norm(delta_xyz, axis=1)
+    
+    # Convertir dir_offsets en array pour vectorisation
+    dir_offsets = np.array(dir_offsets)  # shape: (n_directions, 3)
+    
+    # Calculer toutes les distances d'un coup
+    distances = np.sqrt(
+        (dir_offsets[:, 0] * dx) ** 2 + 
+        (dir_offsets[:, 1] * dy) ** 2 + 
+        (dir_offsets[:, 2] * dz) ** 2
+    )
+    
+    # Masque pour les directions valides (distance > 0)
     valid_dirs = distances > 0
-    directions = np.zeros_like(delta_xyz)
-    directions[valid_dirs] = delta_xyz[valid_dirs] / distances[valid_dirs, None]
-
+    
+    # Initialiser le tableau de coûts
     move_costs = np.full((nz, ny, nx, n_directions), np.inf)
-
-    U=1
+    
+    # Cas simple : pas de champ de vitesse
     if vx is None or vy is None or vz is None:
-        for d_idx in range(n_directions):
-            if distances[d_idx] > 0:
-                move_costs[..., d_idx] = distances[d_idx]
+        move_costs[:, :, :, valid_dirs] = distances[valid_dirs]
         return move_costs
-
-    v_field = np.stack([vz, vy, vx], axis=-1)  # shape (nz, ny, nx, 3)
-
-    norm_v_field = np.linalg.norm(v_field, axis=-1)  # shape (nz, ny, nx)
-
-    for d_idx in range(n_directions):
-        if not valid_dirs[d_idx]:
-            continue
-
-        d = directions[d_idx]  # shape (3,)
-        dist = distances[d_idx]
-
-        d_broadcast = d.reshape((1, 1, 1, 3))  # shape (1,1,1,3)
-        v = v_field + d_broadcast * U  # shape (nz, ny, nx, 3)
-        v_dot_d = np.sum(v * d_broadcast, axis=-1)  # shape (nz, ny, nx)
-        v_l = v_field
-        v_l_dot_d = np.sum(v_l * d_broadcast, axis=-1)
-        norm_d = np.linalg.norm(d)
-
-        with np.errstate(divide='ignore', invalid='ignore'):
-            alignment = np.abs(v_l_dot_d) / (norm_v_field * norm_d)
-            alignment[norm_v_field < 1e-4] = 1.0
-
-        alignment = alignment ** pow_al
-        effective_speed = np.maximum(v0 ** pow_v0 * v_dot_d * alignment,0.000000000000001)
-
+    
+    U = 1
+    
+    # Calculer les directions normalisées pour toutes les directions valides
+    dir_norm = np.zeros((n_directions, 3))
+    dir_norm[valid_dirs, 0] = dir_offsets[valid_dirs, 0] * dx / distances[valid_dirs]
+    dir_norm[valid_dirs, 1] = dir_offsets[valid_dirs, 1] * dy / distances[valid_dirs]
+    dir_norm[valid_dirs, 2] = dir_offsets[valid_dirs, 2] * dz / distances[valid_dirs]
+    
+    # Vectoriser sur toutes les positions et directions
+    for d_idx in np.where(valid_dirs)[0]:
+        di, dj, dk = dir_offsets[d_idx]
+        distance = distances[d_idx]
+        dir_x, dir_y, dir_z = dir_norm[d_idx]
+        
+        # Calculer les indices des voisins (avec clamp)
+        neighbor_i = np.clip(np.arange(nx)[None, None, :] + di, 0, nx-1)
+        neighbor_j = np.clip(np.arange(ny)[None, :, None] + dj, 0, ny-1)
+        neighbor_k = np.clip(np.arange(nz)[:, None, None] + dk, 0, nz-1)
+        
+        # Champ de vitesse local en chaque point
+        v_l_x = vx  # shape: (nz, ny, nx)
+        v_l_y = vy  # shape: (nz, ny, nx)
+        v_l_z = vz  # shape: (nz, ny, nx)
+        
+        # Vitesse totale v = v_l + U * d
+        v_x = v_l_x + U * dir_x
+        v_y = v_l_y + U * dir_y
+        v_z = v_l_z + U * dir_z
+        
+        # Composante du flux dans la direction
+        flow_component = v_x * dir_x + v_y * dir_y + v_z * dir_z
+        
+        # Calcul de l'alignement
+        v_l_norm = np.sqrt(v_l_x**2 + v_l_y**2 + v_l_z**2)
+        v_l_dot_d = v_l_x * dir_x + v_l_y * dir_y + v_l_z * dir_z
+        
+        # Éviter division par zéro
+        alignment = np.ones_like(v_l_norm)
+        mask_nonzero = v_l_norm > 0.0001
+        alignment[mask_nonzero] = (np.abs(v_l_dot_d[mask_nonzero]) / v_l_norm[mask_nonzero]) ** pow_al
+        
+        # Vitesse effective
+        effective_speed = flow_component * alignment
+        
+        # Facteur de vitesse du voisin
+        v0_neighbor = v0[neighbor_k, neighbor_j, neighbor_i]
+        effective_speed = (v0_neighbor ** pow_v0) * np.maximum(effective_speed, 0.001)
+        
+        # Conditions pour calculer le coût
         if pow_al > 0 or pow_v0 > 0:
-            mask = (v_l_dot_d > 0) & (v0 > 0)
+            valid_mask = (v_l_dot_d > 0.0) & (v0_neighbor > 0)
         else:
-            mask = v_dot_d > 0
-
-        cost = np.full_like(effective_speed, np.inf)
-        cost[mask] = dist / effective_speed[mask]
-        move_costs[..., d_idx] = cost
-
+            valid_mask = flow_component > 0
+        
+        # Calculer les coûts
+        costs = np.full((nz, ny, nx), np.inf)
+        if pow_al > 0 or pow_v0 > 0:
+            costs[valid_mask] = distance / effective_speed[valid_mask]
+        else:
+            costs[valid_mask] = distance / flow_component[valid_mask]
+        
+        move_costs[:, :, :, d_idx] = costs
+    
     return move_costs
-
 
 def heuristic(i1, j1,k1, i2, j2,k2, dx, dy,dz):
     """
@@ -349,7 +392,7 @@ def compute_v(x, y,z, vx_phys,vy_phys,vz_phys, B, grid_size, ratio, sdf_function
     phi=phi.T
     # print("Shape of phi :",phi.shape)
     
-    v0 = (1.0 / (1.0 + np.exp(B * phi))) - c
+    v0 = - phi
     # v0 = np.clip(v0, -0.001, 1.0)
     save_path_flow = f"data/velocity_flow/grid_size_{grid_size[0]}_{grid_size[1]}_{grid_size[2]}_phi_3d/"
     if os.path.exists(save_path_flow):
@@ -386,22 +429,19 @@ def compute_v(x, y,z, vx_phys,vy_phys,vz_phys, B, grid_size, ratio, sdf_function
         np.save(os.path.join(save_path_flow, "flow_direction_z.npy"), flow_direction_z)
 
         print("Flow ready")
-    vx = flow_direction_x * flow_strength
-    vy = flow_direction_y * flow_strength
-    vz = flow_direction_z * flow_strength
+    vx = flow_direction_x * flow_strength / (np.max(flow_strength)) * ratio
+    vy = flow_direction_y * flow_strength / (np.max(flow_strength)) * ratio
+    vz = flow_direction_z * flow_strength / (np.max(flow_strength)) * ratio
     vx = vx.T
     vy = vy.T
     vz = vz.T
-    
+    # === Statistiques initiales ===
+    for name, arr in zip(["vx", "vy", "vz"], [vx, vy, vz]):
+        print(f"{name}: min={arr.min():.3e}, max={arr.max():.3e}, mean={arr.mean():.3e}, std={arr.std():.3e}")
+
     speed = np.sqrt(vx**2 + vy**2 + vz**2)
-    quantile_999 = np.quantile(speed, 0.999)
-    print(f"Seuil 99,9% (quantile) : {quantile_999:.3e}")
-
-    mask = speed <= quantile_999
-
-    vx = np.where(mask, vx, 0.0)
-    vy = np.where(mask, vy, 0.0)
-    vz = np.where(mask, vz, 0.0)
+    print(f"Speed: min={speed.min():.3e}, max={speed.max():.3e}, mean={speed.mean():.3e}, std={speed.std():.3e}")
+    
     print("vx shape :",vx.shape)
     print("vy shape :",vy.shape)
     print("vz shape :",vz.shape)
@@ -409,26 +449,33 @@ def compute_v(x, y,z, vx_phys,vy_phys,vz_phys, B, grid_size, ratio, sdf_function
         
     return v0, vx, vy,vz, save_path_phi, save_path_flow
 
-def paraview_export(vx,vy,vz,dx,dy,dz,sdf,path,output_save_path):
-    N =vx.shape
-    nx,ny,nz = N
+def paraview_export(vx, vy, vz, dx, dy, dz, sdf, path_points, output_save_path):
+    nz, ny, nx = vx.shape
+    
     grid = pv.ImageData()
     grid.dimensions = (nx, ny, nz)
     grid.spacing = (dx, dy, dz)
     grid.origin = (0, 0, 0)
-    sdf=sdf.T
-    grid["SDF"] = sdf.flatten(order="F")
-    print(grid["SDF"].shape)
+    
+    grid["SDF"] = sdf.flatten(order="C")
+    
     velocity_vectors = np.stack([vx, vy, vz], axis=-1)
-    grid["velocity"] = velocity_vectors.reshape(-1, 3, order="F")
-    print(grid["velocity"].shape)  # doit être (nx * ny * nz, 3)
+    grid["velocity"] = velocity_vectors.reshape(-1, 3, order="C")
     
-    grid["path"] = path.flatten(order="F")
-    # Sauvegarde
-    grid.save(output_save_path)
-    print(f"Fichier sauvegardé dans : {output_save_path}")
+    indicator = np.zeros_like(sdf, dtype=np.uint8)
+    for point in path_points:
+        if len(point) == 3:
+            i, j, k = point 
+            if 0 <= i < nx and 0 <= j < ny and 0 <= k < nz:
+                indicator[k, j, i] = 1
     
-
+    grid["path_mask"] = indicator.flatten(order="C")
+    
+    os.makedirs(output_save_path, exist_ok=True)
+    output_save_path_vti = os.path.join(output_save_path, 'sdf_vel.vti')
+    grid.save(output_save_path_vti)
+    print(f"Fichier sauvegardé dans : {output_save_path_vti}")
+    
 def plot_different_path(
     files_path, label_list, x_new, y_new, sdf_function, vx, vy, v0, scale
 ):
@@ -485,8 +532,8 @@ if __name__ == "__main__":
 
     plt.figure(figsize=(12, 10))
     weight_sdf = 1
-    start_point = (physical_width * 0.8, physical_height * 0.3,physical_depth*0.5)
-    goal_point = (0.8,0.6,0.5)
+    start_point = (physical_width * 0.98, physical_height * 0.3,physical_depth*0.5)
+    goal_point = (0.8,0.3,0.5)
     goal_point = (physical_width * goal_point[0], physical_height * goal_point[1],physical_depth * goal_point[2])
     print(
         "Distance between the two points : ",
@@ -495,10 +542,10 @@ if __name__ == "__main__":
     
     print("SDF of goal point : ", sdf_func(goal_point))
     c = 0.5
-    B = 10
+    B = 5
     h = 1
-    pow_v0 = 0
-    pow_al = 10
+    pow_v0 = 7
+    pow_al = 4
     max_radius = 1.5
     # pow_v0 = 0
     # pow_al = 0
@@ -539,7 +586,7 @@ if __name__ == "__main__":
 
 
     
-    path, travel_time = astar_anisotropic(
+    path, path_id,travel_time = astar_anisotropic(
         x_phys,
         y_phys,
         z_phys,
@@ -572,13 +619,13 @@ if __name__ == "__main__":
     # print("Path length : ", distances)
     z_coords =path[:,2] 
     
-    smoothed_x = gaussian_filter1d(path[:, 0], sigma=1)
-    smoothed_y = gaussian_filter1d(path[:, 1], sigma=1)
-    smoothed_z = gaussian_filter1d(path[:, 2], sigma=1)
-    path = np.stack([smoothed_x, smoothed_y], axis=1)
+    smoothed_x = gaussian_filter1d(path[:, 0], sigma=5)
+    smoothed_y = gaussian_filter1d(path[:, 1], sigma=5)
+    smoothed_z = gaussian_filter1d(path[:, 2], sigma=5)
+    path_2D = np.stack([smoothed_x, smoothed_y], axis=1)
     
     visualize_results_a_star(
-        X, Y, sdf_func_2D, path, vx, vy, v0, scale, label=f"B : {B}"
+        X, Y, sdf_func_2D, path_2D, vx, vy, v0, scale, label=f"pow al : {pow_al}, pow_v0 : {pow_v0}, B : {B} and c :{c}"
     )
     # plot_velocity(6, vx, vy, v0, X, Y)
     plt.legend()
@@ -611,8 +658,9 @@ if __name__ == "__main__":
     # label_list = ['Shortest geometrical path','Algorithm 1', 'Algorithm 2']
     # plot_different_path(files_path,label_list,x_phys,y_phys,sdf_func,vx,vy,v0,scale)
 
-    save_output_path_para = f"fig/Astar_path_{current_time}.vti"
+    save_output_path_para = f"paraview/Astar_path_{current_time}"
+    os.makedirs(save_output_path_para,exist_ok=True)
     dx = x_phys[1] - x_phys[0]
     dy = y_phys[1] - y_phys[0]
     dz = z_phys[1] - z_phys[0]
-    # paraview_export(vx,vy,vz,dx,dy,dz,sdf_phys,path,save_output_path_para)
+    paraview_export(vx,vy,vz,dx,dy,dz,sdf_phys.T,path_id,save_output_path_para)

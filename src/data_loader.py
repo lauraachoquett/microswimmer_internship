@@ -4,7 +4,7 @@ from scipy.interpolate import RegularGridInterpolator
 import os
 import pyvista as pv
 import numpy as np
-
+import time
 def sdf_read(path):
     with open(path, "rb") as f:
         L = [float(l) for l in f.readline().decode().split()]
@@ -76,7 +76,18 @@ def load_sim_sdf(ratio):
     N, h, vel = vel_read(path_vel)
     v = vel[:, :, :, 0:3]
     vx, vy,vz = v[:, :, :,0], v[:, :, :,1] ,v[:, :,:,2] 
+    speed = np.sqrt(vx**2 + vy**2 + vz**2)
+    
+    quantile_999 = np.quantile(speed, 0.999995)
+    print(f"Seuil 99,9% (quantile) : {quantile_999:.3e}")
+    mask = (speed <= quantile_999)
 
+
+    # Masquage
+    vx = np.where(mask, vx, 0.0)
+    vy = np.where(mask, vy, 0.0)
+    vz = np.where(mask, vz, 0.0)
+    
     velocity_interpolator_x = RegularGridInterpolator(
         (z,y, x), vx, bounds_error=False, fill_value=None
     )
@@ -104,7 +115,8 @@ def load_sim_sdf(ratio):
     )
 
     v_magnitude = np.sqrt(vx_phys**2 + vy_phys**2+ vz_phys**2)
-
+    
+    
     def velocity_retina(point):
 
         return (
@@ -225,16 +237,23 @@ if __name__ == "__main__":
     plt.ylabel("Fréquence (log)")
     plt.savefig('fig/hist_v')
     plt.close()
+    
+    quantile_999 = np.quantile(speed, 0.999995)
+    print(f"Seuil 99,9% (quantile) : {quantile_999:.3e}")
+    # Créer un masque pour ne garder que les vitesses < seuil
+    mask = (speed <= quantile_999)
 
-    # # === Filtrage des vitesses trop élevées ===
-    # mask = speed > 10  # ou < threshold si tu préfères être cohérente
-    # vx[mask] = 0
-    # vy[mask] = 0
-    # vz[mask] = 0
+
+    # Masquage
+    vx = np.where(mask, vx, 0.0)
+    vy = np.where(mask, vy, 0.0)
+    vz = np.where(mask, vz, 0.0)
 
     
-    # === Affichage des shapes filtrées ===
-    
+    filtered_speed = np.sqrt(vx**2 + vy**2 + vz**2)
+    print(f"After filtering: max={filtered_speed.max():.3e}, min={filtered_speed.min():.3e}, mean={filtered_speed.mean():.3e}, std={filtered_speed.std():.3e}")
+    for name, arr in zip(["vx", "vy", "vz","sdf"], [vx, vy, vz,sdf]):
+        print(f"After filtering {name}:  max={arr.max():.3e}, min={arr.min():.3e}, mean={arr.mean():.3e}, std={arr.std():.3e}")
     nx,ny,nz = N
     grid = pv.ImageData()
     grid.dimensions = (nx, ny, nz)
@@ -256,7 +275,7 @@ if __name__ == "__main__":
     grid["velocity"] = velocity_vectors.reshape(-1, 3, order="F")
     print(grid["velocity"].shape)  # doit être (nx * ny * nz, 3)
     # Sauvegarde
-    output_path = "velocity_with_sdf.vti"
+    output_path = f"velocity_with_sdf_{time.time()}.vti"
     grid.save(output_path)
     print(f"Fichier sauvegardé dans : {output_path}")
     
