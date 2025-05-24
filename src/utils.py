@@ -2,6 +2,8 @@ from pathlib import Path
 
 import numpy as np
 import torch
+from math import ceil, gcd, sqrt
+from functools import reduce
 
 
 class ReplayBuffer(object):
@@ -105,3 +107,36 @@ def create_numbered_run_folder(parent_dir):
 
     print(f"✔ Nouveau dossier créé : {new_folder}")
     return new_folder
+
+
+
+
+
+def gcd_of_three(a, b, c):
+    return reduce(gcd, [abs(a), abs(b), abs(c)])
+
+def generate_directions_3d(max_radius):
+    directions = set()
+    max_radius_int = ceil(max_radius)
+    for dx in range(-max_radius_int, max_radius_int + 1):
+        for dy in range(-max_radius_int, max_radius_int + 1):
+            for dz in range(-max_radius_int, max_radius_int + 1):
+                if dx == 0 and dy == 0 and dz == 0:
+                    continue
+                
+                distance = sqrt(dx**2 + dy**2 + dz**2)
+                if distance <= max_radius:
+                    if dx == 0 and dy == 0:
+                        g = abs(dz)
+                    elif dx == 0 and dz == 0:
+                        g = abs(dy)
+                    elif dy == 0 and dz == 0:
+                        g = abs(dx)
+                    else:
+                        g = gcd_of_three(dx, dy, dz)
+                    
+                    if g > 0:
+                        reduced = (dx // g, dy // g, dz // g)
+                        directions.add(reduced)
+    
+    return list(directions)

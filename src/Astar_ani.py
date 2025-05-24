@@ -14,58 +14,20 @@ from tqdm import tqdm
 import pyvista as pv
 import numpy as np
 
+from src.utils import gcd_of_three,generate_directions_3d
 from src.Astar import resample_path
 from src.data_loader import load_sdf_from_csv, load_sim_sdf, vel_read,plot_sdf_slices
 from src.fmm import sdf_func_and_velocity_func
-from src.sdf import get_contour_coordinates
+from src.plot_visualize_a_star import plot_a_star,paraview_export, paraview_export_points
 
-def gcd_of_three(a, b, c):
-    return reduce(gcd, [abs(a), abs(b), abs(c)])
-
-def generate_directions_3d(max_radius):
-    directions = set()
-    max_radius_int = ceil(max_radius)
-    for dx in range(-max_radius_int, max_radius_int + 1):
-        for dy in range(-max_radius_int, max_radius_int + 1):
-            for dz in range(-max_radius_int, max_radius_int + 1):
-                if dx == 0 and dy == 0 and dz == 0:
-                    continue
-                
-                distance = sqrt(dx**2 + dy**2 + dz**2)
-                if distance <= max_radius:
-                    if dx == 0 and dy == 0:
-                        g = abs(dz)
-                    elif dx == 0 and dz == 0:
-                        g = abs(dy)
-                    elif dy == 0 and dz == 0:
-                        g = abs(dx)
-                    else:
-                        g = gcd_of_three(dx, dy, dz)
-                    
-                    if g > 0:
-                        reduced = (dx // g, dy // g, dz // g)
-                        directions.add(reduced)
-    
-    return list(directions)
-
-
-def contour_2D(sdf_function, X_new, Y_new, scale):
-    if os.path.exists(f"data/retina2D_contour_scale_{scale}.npy"):
-        obstacle_contour = np.load(
-            f"data/retina2D_contour_scale_{scale}.npy", allow_pickle=False
-        )
-        print("Contour loaded")
-    else:
-        Z = np.vectorize(lambda px, py: sdf_function((px, py)))(X_new, Y_new)
-        obstacle_contour = get_contour_coordinates(X_new, Y_new, Z, level=0)
-        np.save(
-            f"data/retina2D_contour_scale_{scale}.npy",
-            obstacle_contour,
-            allow_pickle=False,
-        )
-
-    return obstacle_contour
-
+def heuristic(i1, j1,k1, i2, j2,k2, dx, dy,dz):
+    """
+    Calcule une heuristique admissible pour A*.
+    Utilise la distance euclidienne divisée par la vitesse maximale possible.
+    """
+    distance = np.sqrt(((i2 - i1) * dx) ** 2 + ((j2 - j1) * dy) ** 2 +  ((k2 - k1) * dz) ** 2)
+    v_max = 1.0
+    return distance / v_max
 
 def astar_anisotropic(
     x,
@@ -160,7 +122,7 @@ def astar_anisotropic(
                 p = (x[i], y[j],z[k])
                 path.append(p)
                 path_id.append([i,j,k])
-                print("V0 : ", v0[k,j,i]**pow_v0)
+                # print("V0 : ", v0[k,j,i]**pow_v0)
             path_id.reverse()
             path.reverse()
             return path, path_id,travel_time[k_goal,j_goal, i_goal]
@@ -202,7 +164,6 @@ def astar_anisotropic(
     return [],[],travel_time
 
 
-import numpy as np
 
 def precalculate_move_costs(v0, vx, vy, vz, dir_offsets, dx, dy, dz, weight_sdf, pow_v0, pow_al):
     """
@@ -309,68 +270,6 @@ def precalculate_move_costs(v0, vx, vy, vz, dir_offsets, dx, dy, dz, weight_sdf,
     
     return move_costs
 
-def heuristic(i1, j1,k1, i2, j2,k2, dx, dy,dz):
-    """
-    Calcule une heuristique admissible pour A*.
-    Utilise la distance euclidienne divisée par la vitesse maximale possible.
-    """
-    distance = np.sqrt(((i2 - i1) * dx) ** 2 + ((j2 - j1) * dy) ** 2 +  ((k2 - k1) * dz) ** 2)
-    v_max = 1.0
-    return distance / v_max
-
-
-def plot_velocity(step, vx, vy, v0, X, Y):
-    step = 8
-
-    X_sub = X[::step, ::step]
-    Y_sub = Y[::step, ::step]
-    vx_sub = vx[::step, ::step]
-    vy_sub = vy[::step, ::step]
-    v0_sub = v0[::step, ::step]
-    print(v0_sub.shape)
-    mask = ((vx_sub != 0) | (vy_sub != 0)) & (v0_sub > 0.2)
-
-    X_masked = X_sub[mask]
-    Y_masked = Y_sub[mask]
-    vx_masked = vx_sub[mask]
-    vy_masked = vy_sub[mask]
-    plt.imshow(
-        v0,
-        extent=[X.min(), X.max(), Y.min(), Y.max()],
-        origin="lower",
-        cmap="Reds",
-        alpha=0.7,
-    )
-    plt.colorbar(label="v0")
-
-    plt.quiver(
-        X_masked,
-        Y_masked,
-        vx_masked,
-        vy_masked,
-        color="darkred",
-        scale=80,
-        alpha=0.5,
-    )
-
-
-def visualize_results_a_star(
-    X, Y, sdf_function, path, vx, vy, v0, scale, label="", color=None
-):
-    """
-    Visualise les résultats de l'algorithme A*.
-    """
-
-    obstacle_contour = contour_2D(sdf_function, X, Y, scale)
-
-    plt.scatter(obstacle_contour[:, 0], obstacle_contour[:, 1], color="black", s=0.2)
-    palette = sns.color_palette()
-
-    path_x, path_y = zip(*path)
-    plt.plot(path_x, path_y, linewidth=2, label=label)
-    # plt.scatter([path[0][0]], [path[0][1]], s=50)
-    # plt.scatter([path[-1][0]], [path[-1][1]], s=20, color = palette[id])
-
 
 def compute_v(x, y,z, vx_phys,vy_phys,vz_phys, B, grid_size, ratio, sdf_function, c):
 
@@ -449,64 +348,24 @@ def compute_v(x, y,z, vx_phys,vy_phys,vz_phys, B, grid_size, ratio, sdf_function
         
     return v0, vx, vy,vz, save_path_phi, save_path_flow
 
-def paraview_export(vx, vy, vz, dx, dy, dz, sdf, path_points, output_save_path):
-    nz, ny, nx = vx.shape
-    
-    grid = pv.ImageData()
-    grid.dimensions = (nx, ny, nz)
-    grid.spacing = (dx, dy, dz)
-    grid.origin = (0, 0, 0)
-    
-    grid["SDF"] = sdf.flatten(order="C")
-    
-    velocity_vectors = np.stack([vx, vy, vz], axis=-1)
-    grid["velocity"] = velocity_vectors.reshape(-1, 3, order="C")
-    
-    indicator = np.zeros_like(sdf, dtype=np.uint8)
-    for point in path_points:
-        if len(point) == 3:
-            i, j, k = point 
-            if 0 <= i < nx and 0 <= j < ny and 0 <= k < nz:
-                indicator[k, j, i] = 1
-    
-    grid["path_mask"] = indicator.flatten(order="C")
-    
-    os.makedirs(output_save_path, exist_ok=True)
-    output_save_path_vti = os.path.join(output_save_path, 'sdf_vel.vti')
-    grid.save(output_save_path_vti)
-    print(f"Fichier sauvegardé dans : {output_save_path_vti}")
-    
-def plot_different_path(
-    files_path, label_list, x_new, y_new, sdf_function, vx, vy, v0, scale
-):
-    path_list = []
-    palette = sns.color_palette()
 
-    for id, file_path in enumerate(files_path):
-        path = np.load(file_path)
-        path, distances = resample_path(path, len(path))
-        print(f"{file_path} length : {distances}")
-        visualize_results_a_star(
-            x_new,
-            y_new,
-            sdf_function,
-            path,
-            vx,
-            vy,
-            v0,
-            scale,
-            label=label_list[id],
-            color=palette[id],
-        )
-
-    plt.legend()
-    current_time = datetime.now().strftime("%m-%d_%H-%M-%S")
-    plt.gca().set_aspect("equal", adjustable="box")
-    plt.axis("off")
-    plt.title("Path")
-    plt.tight_layout()
-    plt.savefig(f"fig/Astar_ani_test_{current_time}.png", dpi=300, bbox_inches="tight")
-
+def resample_and_smooth(path,sigma): 
+    dist = np.array([abs(path[i + 1] - path[i]) for i in range(len(path) - 1)])
+    print("Path shape : ", path.shape)
+    
+    print("Path before resampling :", len(path))
+    n = ceil(np.max(dist) / (5 * 1e-3))
+    if n > 1:
+        path, distances = resample_path(path, len(path) * n)
+    print("After resampling : ", len(path))
+    print("Path length : ", distances)
+    z_coords =path[:,2] 
+    smoothed_x = gaussian_filter1d(path[:, 0], sigma=sigma)
+    smoothed_y = gaussian_filter1d(path[:, 1], sigma=sigma)
+    smoothed_z = gaussian_filter1d(path[:, 2], sigma=sigma)
+    path_2D = np.stack([smoothed_x, smoothed_y], axis=1)
+    path = np.stack([smoothed_x, smoothed_y,smoothed_z], axis=1)
+    return path,path_2D,z_coords
 
 if __name__ == "__main__":
     # Exemple : 16 directions ou plus selon le rayon
@@ -515,10 +374,12 @@ if __name__ == "__main__":
 
     # Determine the size of the domain. It maps each point of the domain to each point on the grid.
     sdf_func,sdf_phys,velocity_retina,x_phys,y_phys,z_phys,vx_phys,vy_phys,vz_phys,physical_depth,physical_width,physical_height,scale = load_sim_sdf(ratio)
+    
     print("SDF phys :", sdf_phys.shape) ## Convention x,y,z (576,528,24)
     print("x_phys   :", x_phys.shape) ## 576
     print("y_phys   :", y_phys.shape) ## 528
     print("z_phys   :", z_phys.shape) ## 24
+    
     X, Y,Z= np.meshgrid(x_phys, y_phys,z_phys,indexing='ij')
     print("X shape :",X.shape) # (576, 528, 24) 
     # print("Y shape :",Y.shape) # (576, 528, 24)
@@ -526,9 +387,7 @@ if __name__ == "__main__":
     
     def sdf_func_2D(point):
         return sdf_func((point[0],point[1],z_phys[len(z_phys)//2]))
-    # sdf_function :  Calculate the sdf in any point of the domain py interpolation
-    # velocity_retina :  Calculate the velocity in any point of the domain py interpolation
-
+    
 
     plt.figure(figsize=(12, 10))
     weight_sdf = 1
@@ -583,8 +442,6 @@ if __name__ == "__main__":
 
    
     start_time = time.time()
-
-
     
     path, path_id,travel_time = astar_anisotropic(
         x_phys,
@@ -608,35 +465,31 @@ if __name__ == "__main__":
     print("Travel time :", travel_time)
 
     path = np.array(path)  # de forme (N, 2)
-    dist = np.array([abs(path[i + 1] - path[i]) for i in range(len(path) - 1)])
-    print("Path shape : ", path.shape)
+    path,path_2D,z_coords = resample_and_smooth(path,sigma=5)
     
-    print("Path before resampling :", len(path))
-    # n = ceil(np.max(dist) / (5 * 1e-3))
-    # if n > 1:
-    #     path, distances = resample_path(path, len(path) * n)
-    # print("After resampling : ", len(path))
-    # print("Path length : ", distances)
-    z_coords =path[:,2] 
-    
-    smoothed_x = gaussian_filter1d(path[:, 0], sigma=5)
-    smoothed_y = gaussian_filter1d(path[:, 1], sigma=5)
-    smoothed_z = gaussian_filter1d(path[:, 2], sigma=5)
-    path_2D = np.stack([smoothed_x, smoothed_y], axis=1)
-    
-    visualize_results_a_star(
-        X, Y, sdf_func_2D, path_2D, vx, vy, v0, scale, label=f"pow al : {pow_al}, pow_v0 : {pow_v0}, B : {B} and c :{c}"
-    )
-    # plot_velocity(6, vx, vy, v0, X, Y)
-    plt.legend()
     current_time = datetime.now().strftime("%m-%d_%H-%M-%S")
-    plt.gca().set_aspect("equal", adjustable="box")
-    plt.axis("off")
-    plt.title("Path")
-    plt.tight_layout()
-    plt.savefig(f"fig/Astar_ani_test_{current_time}.png", dpi=300, bbox_inches="tight")
-    plt.close()
+    plot_a_star( X, Y, sdf_func_2D, vx, vy, v0, path_2D, scale, current_time,label=f"pow al : {pow_al}, pow_v0 : {pow_v0}, B : {B} and c :{c}", bool_velocity=False,plot_path=True)
+    
+    # save_path_path = f"data/retina2D_path_time_4_v1_bis_bg.npy"
+    # np.save(save_path_path, path, allow_pickle=False)
 
+
+    # files_path = ['data/retina2D_path_time_4_free_bg.npy','data/retina2D_path_time_4_v1_bis_bg.npy','data/retina2D_path_time_4_v2_bg.npy']
+    # label_list = ['Shortest geometrical path','Algorithm 1', 'Algorithm 2']
+    # plot_different_path(files_path,label_list,x_phys,y_phys,sdf_func,vx,vy,v0,scale)
+
+
+    save_output_path_para = f"paraview/Astar_path_{current_time}/sdf_vel_path.vti"
+    os.makedirs(save_output_path_para,exist_ok=True)
+    dx = x_phys[1] - x_phys[0]
+    dy = y_phys[1] - y_phys[0]
+    dz = z_phys[1] - z_phys[0]
+    paraview_export_points(vx,vy,vz,dx,dy,dz,sdf_phys.T,path_id,save_output_path_para)
+    
+    
+    
+        
+    
     plt.hist(z_coords, bins=50, density=True)
     plt.savefig('fig/pathz.png',dpi=100,bbox_inches='tight')
     plt.close()
@@ -648,19 +501,7 @@ if __name__ == "__main__":
     plt.ylabel("Frequency (log)")
     plt.savefig('fig/hist_v0')
     plt.close()
-    # save_path_path = f"data/retina2D_path_time_4_v1_bis_bg.npy"
-    # np.save(save_path_path, path, allow_pickle=False)
-
+    
     end_time = time.time()
     elapsed_time = (end_time - start_time) / 60
     print("Execution time:", elapsed_time, "minutes")
-    # files_path = ['data/retina2D_path_time_4_free_bg.npy','data/retina2D_path_time_4_v1_bis_bg.npy','data/retina2D_path_time_4_v2_bg.npy']
-    # label_list = ['Shortest geometrical path','Algorithm 1', 'Algorithm 2']
-    # plot_different_path(files_path,label_list,x_phys,y_phys,sdf_func,vx,vy,v0,scale)
-
-    save_output_path_para = f"paraview/Astar_path_{current_time}"
-    os.makedirs(save_output_path_para,exist_ok=True)
-    dx = x_phys[1] - x_phys[0]
-    dy = y_phys[1] - y_phys[0]
-    dz = z_phys[1] - z_phys[0]
-    paraview_export(vx,vy,vz,dx,dy,dz,sdf_phys.T,path_id,save_output_path_para)

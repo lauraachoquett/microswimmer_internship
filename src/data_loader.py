@@ -40,9 +40,12 @@ def load_sdf_from_csv(domain_size):
 def load_sim_sdf(ratio):
     L = 0.269
     x, y,z, N, _, sdf = load_sdf_from_csv((1, 1, 1))
+    
     print("N :",N)
     scale = L / abs(np.min(sdf))
+    
     print("SDF :",sdf.shape)
+    ## First inerpolation on a standard domain
     sdf_interpolator = RegularGridInterpolator(
         (z,y, x), sdf, bounds_error=False, fill_value=None
     )
@@ -51,27 +54,39 @@ def load_sim_sdf(ratio):
     physical_height = scale * N[1]
     physical_width = scale * N[0]
 
+    ## Physical domain used in the simulation : (Here I could change the number of points to refine the grid)
     z_phys = np.linspace(0, physical_depth, N[2])
     y_phys = np.linspace(0, physical_height, N[1])
     x_phys = np.linspace(0, physical_width, N[0])
+    
+    ## Mesh (Access to x,y,z-coordinates with index)
     X_phys, Y_phys,Z_phys = np.meshgrid(x_phys, y_phys,z_phys, indexing='ij')
     
     ratio_original = N[1] / N[0]
     ratio_physique = physical_height / physical_width
 
+    ## Normalization (values between 0 and 1) to use the previous interpolation function
     Z_norm = Z_phys / physical_depth
     Y_norm = Y_phys / physical_height
     X_norm = X_phys / physical_width
+    
     points = np.vstack([Z_norm.ravel(),Y_norm.ravel(), X_norm.ravel()]).T
 
+    ## Compute the sdf on this grid normalized : 
     sdf_interp = sdf_interpolator(points).reshape(X_phys.shape)
+    
+    ## Rescale the signed distance function 
     sdf_phys = sdf_interp * scale
+    
+    ## Now we have the interpolate function on the physical domain not the standard one
     sdf_interp_phys = RegularGridInterpolator(
         (x_phys,y_phys,z_phys), sdf_phys, bounds_error=False, fill_value=None
     )
 
     def sdf_func_phys(point):
         return sdf_interp_phys(point)
+    
+    ## Same process with the velocity
     path_vel = "data/vel.sdf"
     N, h, vel = vel_read(path_vel)
     v = vel[:, :, :, 0:3]
