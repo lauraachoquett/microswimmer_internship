@@ -16,6 +16,8 @@ from src.fmm import sdf_func_and_velocity_func
 from src.sdf import get_contour_coordinates
 
 from math import gcd, sqrt
+from matplotlib import cm
+from matplotlib.colors import Normalize
 
 def generate_directions(max_radius):
     directions = set()
@@ -165,51 +167,94 @@ def astar_anisotropic(
     return [], travel_time
 
 
-def precalculate_move_costs(v0, vx, vy, dir_offsets, dx, dy, weight_sdf, pow_v0,pow_al):
+
+def precalculate_move_costs(v0, vx, vy, dir_offsets, dx, dy, weight_sdf, pow_v0, pow_al):
     """
     Pré-calcule les coûts de déplacement pour chaque direction à chaque point.
+    Version vectorisée optimisée.
 
     Retourne:
     - move_costs: tableau 3D (ny, nx, n_directions) des coûts
     """
     ny, nx = v0.shape
     n_directions = len(dir_offsets)
+    
+    # Convertir dir_offsets en array pour vectorisation
+    dir_offsets = np.array(dir_offsets)  # shape: (n_directions, 2)
+    
+    # Calculer toutes les distances d'un coup
+    distances = np.sqrt((dir_offsets[:, 0] * dx) ** 2 + (dir_offsets[:, 1] * dy) ** 2)
+    
+    # Masque pour les directions valides (distance > 0)
+    valid_dirs = distances > 0
+    
+    # Initialiser le tableau de coûts
     move_costs = np.full((ny, nx, n_directions), np.inf)
-
+    
+    # Cas simple : pas de champ de vitesse
+    if vx is None or vy is None:
+        move_costs[:, :, valid_dirs] = distances[valid_dirs]
+        return move_costs
+    
     U = 1
-    for j in range(ny):
-        for i in range(nx):
-            for d_idx, (di, dj) in enumerate(dir_offsets):
-                distance = np.sqrt((di * dx) ** 2 + (dj * dy) ** 2)
-                
-
-                if distance > 0:
-                    if vx is None or vy is None:
-                        move_costs[j, i, d_idx] = distance
-                        continue
-                    dir_x = di * dx / distance
-                    dir_y = dj * dy / distance
-                    d = np.array([dir_x, dir_y])
-                    v_l = np.array([vx[j, i], vy[j, i]])
-                    v = v_l + U * d
-                    flow_component = v @ d
-                    if np.linalg.norm(v_l) > 0.0001:
-                        alignment = np.linalg.norm(v_l @ d) / (
-                             np.linalg.norm(d) *  np.linalg.norm(v_l)
-                        )
-                    else:
-                        alignment = 1
-                    alignment = alignment ** (pow_al)
-                    effective_speed = flow_component * alignment
-                    neighbor_i = min(nx-1,max(0,i+di))
-                    neighbor_j = min(ny-1,max(0,j+dj))
-                    effective_speed = v0[neighbor_j,neighbor_i] ** (pow_v0) * max(effective_speed, 0.001)
-                    if pow_al > 0  or pow_v0 > 0:
-                        if v_l @ d > 0 and v0[neighbor_j,neighbor_i] > 0:
-                            move_costs[j, i, d_idx] = distance / effective_speed
-                    else : 
-                        if flow_component > 0:
-                            move_costs[j, i, d_idx] = distance / (flow_component)
+    
+    # Calculer les directions normalisées pour toutes les directions valides
+    dir_norm = np.zeros((n_directions, 2))
+    dir_norm[valid_dirs, 0] = dir_offsets[valid_dirs, 0] * dx / distances[valid_dirs]
+    dir_norm[valid_dirs, 1] = dir_offsets[valid_dirs, 1] * dy / distances[valid_dirs]
+    
+    # Vectoriser sur toutes les positions et directions
+    for d_idx in np.where(valid_dirs)[0]:
+        di, dj = dir_offsets[d_idx]
+        distance = distances[d_idx]
+        dir_x, dir_y = dir_norm[d_idx]
+        
+        # Calculer les indices des voisins (avec clamp)
+        neighbor_i = np.clip(np.arange(nx)[None, :] + di, 0, nx-1)
+        neighbor_j = np.clip(np.arange(ny)[:, None] + dj, 0, ny-1)
+        
+        # Champ de vitesse local en chaque point
+        v_l_x = vx  # shape: (ny, nx)
+        v_l_y = vy  # shape: (ny, nx)
+        
+        # Vitesse totale v = v_l + U * d
+        v_x = v_l_x + U * dir_x
+        v_y = v_l_y + U * dir_y
+        
+        # Composante du flux dans la direction
+        flow_component = v_x * dir_x + v_y * dir_y
+        
+        # Calcul de l'alignement
+        v_l_norm = np.sqrt(v_l_x**2 + v_l_y**2)
+        v_l_dot_d = v_l_x * dir_x + v_l_y * dir_y
+        
+        # Éviter division par zéro
+        alignment = np.ones_like(v_l_norm)
+        mask_nonzero = v_l_norm > 0.0001
+        alignment[mask_nonzero] = (np.abs(v_l_dot_d[mask_nonzero]) / v_l_norm[mask_nonzero]) ** pow_al
+        
+        # Vitesse effective
+        effective_speed = flow_component * alignment
+        
+        # Facteur de vitesse du voisin
+        v0_neighbor = v0[neighbor_j, neighbor_i]
+        effective_speed = (v0_neighbor ** pow_v0) * np.maximum(effective_speed, 0.001)
+        
+        # Conditions pour calculer le coût
+        if pow_al > 0 or pow_v0 > 0:
+            valid_mask = (v_l_dot_d > 0.0) & (v0_neighbor > 0)
+        else:
+            valid_mask = flow_component > 0
+        
+        # Calculer les coûts
+        costs = np.full((ny, nx), np.inf)
+        if pow_al > 0 or pow_v0 > 0:
+            costs[valid_mask] = distance / effective_speed[valid_mask]
+        else:
+            costs[valid_mask] = distance / flow_component[valid_mask]
+        
+        move_costs[:, :, d_idx] = costs
+    
     return move_costs
 
 
@@ -223,7 +268,7 @@ def heuristic(i1, j1, i2, j2, dx, dy):
     return distance / v_max
 
 def plot_velocity(step,vx,vy,v0,X,Y,grid_size):
-    step = 6
+    step = 5
 
     X_sub = X[::step, ::step]
     Y_sub = Y[::step, ::step]
@@ -247,35 +292,41 @@ def plot_velocity(step,vx,vy,v0,X,Y,grid_size):
 
     v_norm = np.sqrt(vx**2 + vy**2)
 
-    plt.contourf(X, Y, v_norm, levels=50, cmap="Reds")  # ou autre cmap : 'viridis', 'plasma', etc.
-    plt.colorbar(label='||v||')
-    # plt.quiver(
-    #     X_masked,
-    #     Y_masked,
-    #     vx_masked,
-    #     vy_masked,
-    #     color="darkred",
-    #     scale=80,
-    #     alpha=0.3,
-    # )
+    # plt.contourf(X, Y, v_norm, levels=50, cmap="Reds")  # ou autre cmap : 'viridis', 'plasma', etc.
+    # plt.colorbar(label='||v||')
+    # Couleur des flèches dépend de la norme locale
+    arrow_colors = v_norm[::step, ::step][mask]
+    quiv = plt.quiver(
+        X_masked,
+        Y_masked,
+        vx_masked,
+        vy_masked,
+        arrow_colors,
+        cmap="Reds",
+        scale=90,
+        alpha=0.9,
+    )
+    # Utiliser une colormap où la valeur minimale n'est pas trop claire
+
+    # Choisir une colormap adaptée (par exemple 'Reds') et tronquer les valeurs basses
+    cmap = cm.get_cmap("Reds")
+    norm = Normalize(vmin=np.percentile(arrow_colors, 5), vmax=arrow_colors.max())
+    quiv.set_cmap(cmap)
+    quiv.set_norm(norm)
+    plt.colorbar(quiv, label='||v|| (arrows)')
 
 def visualize_results_a_star(
-    X, Y, sdf_function, path, vx, vy,v0, scale,label = '',color=None
-    ):
+    X, Y, sdf_function, path, vx, vy, v0, scale, label='', color=None
+):
     """
     Visualise les résultats de l'algorithme A*.
     """
-
-
     obstacle_contour = contour_2D(sdf_function, X, Y, scale)
-
     plt.scatter(obstacle_contour[:, 0], obstacle_contour[:, 1], color="black", s=0.5)
-    palette = sns.color_palette()
 
     path_x, path_y = zip(*path)
-    plt.plot(path_x, path_y, linewidth=2, label=label,color=color)
-    # plt.scatter([path[0][0]], [path[0][1]], s=50)
-    # plt.scatter([path[-1][0]], [path[-1][1]], s=20, color = palette[id])
+    plt.plot(path_x, path_y, linewidth=2, label=label, color=color)
+
     
 
 def compute_v(x, y, velocity_retina, B, grid_size, ratio, sdf_function, c):
@@ -343,19 +394,38 @@ def compute_v(x, y, velocity_retina, B, grid_size, ratio, sdf_function, c):
         print("vy shape :",vy.shape)
     return speed, vx, vy, save_path_phi, save_path_flow
 
-def plot_different_path(files_path,label_list,x_new,y_new,sdf_function,vx,vy,v0,scale,grid_size) : 
+def plot_different_path(files_path,label_list,x_phys,y_phys,sdf_function,vx,vy,v0,scale,grid_size) : 
     path_list = []
     palette = ['cornflowerblue','navy','darkgreen']
-    X, Y = np.meshgrid(x_new, y_new)
+    X, Y = np.meshgrid(x_phys, y_phys)
+
     plot_velocity(6,vx,vy,v0,X,Y,grid_size)
+    
+    if os.path.exists(f"data/retina2D_SDF_neg_scale_{scale}.npy"):
+        Z = np.load(
+            f"data/retina2D_SDF_neg_scale_{scale}.npy", allow_pickle=False
+        )
+        print("Contour loaded")
+    else:
+        Z = np.vectorize(lambda px, py: sdf_function((px, py)))(X, Y)
+        np.save(
+            f"data/retina2D_SDF_neg_scale_{scale}.npy",
+            Z,
+            allow_pickle=False,
+        )
+
+    plt.contourf(X, Y, Z, levels=[Z.min(), 0], colors='linen', alpha=0.5, zorder=0)
+    
     for id,file_path in enumerate(files_path) : 
         path = np.load(file_path)
         path,distances = resample_path(path, len(path))
         print(f"{file_path} distances : {distances}")
         visualize_results_a_star(
-            x_new, y_new, sdf_function, path, vx, vy,v0,scale,label = label_list[id],color = palette[id]
+            X, Y, sdf_function, path, vx, vy,v0,scale,label = label_list[id],color = palette[id]
         )
-        
+    plt.scatter([path[0][0]], [path[0][1]], s=50,color=palette[1],label = 'Start')
+    plt.scatter([path[-1][0]], [path[-1][1]], s=50, color = 'red',label = 'Target')
+    
     plt.legend()
     current_time = datetime.now().strftime("%m-%d_%H-%M-%S")
     plt.gca().set_aspect("equal", adjustable="box")
@@ -401,6 +471,8 @@ if __name__ == "__main__":
     v0, vx, vy, _, _ = compute_v(
         x_phys, y_phys, velocity_retina, B, grid_size, ratio, sdf_func, c
     )
+    speed = np.sqrt(vx**2 + vy**2)
+    print(f"Speed: min={speed.min():.3e}, max={speed.max():.3e}, mean={speed.mean():.3e}, std={speed.std():.3e}")
     
     for name, arr in zip(["vx", "vy","v0"], [vx, vy,v0]):
         print(f"{name}: min={arr.min():.3e}, max={arr.max():.3e}, mean={arr.mean():.3e}, std={arr.std():.3e}")
@@ -420,8 +492,8 @@ if __name__ == "__main__":
     #     max_radius=5
     
         
-    # start_time = time.time()
-    # # Compute the path
+    start_time = time.time()
+    # Compute the path
     # path, travel_time = astar_anisotropic(
     #     x_phys,
     #     y_phys,
