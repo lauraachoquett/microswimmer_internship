@@ -18,7 +18,8 @@ from src.utils import gcd_of_three,generate_directions_3d
 from src.Astar import resample_path
 from src.data_loader import load_sdf_from_csv, load_sim_sdf, vel_read,plot_sdf_slices
 from src.fmm import sdf_func_and_velocity_func
-from src.plot_visualize_a_star import plot_a_star,paraview_export, paraview_export_points
+from src.plot_visualize_a_star import plot_a_star,save_grid_paraview
+from src.plot import paraview_export
 
 def heuristic(i1, j1,k1, i2, j2,k2, dx, dy,dz):
     """
@@ -63,6 +64,8 @@ def astar_anisotropic(
     - path : liste de points (x, y) représentant le chemin optimal
     - travel_time : tableau 2D des temps de trajet pour chaque point visité
     """
+    print('================    A*    ================')
+
     nx, ny,nz = len(x), len(y),len(z)
     dx = x[1] - x[0]
     dy = y[1] - y[0]
@@ -291,7 +294,8 @@ def compute_v(x, y,z, vx_phys,vy_phys,vz_phys, B, grid_size, ratio, sdf_function
     phi=phi.T
     # print("Shape of phi :",phi.shape)
     
-    v0 = - phi
+    # v0 = - phi
+    v0 = (1.0 / (1.0 + np.exp(B * phi))) - c
     # v0 = np.clip(v0, -0.001, 1.0)
     save_path_flow = f"data/velocity_flow/grid_size_{grid_size[0]}_{grid_size[1]}_{grid_size[2]}_phi_3d/"
     if os.path.exists(save_path_flow):
@@ -335,6 +339,7 @@ def compute_v(x, y,z, vx_phys,vy_phys,vz_phys, B, grid_size, ratio, sdf_function
     vy = vy.T
     vz = vz.T
     # === Statistiques initiales ===
+    print('================ VELOCITY ================ ')
     for name, arr in zip(["vx", "vy", "vz"], [vx, vy, vz]):
         print(f"{name}: min={arr.min():.3e}, max={arr.max():.3e}, mean={arr.mean():.3e}, std={arr.std():.3e}")
 
@@ -392,7 +397,7 @@ if __name__ == "__main__":
     plt.figure(figsize=(12, 10))
     weight_sdf = 1
     start_point = (physical_width * 0.98, physical_height * 0.3,physical_depth*0.5)
-    goal_point = (0.8,0.3,0.5)
+    goal_point = (0.8,0.6,0.5)
     goal_point = (physical_width * goal_point[0], physical_height * goal_point[1],physical_depth * goal_point[2])
     print(
         "Distance between the two points : ",
@@ -401,11 +406,11 @@ if __name__ == "__main__":
     
     print("SDF of goal point : ", sdf_func(goal_point))
     c = 0.5
-    B = 5
-    h = 1
+    B = 2
+    h = 3
     pow_v0 = 7
-    pow_al = 4
-    max_radius = 1.5
+    pow_al = 5
+    max_radius = 1
     # pow_v0 = 0
     # pow_al = 0
 
@@ -429,6 +434,7 @@ if __name__ == "__main__":
         v0 = np.ones_like(v0)
         vx = None
         vy = None
+        vz = None
         h = 0
         pow_v0 = 0
         pow_al = 0
@@ -465,10 +471,10 @@ if __name__ == "__main__":
     print("Travel time :", travel_time)
 
     path = np.array(path)  # de forme (N, 2)
-    path,path_2D,z_coords = resample_and_smooth(path,sigma=5)
+    path,path_2D,z_coords = resample_and_smooth(path,sigma=20)
     
     current_time = datetime.now().strftime("%m-%d_%H-%M-%S")
-    plot_a_star( X, Y, sdf_func_2D, vx, vy, v0, path_2D, scale, current_time,label=f"pow al : {pow_al}, pow_v0 : {pow_v0}, B : {B} and c :{c}", bool_velocity=False,plot_path=True)
+    plot_a_star( X, Y, sdf_func_2D, vx, vy, v0, path_2D, scale, current_time,label=f"pow al : {pow_al}, pow_v0 : {pow_v0}, B : {B}, radius  : {max_radius} and c :{c}", bool_velocity=False,plot_path=True)
     
     # save_path_path = f"data/retina2D_path_time_4_v1_bis_bg.npy"
     # np.save(save_path_path, path, allow_pickle=False)
@@ -485,7 +491,9 @@ if __name__ == "__main__":
     dx = x_phys[1] - x_phys[0]
     dy = y_phys[1] - y_phys[0]
     dz = z_phys[1] - z_phys[0]
-    grid =  paraview_export_points(vx,vy,vz,dx,dy,dz,sdf_phys.T,path_id,save_output_path_para)
+    print(f"dx : {dx}, dy : {dy} and dz : {dz} ")
+    grid = save_grid_paraview(vx.T, vy.T, vz.T, dx, dy, dz, sdf_phys.T)
+    paraview_export(path,save_output_path_para)
         
     plt.hist(z_coords, bins=50, density=True)
     plt.savefig('fig/pathz.png',dpi=100,bbox_inches='tight')

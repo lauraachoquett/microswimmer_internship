@@ -12,6 +12,7 @@ import pandas as pd
 import plotly.graph_objects as go
 import seaborn as sns
 from mpl_toolkits.mplot3d import Axes3D  # nécessaire pour l'import
+import pyvista as pv
 
 colors_default = plt.cm.tab10.colors
 from src.generate_path import (generate_curve, generate_demi_circle_path,
@@ -137,7 +138,7 @@ def plot_trajectories(
 
 
 def plot_html_3d(
-    trajectories_list, save_path_html, list_of_path,dir=None,center=None,a=None, colors=None, color_id=0
+    trajectories_list, save_path_html, list_of_path,dir=None,center=None,a=None, obstacle_contour = None,colors=None, color_id=0
 ):
     if colors is None:
         colors = ["red", "blue", "green", "orange", "purple", "brown"]
@@ -261,6 +262,24 @@ def plot_html_3d(
             line=dict(color='black', width=4),
             name='vortex radius'
         ))
+    
+    if obstacle_contour is not None : 
+
+        z = 0.5 * np.ones(obstacle_contour.shape[0])
+        x = obstacle_contour[:,0]
+        y = obstacle_contour[:,1]
+        fig.add_trace(
+            go.Scatter3d(
+                x=x,
+                y=y,
+                z=z,
+                mode="markers",
+                name="Contour",
+                marker=dict(size=1, color='indianred'),
+            )
+        )
+
+        
     fig.update_layout(
         scene=dict(
             xaxis_title="X",
@@ -269,6 +288,7 @@ def plot_html_3d(
             xaxis=dict(showgrid=False),
             yaxis=dict(showgrid=False),
             zaxis=dict(showgrid=False),
+            aspectmode="data",
         ),
         title="Trajectoires 3D interactives",
         legend=dict(itemsizing="constant"),
@@ -591,6 +611,53 @@ def plot_return_beta(file_path):
     # Afficher le graphique
     plt.savefig("fig/rank_beta_return.png", dpi=200, bbox_inches="tight")
 
+
+def paraview_export(path_physical,  output_save_path,trajectories=None):
+    os.makedirs(output_save_path,exist_ok=True)
+    if path_physical is not None and len(path_physical) > 0:
+        try:
+            print(f"Path points shape: {path_physical.shape}")
+            if path_physical.shape[1] == 3:
+                path_polydata = pv.PolyData(path_physical)
+                
+                if len(path_physical) > 1:
+                    lines = []
+                    for i in range(len(path_physical) - 1):
+                        lines.extend([2, i, i + 1])  
+                    path_polydata.lines = np.array(lines)
+                    print(f"Nombre de segments créés: {len(path_physical) - 1}")
+                
+                path_output = os.path.join(output_save_path,'path.vtp')
+                path_polydata.save(path_output)
+                print(f"Chemin sauvegardé: {path_output}")
+                
+        except Exception as e:
+            print(f"Erreur lors de la création du chemin: {e}")
+    if trajectories is not None:
+        for id,elt in enumerate(trajectories) :
+            trajectory = elt[0]
+            if trajectory is not None and len(trajectory) > 0:
+                try:
+                    if trajectory.shape[1] == 3:
+                        path_polydata = pv.PolyData(trajectory)
+                        
+                        if len(trajectory) > 1:
+                            lines = []
+                            for i in range(len(trajectory) - 1):
+                                lines.extend([2, i, i + 1])  
+                            path_polydata.lines = np.array(lines)
+                            print(f"Nombre de segments créés: {len(trajectory) - 1}")
+                        
+                        path_output = os.path.join(output_save_path,f'trajectory_{id}.vtp')
+                        
+                        path_polydata.save(path_output)
+                        print(f"Chemin sauvegardé: {path_output}")
+                        
+                except Exception as e:
+                    print(f"Erreur lors de la création du chemin: {e}")
+                    print(f"Format attendu: liste de [i,j,k] où i,j,k sont des indices de grille")
+            
+        
 def draw_circle(center,radius):
     t = np.linspace(0,2*np.pi,200)
     print(center)

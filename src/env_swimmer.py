@@ -40,7 +40,6 @@ class MicroSwimmer(gym.Env):
         else:
             base += self.n_lookahead  # Position of points ahead
 
-        print("Base: ", base)
 
         self.observation_space = gym.spaces.Box(
             shape=(self.dim * base,),

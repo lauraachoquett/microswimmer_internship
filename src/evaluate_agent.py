@@ -13,7 +13,7 @@ import copy
 
 from src.generate_path import generate_curve
 from src.plot import (plot_html_3d, plot_trajectories, plot_trajectories_3D,
-                      video_trajectory)
+                      video_trajectory,paraview_export)
 
 
 def evaluate_agent(
@@ -211,8 +211,10 @@ def evaluate_agent(
         )
 
     if plot:
+        trajectories =states_list_per_episode[-4:]
         path_save_fig = os.path.join(save_path_result_fig, file_name)
         save_path_html = os.path.join(save_path_result_fig, file_name + "_3D.html")
+        save_path_paraview = os.path.join(save_path_result_fig, file_name + "_paraview/")
         if dim == 2:
             fig, ax = plt.subplots(figsize=(10, 8))
 
@@ -238,7 +240,7 @@ def evaluate_agent(
 
             plot_trajectories(
                 ax,
-                states_list_per_episode[-4:],
+                trajectories,
                 path,
                 title,
                 a,
@@ -263,7 +265,7 @@ def evaluate_agent(
 
             plot_trajectories_3D(
                 ax,
-                states_list_per_episode[-4:],
+                trajectories,
                 title=title,
                 type=type,
                 a=a,
@@ -279,7 +281,8 @@ def evaluate_agent(
 
         if dim == 3:
             list_of_path = [x[0] for x in list_of_path_tree]
-            plot_html_3d(states_list_per_episode[-4:], save_path_html, list_of_path,dir,center, a,)
+            plot_html_3d(trajectories, save_path_html, list_of_path,dir,center, a,obstacle_contour)
+            paraview_export(path,  save_path_paraview,trajectories)
 
     # print(mean(v_hist))
     # path_save_fig = os.path.join(save_path_result_fig, file_name + "_hist_v.png")

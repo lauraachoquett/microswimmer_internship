@@ -17,3 +17,5 @@ fig/Astar_*
 test_pyvista.ipynb
 fig/
 *.vti
+*.vtp
+paraview/

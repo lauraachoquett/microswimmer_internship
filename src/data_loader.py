@@ -53,7 +53,7 @@ def load_sim_sdf(ratio):
     physical_depth = scale * N[2]
     physical_height = scale * N[1]
     physical_width = scale * N[0]
-
+    print(f"physical_depth: {physical_depth}, physical_height: {physical_height}, physical_width: {physical_width}")
     ## Physical domain used in the simulation : (Here I could change the number of points to refine the grid)
     z_phys = np.linspace(0, physical_depth, N[2])
     y_phys = np.linspace(0, physical_height, N[1])
@@ -94,11 +94,15 @@ def load_sim_sdf(ratio):
     speed = np.sqrt(vx**2 + vy**2 + vz**2)
     
     quantile_999 = np.quantile(speed, 0.999995)
-    print(f"Seuil 99,9% (quantile) : {quantile_999:.3e}")
+    print(f"Seuil 99,99% (quantile) : {quantile_999:.3e}")
     mask = (speed <= quantile_999)
 
 
     # Masquage
+    vx = np.where(mask, vx, 0.0)
+    vy = np.where(mask, vy, 0.0)
+    vz = np.where(mask, vz, 0.0)
+    
     vx = np.where(mask, vx, 0.0)
     vy = np.where(mask, vy, 0.0)
     vz = np.where(mask, vz, 0.0)
@@ -110,7 +114,7 @@ def load_sim_sdf(ratio):
         (z,y, x), vy, bounds_error=False, fill_value=None
     )
     velocity_interpolator_z = RegularGridInterpolator(
-        (z,y, x), vy, bounds_error=False, fill_value=None
+        (z,y, x), vz, bounds_error=False, fill_value=None
     )
     vx_interp = velocity_interpolator_x(points).reshape(Z_phys.shape)
     vy_interp = velocity_interpolator_y(points).reshape(Z_phys.shape)
