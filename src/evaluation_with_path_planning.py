@@ -566,7 +566,7 @@ if __name__ == "__main__":
     with open("src/config_path_eva.yaml", "r") as f:
         config_par_path = yaml.safe_load(f)
           
-    # file_to_config_path = create_all_path(config_par_path,500)
+    file_to_config_path = create_all_path(config_par_path,500,True)
     ratio = 5
     sdf_func,velocity_retina,x_phys,y_phys,physical_width,physical_height,scale= load_sim_sdf(ratio)
 

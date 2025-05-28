@@ -6,6 +6,7 @@ from math import ceil, sqrt
 import seaborn as sns
 import matplotlib.pyplot as plt
 import numpy as np
+import json
 from matplotlib.colors import LogNorm
 from scipy.interpolate import RegularGridInterpolator, splev, splprep
 from scipy.ndimage import gaussian_filter1d
@@ -179,37 +180,29 @@ def precalculate_move_costs(v0, vx, vy, dir_offsets, dx, dy, weight_sdf, pow_v0,
     ny, nx = v0.shape
     n_directions = len(dir_offsets)
     
-    # Convertir dir_offsets en array pour vectorisation
     dir_offsets = np.array(dir_offsets)  # shape: (n_directions, 2)
     
-    # Calculer toutes les distances d'un coup
     distances = np.sqrt((dir_offsets[:, 0] * dx) ** 2 + (dir_offsets[:, 1] * dy) ** 2)
     
-    # Masque pour les directions valides (distance > 0)
     valid_dirs = distances > 0
-    
-    # Initialiser le tableau de coûts
+
     move_costs = np.full((ny, nx, n_directions), np.inf)
     
-    # Cas simple : pas de champ de vitesse
     if vx is None or vy is None:
         move_costs[:, :, valid_dirs] = distances[valid_dirs]
         return move_costs
     
     U = 1
     
-    # Calculer les directions normalisées pour toutes les directions valides
     dir_norm = np.zeros((n_directions, 2))
     dir_norm[valid_dirs, 0] = dir_offsets[valid_dirs, 0] * dx / distances[valid_dirs]
     dir_norm[valid_dirs, 1] = dir_offsets[valid_dirs, 1] * dy / distances[valid_dirs]
     
-    # Vectoriser sur toutes les positions et directions
     for d_idx in np.where(valid_dirs)[0]:
         di, dj = dir_offsets[d_idx]
         distance = distances[d_idx]
         dir_x, dir_y = dir_norm[d_idx]
         
-        # Calculer les indices des voisins (avec clamp)
         neighbor_i = np.clip(np.arange(nx)[None, :] + di, 0, nx-1)
         neighbor_j = np.clip(np.arange(ny)[:, None] + dj, 0, ny-1)
         
@@ -242,7 +235,7 @@ def precalculate_move_costs(v0, vx, vy, dir_offsets, dx, dy, weight_sdf, pow_v0,
         
         # Conditions pour calculer le coût
         if pow_al > 0 or pow_v0 > 0:
-            valid_mask = (v_l_dot_d > 0.0) & (v0_neighbor > 0)
+            valid_mask = (v_l_dot_d > 0.0)
         else:
             valid_mask = flow_component > 0
         
@@ -447,108 +440,132 @@ if __name__ == "__main__":
     # velocity_retina :  Calculate the velocity in any point of the domain py interpolation
 
     # Reduce the cell size by a factor : res_factor
+            
+    # Compute v0,vx and vy on this new domain.
+               
+            
+    plt.figure(figsize=(12, 10))
+    start_point = (float(physical_width * 0.98), float(physical_height * 0.3))
+    goal_point_tmp = ( 17.38728683339246/20, 12.3556761323975/20)
+    goal_point = (float(physical_width * goal_point_tmp[0]), float(physical_height * goal_point_tmp[1]))
+    print('distance between the two points : ',  np.linalg.norm(np.array(goal_point)-np.array(start_point)))
 
     c = 0.4
-    # Compute v0,vx and vy on this new domain.
-    plt.figure(figsize=(12, 10))
-    start_point = (physical_width * 0.98, physical_height * 0.3)
-    # goal_point = (goal_point[0] * scale, goal_point[1] * scale)
-    # goal_point = (17.095518023108937/20,12.52076514689449/20)
-    goal_point =  (5.762615626076424/20,16.142539758719423/20)
-    # goal_point=(7.855210513776498,19.169570750237117)
-    goal_point = (10.79606786617848/20, 12.296130605776128/20)
-    goal_point = (physical_width * goal_point[0], physical_height * goal_point[1])
-    print('distance between the two points : ',  np.linalg.norm(np.array(goal_point)-np.array(start_point)))
-    B = 5
+    B = 1.6
     h = 2
-    pow_v0 = 7
-    pow_al = 5
-    max_radius = 3
-    
+    pow_v0 = 5
+    pow_al = 7
+    max_radius = 2
+
     shortest_geo_path = False
     v1 = False
     grid_size = (len(x_phys),len(y_phys))
-    v0, vx, vy, _, _ = compute_v(
-        x_phys, y_phys, velocity_retina, B, grid_size, ratio, sdf_func, c
-    )
-    speed = np.sqrt(vx**2 + vy**2)
-    print(f"Speed: min={speed.min():.3e}, max={speed.max():.3e}, mean={speed.mean():.3e}, std={speed.std():.3e}")
-    
-    for name, arr in zip(["vx", "vy","v0"], [vx, vy,v0]):
-        print(f"{name}: min={arr.min():.3e}, max={arr.max():.3e}, mean={arr.mean():.3e}, std={arr.std():.3e}")
-    
-    # if shortest_geo_path: 
-    #     v0 = np.ones_like(v0)
-    #     vx = None
-    #     vy = None
-    #     h = 0.0
-    #     max_radius=5
-    
-    # if v1 : 
-    #     v0 = np.ones_like(v0)
-    #     pow_v0 = 0
-    #     pow_al = 0
-    #     h = 0.0
-    #     max_radius=5
-    
-        
-    start_time = time.time()
-    # Compute the path
-    # path, travel_time = astar_anisotropic(
-    #     x_phys,
-    #     y_phys,
-    #     v0,
-    #     vx,
-    #     vy,
-    #     start_point,
-    #     goal_point,
-    #     sdf_func,
-    #     heuristic_weight=h,
-    #     pow_v0=pow_v0,
-    #     pow_al=pow_al,
-    #     max_radius=max_radius
-    # )
-    # # path = shortcut_path(path,is_collision_free,sdf_interpolator)
-    # print("Travel time :", travel_time)
 
-    # path = np.array(path)  # de forme (N, 2)
-    # dist = np.array([abs(path[i + 1] - path[i]) for i in range(len(path) - 1)])
-    # print("path before resampling :", len(path))
-    # n = ceil(np.max(dist) / (5 * 1e-3))
-    # if n > 1:
-    #     path,distances = resample_path(path, len(path) * n)
-    # print("after resampling : ", len(path))
-    # smoothed_x = gaussian_filter1d(path[:, 0], sigma=30)
-    # smoothed_y = gaussian_filter1d(path[:, 1], sigma=30)
-    # path = np.stack([smoothed_x, smoothed_y], axis=1)
-    # print("Path length : ",distances)
-    # X, Y = np.meshgrid(x_phys, y_phys)
-    # visualize_results_a_star(
-    #     X, Y, sdf_func, path, vx, vy,v0,scale,label = f'path'
-    # )
-    # end_time = time.time()
-    # elapsed_time = (end_time - start_time) / 60
-    # print("Execution time:", elapsed_time, "minutes")
+    current_time = datetime.now().strftime("%m-%d_%H-%M-%S")
+    save_dir = f"fig/Astar_ani_test_{current_time}"
+    os.makedirs(save_dir, exist_ok=True)
+
+
+    params = {
+        "start_point": tuple(float(x) for x in start_point),
+        "goal_point": tuple(float(x) for x in goal_point),
+        "c": float(c),
+        "B": float(B),
+        "h": float(h),
+        "pow_v0": float(pow_v0),
+        "pow_al": float(pow_al),
+        "max_radius": int(max_radius),
+        "shortest_geo_path": bool(shortest_geo_path),
+        "v1": bool(v1),
+        "grid_size": tuple(int(x) for x in grid_size),
+        "ratio": float(ratio),
+        "scale": float(scale),
+    }
+    with open(os.path.join(save_dir, "params.json"), "w") as f:
+        json.dump(params, f, indent=4)
+
+    for B in np.linspace(1,6,4):
+        v0, vx, vy, _, _ = compute_v(
+            x_phys, y_phys, velocity_retina, B, grid_size, ratio, sdf_func, c
+        )
+        speed = np.sqrt(vx**2 + vy**2)
+        print(f"Speed: min={speed.min():.3e}, max={speed.max():.3e}, mean={speed.mean():.3e}, std={speed.std():.3e}")
         
+        for name, arr in zip(["vx", "vy","v0"], [vx, vy,v0]):
+            print(f"{name}: min={arr.min():.3e}, max={arr.max():.3e}, mean={arr.mean():.3e}, std={arr.std():.3e}")
+        
+        if shortest_geo_path: 
+            v0 = np.ones_like(v0)
+            vx = None
+            vy = None
+            h = 0.0
+            max_radius=5
+        
+        if v1 : 
+            v0 = np.ones_like(v0)
+            pow_v0 = 0
+            pow_al = 0
+            h = 0.0
+            max_radius=5
+        
+            
+        start_time = time.time()
+        # Compute the path
+        path, travel_time = astar_anisotropic(
+            x_phys,
+            y_phys,
+            v0,
+            vx,
+            vy,
+            start_point,
+            goal_point,
+            sdf_func,
+            heuristic_weight=h,
+            pow_v0=pow_v0,
+            pow_al=pow_al,
+            max_radius=max_radius
+        )
+        # path = shortcut_path(path,is_collision_free,sdf_interpolator)
+        print("Travel time :", travel_time)
+
+        path = np.array(path)  # de forme (N, 2)
+        dist = np.array([abs(path[i + 1] - path[i]) for i in range(len(path) - 1)])
+        print("path before resampling :", len(path))
+        n = ceil(np.max(dist) / (5 * 1e-3))
+        if n > 1:
+            path,distances = resample_path(path, len(path) * n)
+        print("after resampling : ", len(path))
+        smoothed_x = gaussian_filter1d(path[:, 0], sigma=30)
+        smoothed_y = gaussian_filter1d(path[:, 1], sigma=30)
+        path = np.stack([smoothed_x, smoothed_y], axis=1)
+        print("Path length : ",distances)
+        X, Y = np.meshgrid(x_phys, y_phys)
+        visualize_results_a_star(
+            X, Y, sdf_func, path, vx, vy, v0, scale, label=f'B: {B:.2f}'
+        )
+        end_time = time.time()
+        elapsed_time = (end_time - start_time) / 60
+        print("Execution time:", elapsed_time, "minutes")
+            
     # if vx is not None and vy is not None : 
     #     plot_velocity(6,vx,vy,v0,X,Y,grid_size)
-    # plt.legend()
-    # current_time = datetime.now().strftime("%m-%d_%H-%M-%S")
-    # plt.gca().set_aspect("equal", adjustable="box")
-    # plt.axis("off")
-    # plt.title("Path")
-    # plt.tight_layout()
-    # plt.savefig(f"fig/Astar_ani_test_{current_time}_pow_al_0.png", dpi=300, bbox_inches="tight")
-    # plt.close()
+    plt.legend()
+    plt.gca().set_aspect("equal", adjustable="box")
+    plt.axis("off")
+    plt.title("Path")
+    plt.tight_layout()
+    path_save_fig = os.path.join(save_dir,f"Astar_ani_test_{current_time}_B.png")
+    plt.savefig(path_save_fig, dpi=300, bbox_inches="tight")
+    plt.close()
 
     
     # save_path_path = f"data/retina2D_path_time_4_v1_bg.npy"
     # np.save(save_path_path, path, allow_pickle=False)
 
     
-    files_path = ['data/retina2D_path_time_4_free_bg.npy','data/retina2D_path_time_4_v1_bg.npy','data/retina2D_path_time_4_v2_bg.npy']
-    label_list = ['Shortest geometrical path','Algorithm 1', 'Algorithm 2']
-    plot_different_path(files_path,label_list,x_phys,y_phys,sdf_func,vx,vy,v0,scale,grid_size)
+    # files_path = ['data/retina2D_path_time_4_free_bg.npy','data/retina2D_path_time_4_v1_bg.npy','data/retina2D_path_time_4_v2_bg.npy']
+    # label_list = ['Shortest geometrical path','Algorithm 1', 'Algorithm 2']
+    # plot_different_path(files_path,label_list,x_phys,y_phys,sdf_func,vx,vy,v0,scale,grid_size)
 
         
     
