@@ -10,21 +10,41 @@
 ## 🤖 Reinforcement Learning environment
 
 ### Frenet frame 
-In order to describe the local geometry of a curve in space, we introduce the Frenet frame (also known as the TNB frame), which consists of three orthonormal vectors that move along the curve. Given a smooth parametric curve $\mathbf{\gamma}(s) \in \mathbb{R}^3$ parametrized by its arc length $s$, the Frenet frame is defined by:
+We introduce the Frenet frame (also known as the TNB frame), which consists of three orthonormal vectors that move along the curve. Given a non-degenerate smooth parametric curve $\mathbf{\gamma}(s) \in \mathbb{R}^3$ parametrized by its arc length $s$, the Frenet frame is defined by:
 
 $$
 \mathbf{T}(s) = \frac{d\mathbf{\gamma}}{ds}(s), \qquad
 \mathbf{N}(s) = \frac{d\mathbf{T}/ds}{\|d\mathbf{T}/ds\|}, \qquad
 \mathbf{B}(s) = \mathbf{T}(s) \times \mathbf{N}(s)
 $$ 
-Here, $\mathbf{T}(s)$ is the tangent vector, $\mathbf{N}(s)$ is the normal vector, and $\mathbf{B}(s)$ is the binormal vector. These three vectors form a right-handed orthonormal basis that provides insight into the local curvature and torsion of the curve.
+Here, $\mathbf{T}(s)$ is the tangent vector, $\mathbf{N}(s)$ is the normal vector, and $\mathbf{B}(s)$ is the binormal vector. These three vectors form a right-handed orthonormal basis.
+
 
 <p align="center">
     <img src="fig/readme_fig/FrenetTN.png" width="350"/>
     <img src="fig/readme_fig/Frenetframehelix.gif" width="350"/>
     <br>
-    <i>Figure - (Left) (Right)  Frenet frame along a helix. </i>
+    <i>Figure - (Left) To do (Right)  Frenet frame along a helix. </i>
 </p>
+
+"Although the Frenet frame can easily be computed, its rotation about the tangent of a general spine curve often leads to undesirable twist in motion design or sweep surface modeling." Computation of Rotation Minimizing Frames, Wang et al, 2008
+
+The local curvature can be defined as  : $\kappa  = \|d\mathbf{T}/ds\|$
+The Frenet-Serret formulas are : 
+* $d\mathbf{T}/ds = \kappa \mathbf{N} $
+* $d\mathbf{N}/ds = -\kappa \mathbf{T} + \tau \mathbf{B} $
+* $d\mathbf{B}/ds = -\mathbf{N} $
+
+The Frenet frame is not defined at inflection point ($\kappa \approx 0$), to prevent this issue frames are generated with double reflection algorithm from Wang et al. It aims to generate a moving frame such that the rotation between each frame is minimized.
+
+<p align="center">
+    <img src="fig/readme_fig/FrenetFrameCurve.png" width="350"/>
+    <img src="fig/readme_fig/RMF_Curve.png" width="350"/>
+    <br>
+    <i>Figure - (Left) Frames generated with Frenet  (Right)  Rotating minimizing frame generated with Wang et al method </i>
+</p>
+
+
 
 ### State
 
@@ -33,6 +53,7 @@ Here, $\mathbf{T}(s)$ is the tangent vector, $\mathbf{N}(s)$ is the normal vecto
 - $\mathbf{P}$ : Previous action
 - Lookahead : List of the positions and velocities (optional) of the n points following the closest point along the path.
 
+Positions and velocities are expressed in the same local frame, whereas the previous action is provided in the last computed local frame.
 ### Action 
 
 - Direction $\mathbf{P}$ (2D vector of unit norm)

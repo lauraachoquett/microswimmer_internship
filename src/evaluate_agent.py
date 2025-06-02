@@ -4,7 +4,7 @@ from statistics import mean
 import matplotlib.pyplot as plt
 import numpy as np
 
-from src.frenet import compute_frenet_frame
+from src.frenet import compute_frenet_frame, double_reflection_rmf
 from src.simulation import rankine_vortex, uniform_velocity
 from src.utils import random_bg_parameters
 
@@ -112,7 +112,7 @@ def evaluate_agent(
         nb_of_path = 1
 
     #### EVALUATION ####
-    T, N, B = compute_frenet_frame(path, dim)
+    T, N, B = double_reflection_rmf(path)
     state, done = env.reset(x,tree, path, T, velocity_func, N, B), False
     while episode_num < eval_episodes:
         states_episode.append(x)
@@ -169,7 +169,7 @@ def evaluate_agent(
             p_0 = path[0]
             p_target = path[-1]
             x = p_0
-            T, N, B = compute_frenet_frame(path, dim)
+            T, N, B = double_reflection_rmf(path)
             ## Reset ##
             state, done = env.reset(x,tree, path, T, velocity_func, N, B), False
 
@@ -282,7 +282,8 @@ def evaluate_agent(
         if dim == 3:
             list_of_path = [x[0] for x in list_of_path_tree]
             plot_html_3d(trajectories, save_path_html, list_of_path,dir,center, a,obstacle_contour)
-            paraview_export(path,  save_path_paraview,trajectories)
+            if config['paraview']:
+                paraview_export(path,  save_path_paraview,trajectories)
 
     # print(mean(v_hist))
     # path_save_fig = os.path.join(save_path_result_fig, file_name + "_hist_v.png")

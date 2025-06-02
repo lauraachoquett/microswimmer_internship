@@ -17,7 +17,7 @@ from src.generate_path import *
 from src.invariant_state import *
 from src.simulation import rankine_vortex, uniform_velocity
 from src.utils import ReplayBuffer, courbures, random_bg_parameters
-from src.frenet import compute_frenet_frame
+from src.frenet import compute_frenet_frame, double_reflection_rmf
 
 colors = plt.cm.tab10.colors
 import copy
@@ -87,10 +87,11 @@ def run_expe(config, agent_file="agents"):
     p_0 = config["p_0"]
     path = config["path"]
     tree = config["tree"]
+    nb_points_path = config['nb_points_path']
     print(f"Starting point : {p_0}")
     print(f"Target point : {path[-1]}")
     x = p_0
-    T,N,B = compute_frenet_frame(path,dim)
+    T,N,B = double_reflection_rmf(path)
 
 
     ## Background flow ##
@@ -170,7 +171,7 @@ def run_expe(config, agent_file="agents"):
     config_eval_bis["rankine_bg"] = False
     
     if config['random_helix']:
-        path =  generate_helix(2000, radius = 1/5, pitch = 2,turns=1,clockwise = False)
+        path =  generate_helix(nb_points_path, radius = 1/5, pitch = 2,turns=1,clockwise = False)
         p_0 = path[0]
         p_target = path[-1]
         tree = KDTree(path)
@@ -296,8 +297,8 @@ def run_expe(config, agent_file="agents"):
 
             if config["random_helix"] and episode_num > 10:
                 radius,pitch = random_radius_pitch(episode_num,nb_episode)
-                clockwise = True if episode_num % 2 == 0 else False
-                path = generate_helix(2000, radius = radius, pitch = pitch,turns=1, clockwise=clockwise)
+                clockwise = True # if episode_num % 2 == 0 else False
+                path = generate_helix(nb_points_path, radius = radius, pitch = pitch,turns=1, clockwise=clockwise)
                 tree = KDTree(path)
                 p_0 = path[0]
                 p_target = path[-1]
@@ -306,7 +307,7 @@ def run_expe(config, agent_file="agents"):
                 config["p_0"] = p_0
                 config["x_0"] = p_0
                 config["p_target"] = p_target
-                T,N,B = compute_frenet_frame(path,dim)
+                T,N,B = double_reflection_rmf(path)
 
             state, done = env.reset(x_0=config['x_0'],tree=tree, path=path,T=T,velocity_func=velocity_func,N=N,B=B), False
             
@@ -331,8 +332,8 @@ if __name__ == "__main__":
     #     "Distance path points:      ",
     #     format_sci(np.linalg.norm(path[1, :] - path[0, :])),
     # )
-    
-    path =  generate_helix(2000, radius = 1/2, pitch = 2.5,turns=1,clockwise = False)
+    nb_points_path = 5000
+    path =  generate_helix(nb_points_path, radius = 1/2, pitch = 2.5,turns=1,clockwise = False)
     p_0 = path[0]
     p_target = path[-1]
     
@@ -383,13 +384,14 @@ if __name__ == "__main__":
         "rankine_bg": True,  # Random rankine vortex during the training
         "pertubation_after_episode": 1,  # Background flow add in the training after this episode
         "random_helix": True,  # To train on varying curve (no longer random)
-        "nb_points_path": 500,  # Discretization of the path
+        "nb_points_path": nb_points_path,  # Discretization of the path
         "Dt_action": Dt_action,
         "velocity_bool": True,  # Add the velocity in the state or not
         "n_lookahead": 5,  # Number of points in the lookahead
         "velocity_ahead":  False,
         'add_action' : True,
         'dim':dim,
+        'paraview':False,
     }
     start_time = time.time()
     run_expe(config)

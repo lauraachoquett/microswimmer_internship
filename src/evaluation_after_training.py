@@ -210,6 +210,7 @@ def initialize_parameters(agent_file, p_target, p_0, nb_points_path):
     config_eval["velocity_bool"] = (
         config["velocity_bool"] if "velocity_bool" in config else False
     )
+    config_eval["paraview"] = False
     config_eval["velocity_ahead"] = (
         config["velocity_ahead"] if "velocity_ahead" in config else False
     )
@@ -242,7 +243,9 @@ if __name__ == "__main__":
         "agents/agent_TD3_2025-05-20_17-37",
         "agents/agent_TD3_2025-05-21_11-27",
         "agents/agent_TD3_2025-05-21_16-55",
-        "agents/agent_TD3_2025-05-21_17-33"
+        "agents/agent_TD3_2025-05-21_17-33",
+        "agents/agent_TD3_2025-05-30_13-38",
+        "agents/agent_TD3_2025-05-30_14-55"
     ]
 
     # directory_path = Path("agents/")
@@ -293,6 +296,7 @@ if __name__ == "__main__":
 
     title_add = "rankine_a_025__cir_3_center_0_06_02"
     print("---------------------Evaluation with rankine bg---------------------")
+    print("Maximum velocity : ", cir/(2*np.pi*a))
     for id, type in enumerate(types):
         if type == 'counter_helix':
             a = 0.25

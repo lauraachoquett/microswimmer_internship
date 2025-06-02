@@ -166,7 +166,7 @@ if __name__ == "__main__":
     # name_file = "grid_search/17/result_evaluation_retina_.json"
     # analyse_retina_json(name_file)
 
-    types = ["helix"]
+    types = ["helix","counter_helix"]
     file = "results_evaluation"
     dict = {
         "dir1_05": np.array([1, 0, 0]),
@@ -186,7 +186,7 @@ if __name__ == "__main__":
             )
         files_results.extend(
             [
-                f"results_evaluation/result_evaluation_rankine_a_05__cir_3_center_0_06_05_{type}.json"
+                f"results_evaluation/result_evaluation_rankine_a_025__cir_3_center_0_06_02_{type}.json"
             ]
         )
         files_results.extend([f"results_evaluation/result_evaluation_free_{type}.json"])

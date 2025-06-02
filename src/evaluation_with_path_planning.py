@@ -92,7 +92,7 @@ def evaluate_after_training(
         results = {}
 
     for agent_name in agent_files:
-        config_eval = initialize_parameters(agent_name, p_target, p_0)
+        config_eval = initialize_parameters(agent_name)
         config_eval = copy.deepcopy(config_eval)
         training_type = {
             "rankine_bg": config_eval["rankine_bg"],
@@ -238,7 +238,7 @@ def evaluate_after_training(
     plt.close()
     return results
 
-def initialize_parameters(agent_file, p_target, p_0):
+def initialize_parameters(agent_file):
     path_config = os.path.join(agent_file, "config.pkl")
     with open(path_config, "rb") as f:
         config = pickle.load(f)
@@ -247,9 +247,6 @@ def initialize_parameters(agent_file, p_target, p_0):
     config_eval["random_helix"] = (
         config["random_helix"] if "random_helix" in config else False
     )
-    config_eval["p_target"] = p_target
-    config_eval["p_0"] = p_0
-    config_eval["x_0"] = p_0
     config_eval["t_max"] = 20
     config_eval["eval_episodes"] = 100
     config_eval["velocity_bool"] = (
@@ -274,8 +271,6 @@ def initialize_parameters(agent_file, p_target, p_0):
     threshold = 5 / 576 * 24
     config_eval["threshold"] = threshold
     return config_eval
-
-
 
 def load_config_path(path_to_config_path):
     with open(path_to_config_path, "r") as f:
@@ -409,12 +404,14 @@ def obstacle_and_path(
             )
 
             path = np.array(path)  
+        if len(path)>0:
             distances = np.sum(np.sqrt(np.sum(np.diff(path, axis=0) ** 2, axis=1)),axis=0)
-        print(distances)
+            config_path_a["distances"] = distances
+            config_path_a["path_found"] = True
+            
         config_path_a["path_path"] = save_path_path
         config_path_a["path_phi"] = save_path_phi
         config_path_a["path_flow"] = save_path_flow
-        config_path_a["distances"] = distances
         config_path_a = {
             k: float(v) if isinstance(v, np.float32) else v
             for k, v in config_path_a.items()
@@ -522,7 +519,7 @@ def create_list_of_goal_point(n, start_point, ratio):
         point
         for point in point_list
         if (
-            sdf_function(point) < -0.4
+            sdf_function(point) < -0.6
             and point[0] < 0.9
             and np.linalg.norm(point - start_point) > 0.05
         )
@@ -547,11 +544,12 @@ if __name__ == "__main__":
         config_par_path = yaml.safe_load(f)
 
     ratio = 5
-    # sdf_func,sdf_phys,velocity_retina,x_phys,y_phys,z_phys,vx_phys,vy_phys,vz_phys,physical_depth,physical_width,physical_height,scale = load_sim_sdf(ratio)
-    file_to_config_path = create_all_path(config_par_path,100)
+    sdf_func,sdf_phys,velocity_retina,x_phys,y_phys,z_phys,vx_phys,vy_phys,vz_phys,physical_depth,physical_width,physical_height,scale = load_sim_sdf(ratio)
+    file_to_config_path = create_all_path(config_par_path,6)
 
     file_to_config_path_g = f"config_path/velocity_ratio_{ratio}"
-    file_to_config_path = str(create_numbered_run_folder(file_to_config_path_g))
+    # file_to_config_path = str(create_numbered_run_folder(file_to_config_path_g))
+    file_to_config_path = 'config_path/velocity_ratio_5/32'
     types = [""]
     # types = ["free","v1",""]
     # goal_point = (10.79606786617848/24.067712783813477,12.296130605776128/22.062068939208984,0.5)
@@ -569,6 +567,11 @@ if __name__ == "__main__":
     #     path_method="astar",
     #     file_to_config_path=file_to_config_path,
     # )
+
+    def sdf_func_2D(point):
+        return sdf_func((point[0],point[1],z_phys[len(z_phys)//2]))
+    X, Y = np.meshgrid(x_phys, y_phys)
+    obstacle_contour = contour_2D(sdf_func_2D, X, Y, scale)
 
     start_time_eva = time.time()
     list_config_paths = []
