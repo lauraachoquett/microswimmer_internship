@@ -635,27 +635,38 @@ def paraview_export(path_physical,  output_save_path,trajectories=None):
             print(f"Erreur lors de la création du chemin: {e}")
     if trajectories is not None:
         for id,elt in enumerate(trajectories) :
+            output_save_path_agent = os.path.join(output_save_path,f'agent_{id}')
+            os.makedirs(output_save_path_agent,exist_ok=True)
+            all_vtp_filenames=[]
             trajectory = elt[0]
             if trajectory is not None and len(trajectory) > 0:
                 try:
                     if trajectory.shape[1] == 3:
-                        path_polydata = pv.PolyData(trajectory)
+                        for t, point in enumerate(trajectory):
+                            point_cloud = pv.PolyData(np.array([point]))  # Single point
+                            filename = f"agent_{t:04d}_trajectory_{id}.vtp"
+                            full_path = os.path.join(output_save_path_agent, filename)
+                            point_cloud.save(full_path)
+                            all_vtp_filenames.append((t, filename))
+                        print(f"{len(trajectory)} fichiers .vtp générés pour l'agent {id}.")
                         
-                        if len(trajectory) > 1:
-                            lines = []
-                            for i in range(len(trajectory) - 1):
-                                lines.extend([2, i, i + 1])  
-                            path_polydata.lines = np.array(lines)
-                            print(f"Nombre de segments créés: {len(trajectory) - 1}")
-                        
-                        path_output = os.path.join(output_save_path,f'trajectory_{id}.vtp')
-                        
-                        path_polydata.save(path_output)
-                        print(f"Chemin sauvegardé: {path_output}")
                         
                 except Exception as e:
                     print(f"Erreur lors de la création du chemin: {e}")
                     print(f"Format attendu: liste de [i,j,k] où i,j,k sont des indices de grille")
+                        
+            pvd_path = os.path.join(output_save_path_agent, f"agent_{id}.pvd")
+
+            with open(pvd_path, "w") as f:
+                f.write('<?xml version="1.0"?>\n')
+                f.write('<VTKFile type="Collection" version="0.1" byte_order="LittleEndian">\n')
+                f.write('  <Collection>\n')
+                for t, filename in all_vtp_filenames:
+                    f.write(f'    <DataSet timestep="{t}" group="" part="0" file="{filename}"/>\n')
+                f.write('  </Collection>\n')
+                f.write('</VTKFile>\n')
+
+            print(f"Fichier PVD créé : {pvd_path}")
             
         
 def draw_circle(center,radius):
