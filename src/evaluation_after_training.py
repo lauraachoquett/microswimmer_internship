@@ -206,7 +206,7 @@ def initialize_parameters(agent_file, p_target, p_0, nb_points_path):
     config_eval["x_0"] = p_0
     config_eval["nb_points_path"] = nb_points_path
     config_eval["t_max"] = 12
-    config_eval["eval_episodes"] = 5
+    config_eval["eval_episodes"] = 10
     config_eval["velocity_bool"] = (
         config["velocity_bool"] if "velocity_bool" in config else False
     )
@@ -245,7 +245,8 @@ if __name__ == "__main__":
         "agents/agent_TD3_2025-05-21_16-55",
         "agents/agent_TD3_2025-05-21_17-33",
         "agents/agent_TD3_2025-05-30_13-38",
-        "agents/agent_TD3_2025-05-30_14-55"
+        "agents/agent_TD3_2025-05-30_14-55",
+        "agents/agent_TD3_2025-06-17_11-14"
     ]
 
     # directory_path = Path("agents/")
@@ -296,11 +297,11 @@ if __name__ == "__main__":
 
     title_add = "rankine_a_025__cir_3_center_0_06_02"
     print("---------------------Evaluation with rankine bg---------------------")
-    print("Maximum velocity : ", cir/(2*np.pi*a))
     for id, type in enumerate(types):
         if type == 'counter_helix':
             a = 0.25
             cir = 2
+            print("Maximum velocity : ", cir/(2*np.pi*a))
             center = np.array([0, -0.6, 0.2])
             results = evaluate_after_training(
                 agents_file,
@@ -314,6 +315,8 @@ if __name__ == "__main__":
         else:
             a = 0.25
             cir = 2
+            print("Maximum velocity : ", cir/(2*np.pi*a))
+            
             center = np.array([0,0.6, 0.2])
             results = evaluate_after_training(
                 agents_file,

@@ -140,3 +140,9 @@ def generate_directions_3d(max_radius):
                         directions.add(reduced)
     
     return list(directions)
+
+def generate_state_noise(episode_num,nb_episode):
+    lower_bound=0
+    lenght_ratio = 0.269/20
+    upper_bound = lenght_ratio* episode_num/nb_episode * 5
+    return lower_bound,upper_bound

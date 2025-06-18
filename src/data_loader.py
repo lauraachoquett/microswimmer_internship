@@ -53,7 +53,6 @@ def load_sim_sdf(ratio):
     physical_depth = scale * N[2]
     physical_height = scale * N[1]
     physical_width = scale * N[0]
-    print(f"physical_depth: {physical_depth}, physical_height: {physical_height}, physical_width: {physical_width}")
     ## Physical domain used in the simulation : (Here I could change the number of points to refine the grid)
     z_phys = np.linspace(0, physical_depth, N[2])
     y_phys = np.linspace(0, physical_height, N[1])
@@ -94,7 +93,6 @@ def load_sim_sdf(ratio):
     speed = np.sqrt(vx**2 + vy**2 + vz**2)
     
     quantile_999 = np.quantile(speed, 0.999995)
-    print(f"Seuil 99,99% (quantile) : {quantile_999:.3e}")
     mask = (speed <= quantile_999)
 
 
@@ -234,18 +232,15 @@ if __name__ == "__main__":
     _, _, sdf = sdf_read('data/retina.sdf')  # sdf.shape doit être (Nx, Ny, Nz)
     sdf=sdf.T
     N=vx.shape
-    print(N)
     # === Statistiques initiales ===
-    for name, arr in zip(["vx", "vy", "vz"], [vx, vy, vz]):
-        print(f"{name}: min={arr.min():.3e}, max={arr.max():.3e}, mean={arr.mean():.3e}, std={arr.std():.3e}")
+    # for name, arr in zip(["vx", "vy", "vz"], [vx, vy, vz]):
+    #     print(f"{name}: min={arr.min():.3e}, max={arr.max():.3e}, mean={arr.mean():.3e}, std={arr.std():.3e}")
 
     speed = np.sqrt(vx**2 + vy**2 + vz**2)
-    print(f"Speed: min={speed.min():.3e}, max={speed.max():.3e}, mean={speed.mean():.3e}, std={speed.std():.3e}")
 
     # === Analyse des vitesses élevées ===
     threshold = 100  # à adapter selon le cas
     outliers = np.argwhere(speed > threshold)
-    print(f"Nb points avec vitesse > {threshold:.2f} : {len(outliers)}")
 
     # === Histogramme de la vitesse ===
     os.makedirs("fig", exist_ok=True)
@@ -258,7 +253,6 @@ if __name__ == "__main__":
     plt.close()
     
     quantile_999 = np.quantile(speed, 0.999995)
-    print(f"Seuil 99,9% (quantile) : {quantile_999:.3e}")
     # Créer un masque pour ne garder que les vitesses < seuil
     mask = (speed <= quantile_999)
 

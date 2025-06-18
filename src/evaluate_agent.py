@@ -34,6 +34,7 @@ def evaluate_agent(
     sdf=None,
     velocity_func_l=None,
     video=False,
+    D_state=None
 ):
     config = copy.deepcopy(config)
     parameters = copy.deepcopy(parameters)
@@ -63,6 +64,8 @@ def evaluate_agent(
     rewards_d_per_episode = []
     states_episode = []
     states_list_per_episode = []
+    action_list=[]
+    action_list_per_episode=[]
     count_succes = 0
     v_hist = []
 
@@ -120,6 +123,8 @@ def evaluate_agent(
 
         if iter % steps_per_action == 0 or iter == 1:
             action = agent.select_action(state)
+            action_list.append(list(action))
+
 
         if config["uniform_bg"] or config["rankine_bg"]:
             u_bg = velocity_func(x)
@@ -142,6 +147,7 @@ def evaluate_agent(
             sdf=sdf,
             N=N,
             B=B,
+            D_state=D_state,
         )
 
         x = info["x"]
@@ -154,9 +160,11 @@ def evaluate_agent(
             if done:
                 count_succes += 1
             states_list_per_episode.append([np.array(states_episode), iter])
+            action_list_per_episode.append(action_list)
             iter = 0
             episode_num += 1
             states_episode = []
+            action_list = []
             rewards_per_episode.append(episode_reward)
             rewards_t_per_episode.append(episode_rew_t)
             rewards_d_per_episode.append(episode_rew_d)
@@ -211,7 +219,10 @@ def evaluate_agent(
         )
 
     if plot:
-        trajectories =states_list_per_episode[-4:]
+        if len(states_list_per_episode) >= 4:
+            trajectories = states_list_per_episode[-4:]
+        else:
+            trajectories = states_list_per_episode
         path_save_fig = os.path.join(save_path_result_fig, file_name)
         save_path_html = os.path.join(save_path_result_fig, file_name + "_3D.html")
         save_path_paraview = os.path.join(save_path_result_fig, file_name + "_paraview/")
@@ -295,10 +306,22 @@ def evaluate_agent(
     # plt.legend()
     # plt.savefig(path_save_fig, dpi=100, bbox_inches="tight")
     # plt.close()
+    
+    if len(states_list_per_episode) >= 4:
+        trajectories = states_list_per_episode[-4:]
+    else:
+        trajectories = states_list_per_episode
+        
+    if len(states_list_per_episode) >= 4:
+        actions = action_list_per_episode[-4:]
+    else:
+        actions = action_list_per_episode
+        
     return (
         rewards_per_episode,
         rewards_t_per_episode,
         rewards_d_per_episode,
         count_succes / eval_episodes,
-        states_list_per_episode[-4:],
+        trajectories,
+        actions
     )

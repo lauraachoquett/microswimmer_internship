@@ -9,10 +9,11 @@ import matplotlib.animation as animation
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
+import pyvista as pv
 import plotly.graph_objects as go
 import seaborn as sns
 from mpl_toolkits.mplot3d import Axes3D  # nécessaire pour l'import
-import pyvista as pv
+import pandas as pd
 
 colors_default = plt.cm.tab10.colors
 from src.generate_path import (generate_curve, generate_demi_circle_path,
@@ -678,8 +679,151 @@ def draw_circle(center,radius):
     circle = np.stack((x,y,z),axis=1)
     return x,y,z
 
+def plot_success_rate_D_state(path):
+    length_scale = 0.269/20
+    ms_length = 15
+    import matplotlib.ticker as ticker
+
+    fig, axs = plt.subplots(3, 1, figsize=(8, 12), sharex=True, gridspec_kw={'hspace': 0.25})
+    with open(path, 'r') as f:
+        data = json.load(f)
+
+    agent = list(data.keys())[0]
+    results = data[agent]
+
+    D_states = []
+    success_rates = []
+    mean_rewards_time = []
+    mean_rewards_distance = []
+
+    for D_state, infos in results.items():
+        D_states.append(float(D_state))
+        config = list(infos["results_per_config"].values())[0]
+        success_rates.append(config["success_rate"])
+        rewards_time = config.get("rewards_time", [])
+        rewards_distance = config.get("rewards_distance", [])
+        mean_rewards_time.append(np.mean(rewards_time) if rewards_time else np.nan)
+        mean_rewards_distance.append(np.mean(rewards_distance) if rewards_distance else np.nan)
+
+    D_states = (np.array(D_states)/length_scale)/ms_length
+    # Sort by D_state for nice plots
+    D_states, success_rates, mean_rewards_time, mean_rewards_distance = zip(
+        *sorted(zip(D_states, success_rates, mean_rewards_time, mean_rewards_distance))
+    )
+
+    # Plot 1: Success rate
+    axs[0].plot(D_states, success_rates, 'o-', color='tab:blue', label='Success rate')
+    axs[0].set_ylabel("Success rate", fontsize=12)
+    # axs[0].set_title(r"Success rate vs Noise % of micro-swimmers lenght", fontsize=14)
+    axs[0].grid(True, which='both', linestyle='--', alpha=0.6)
+    axs[0].set_ylim(0, 1.05)
+
+    # Plot 2: Mean rewards_time
+    axs[1].plot(D_states, mean_rewards_time, 'o-', color='tab:orange', label='Mean rewards_time')
+    axs[1].set_ylabel(r"$\bar{J}_t$", fontsize=12)
+    # axs[1].set_title(r"Mean time return vs  Noise % of micro-swimmers lenght", fontsize=14)
+    axs[1].grid(True, which='both', linestyle='--', alpha=0.6)
+
+    # Plot 3: Mean rewards_distance
+    axs[2].plot(D_states, mean_rewards_distance, 'o-', color='tab:green', label='Mean rewards_distance')
+    axs[2].set_xlabel(r" Noise % of micro-swimmer lenght", fontsize=12)
+    axs[2].set_ylabel(r"$\bar{J}_d$", fontsize=12)
+    # axs[2].set_title(r"Mean distance return vs  Noise % of micro-swimmers lenght", fontsize=14)
+    axs[2].grid(True, which='both', linestyle='--', alpha=0.6)
+
+    # Scientific style
+    for ax in axs:
+        ax.tick_params(axis='both', which='major', labelsize=11)
+        ax.xaxis.set_major_locator(ticker.MaxNLocator(integer=True))
+        ax.spines['top'].set_visible(False)
+        ax.spines['right'].set_visible(False)
+
+    plt.tight_layout()
+    plt.savefig('fig/success_rate_D_state.png', dpi=200, bbox_inches='tight')
+    plt.close(fig)
+
+def hist_scientific(data, xlabel='', ylabel='Relative Frequency', title='', 
+                   bins='auto', save_name=None):
+
+    plt.rcParams.update({
+        'font.size': 12,
+        'axes.labelsize': 14,
+        'font.family': 'sans-serif',
+        'font.sans-serif': ['DejaVu Sans', 'Arial', 'Liberation Sans', 'sans-serif'],
+    })
+    
+    fig, ax = plt.subplots(figsize=(8, 6), dpi=300)
+    
+    # Use density=True to get relative frequencies (area sums to 1)
+    counts, bin_edges, patches = ax.hist(
+        data, bins=bins, 
+        alpha=0.7, 
+        color='steelblue', 
+        edgecolor='black', 
+        linewidth=0.8,
+        density=True
+    )
+    
+    # Optionally, scale to sum to 1 (relative frequency per bin, not density)
+    n = len(data)
+    rel_freq = counts * np.diff(bin_edges)
+    ax.clear()
+    ax.bar(bin_edges[:-1], rel_freq, width=np.diff(bin_edges), align='edge',
+           alpha=0.7, color='steelblue', edgecolor='black', linewidth=0.8)
+    
+    ax.set_xlabel(xlabel)
+    ax.set_ylabel(ylabel)
+    if title:
+        ax.set_title(title)
+    
+    ax.grid(True, alpha=0.3)
+    plt.tight_layout()
+    
+    if save_name:
+        plt.savefig(f'{save_name}.png', dpi=300, bbox_inches='tight')
+        plt.savefig(f'{save_name}.pdf', bbox_inches='tight')
+    
+    print(f"N = {len(data)}, μ = {np.mean(data):.2f}, σ = {np.std(data):.2f}")
+
+def compute_cos_theta_action(file):
+    with open(file, 'r') as f:
+        data = json.load(f)
+
+    cos_theta_all_agents = {}
+
+    for agent in data.keys():
+        results = data[agent]
+        cos_theta_list = []
+
+        for D_state, infos in results.items():
+            config = list(infos["results_per_config"].values())[0]
+            actions_D = config.get("action", [])
+            # actions_D is a list of episodes, each episode is a list of actions
+            for episode_actions in actions_D:
+                print(len(episode_actions))
+                episode_actions = np.array(episode_actions)
+                if len(episode_actions) < 2:
+                    continue
+                for i in range(len(episode_actions) - 1):
+                    a1 = episode_actions[i]
+                    a2 = episode_actions[i + 1]
+                    norm1 = np.linalg.norm(a1)
+                    norm2 = np.linalg.norm(a2)
+                    if norm1 == 0 or norm2 == 0:
+                        continue
+                    cos_theta = np.dot(a1, a2) / (norm1 * norm2)
+                    cos_theta_list.append(cos_theta)
+        cos_theta_all_agents[agent] = cos_theta_list
+
+    return cos_theta_all_agents
+    
 
 if __name__ == "__main__":
-    path_json_file = "results_evaluation/result_evaluation_retina.json"
-    agent_file = "agents/agent_TD3_2025-04-18_13-33"
-    plot_success_rate(path_json_file, agent_file)
+    file = 'grid_search/71/result_evaluation_retina_.json'
+    # agent_name = 'agents/agent_TD3_2025-06-17_11-14'
+    # plot_success_rate_D_state(file,agent_name)    
+    cos_theta_all_agents = compute_cos_theta_action(file)
+    i=0
+    for agent,cos_theta_agent in cos_theta_all_agents.items():
+        hist_scientific(cos_theta_agent,xlabel=r'$\cos(\theta)$',title=f'{agent} level of noise : 66% of the microswimmer lenght',save_name=f"fig/histogramme_agent_{i}")
+        i+=1

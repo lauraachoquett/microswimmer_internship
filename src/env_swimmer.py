@@ -47,7 +47,6 @@ class MicroSwimmer(gym.Env):
             high=np.inf,
             dtype=np.float32,
         )
-
         self.x = x_0
         self.x_0 = x_0
         self.previous_x = x_0
@@ -68,24 +67,27 @@ class MicroSwimmer(gym.Env):
         self.rng = np.random.default_rng(seed)
         self.add_action = add_action
 
-    def state(self, tree, path, T, N=None, B=None):
+    def state(self, tree, path, T ,N=None, B=None,D_state=None):
         if tree is None or path is None or T is None:
             return self.x
-
-        self.d, self.id_cp = min_dist_closest_point(self.x, tree)
+        if D_state is not None :
+            x = self.x + D_state * np.random.normal(0, 1, size=(self.x)[0].shape)
+        else : 
+            x=self.x
+        self.d, self.id_cp = min_dist_closest_point(x, tree)
         path_len = len(path)
         p_cp = path[self.id_cp]
 
         if self.dim == 2:
             self.dir_path = T[self.id_cp]
-            s = coordinate_in_path_ref(p_cp, self.dir_path, self.x)
+            s = coordinate_in_path_ref(p_cp, self.dir_path, x)
             s_previous = coordinate_in_path_ref(p_cp, self.dir_path, self.previous_x)
 
         else:
             self.t = T[self.id_cp]
             self.n = N[self.id_cp]
             self.b = B[self.id_cp]
-            s = coordinate_in_path_ref_3D(p_cp, self.x, self.t, self.n, self.b)
+            s = coordinate_in_path_ref_3D(p_cp, x, self.t, self.n, self.b)
             s_previous = coordinate_in_path_ref_3D(
                 p_cp, self.previous_x, self.t, self.n, self.b
             )
@@ -152,6 +154,7 @@ class MicroSwimmer(gym.Env):
         sdf=None,
         N=None,
         B=None,
+        D_state = None,
     ):
         rew_t, rew_d, rew_tar, rew = self.reward(x_target, beta)
         self.previous_x = self.x
@@ -177,7 +180,7 @@ class MicroSwimmer(gym.Env):
             sdf=sdf,
             dim=self.dim,
         )
-        next_state = self.state(tree, path, T, N, B)
+        next_state = self.state(tree, path, T, N, B,D_state)
         done = False
         d = np.linalg.norm(self.x - x_target)
         if d < threshold:

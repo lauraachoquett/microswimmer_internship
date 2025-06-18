@@ -52,6 +52,15 @@ from src.visualize import (plot_robust_D, plot_robust_u_bg_rankine,
 # Ajouter le dossier 'src' au sys.path pour permettre l'importation des modules dans src
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "src")))
 
+def convert_numpy_types(obj):
+    if isinstance(obj, np.generic):
+        return obj.item()
+    elif isinstance(obj, dict):
+        return {k: convert_numpy_types(v) for k, v in obj.items()}
+    elif isinstance(obj, list):
+        return [convert_numpy_types(i) for i in obj]
+    else:
+        return obj
 
 def format_sci(x):
     return "{:.3e}".format(x)
@@ -68,6 +77,8 @@ def evaluate_after_training(
     title_add="",
     list_config_paths=[],
     sigma=10,
+    D_state=None,
+    file_path_result= '',
 ):
     np.random.seed(seed)
     random.seed(seed)
@@ -77,9 +88,6 @@ def evaluate_after_training(
 
     uniform_bg = False
     rankine_bg = False
-    file_path_result_global = "grid_search"
-    file_path_result = str(create_numbered_run_folder(file_path_result_global))
-    os.makedirs(file_path_result, exist_ok=True)
 
     file_name_result = os.path.join(
         file_path_result, f"result_evaluation_{obstacle_type}_{title_add}.json"
@@ -104,6 +112,7 @@ def evaluate_after_training(
             "beta": config_eval["beta"],
             "add_action": config_eval["add_action"],
             "velocity_ahead": config_eval["velocity_ahead"],
+            "D_state_bool": config_eval["D_state_bool"],
         }
         print("Training type :", training_type)
         print("Agent name : ", agent_name)
@@ -111,6 +120,7 @@ def evaluate_after_training(
         config_eval["rankine_bg"] = rankine_bg
         config_eval["random_curve"] = False
         config_eval["beta"] = 0.25
+        config_eval["D_state_bool"] = False
 
         Dt_action = config_eval["Dt_action"]
         steps_per_action = config_eval["steps_per_action"]
@@ -118,15 +128,21 @@ def evaluate_after_training(
         threshold = config_eval["threshold"]
         success_rate_list = []
 
-        results["type"] = [obstacle_type]
+        # Ensure structure: results[agent_name][D_state]
+        if agent_name not in results:
+            results[agent_name] = {}
+        if str(D_state) not in results[agent_name]:
+            results[agent_name][str(D_state)] = {
+                "type": [obstacle_type],
+                "D_state": D_state,
+                "results_per_config": {}
+            }
+        results_per_config = results[agent_name][str(D_state)]["results_per_config"]
 
         for path_to_config in tqdm(list_config_paths, desc="Processing configs"):
-            if agent_name in results.keys():
-                results_per_config = results[agent_name]["results_per_config"]
-                if path_to_config in results[agent_name]["results_per_config"]:
-                    continue
-            else:
-                results_per_config = {}
+            if path_to_config in results_per_config:
+                continue
+
             (
                 path,
                 start_point,
@@ -139,10 +155,8 @@ def evaluate_after_training(
                 ratio,
                 parameters,
             ) = load_config_path(path_to_config)
-            
-            
+
             if len(path) == 0:
-                print("Path empty : ", path_config["path_path"])
                 continue
             file_path_result_parameters = os.path.join(
                 file_path_result, "parameters.json"
@@ -151,7 +165,7 @@ def evaluate_after_training(
             with open(file_path_result_parameters, "w") as f:
                 json.dump(parameters, f, indent=4)
 
-            path,path_2D,z_coords = resample_and_smooth(path,sigma=20)
+            path, path_2D, z_coords = resample_and_smooth(path, sigma=20)
 
             tree = KDTree(path)
             config_eval["path"] = path
@@ -160,8 +174,12 @@ def evaluate_after_training(
             config_eval["p_target"] = np.array(goal_point)
             config_eval["p_0"] = np.array(start_point)
             config_eval["x_0"] = np.array(start_point)
+            config_eval["D_state"] = D_state
             time_t = f"{time}"
-            file_name_or = f"_{time_t}_obstacle_{obstacle_type}_{title_add}"
+            if D_state is None:
+                file_name_or = f"_{time_t}_obstacle_{obstacle_type}_{title_add}"
+            else:
+                file_name_or = f"_{time_t}_obstacle_{obstacle_type}_{title_add}_D_state"
 
             env = MicroSwimmer(
                 x_0=config_eval["x_0"],
@@ -178,7 +196,10 @@ def evaluate_after_training(
             action_dim = env.action_space.shape[0]
             max_action = float(env.action_space.high[0])
             agent = TD3(state_dim, action_dim, max_action)
-            save_path_eval = os.path.join(agent_name, f"eval_bg/velocity_ratio_{ratio}")
+            if D_state is None:
+                save_path_eval = os.path.join(agent_name, f"eval_bg/velocity_ratio_{ratio}")
+            else:
+                save_path_eval = os.path.join(agent_name, f"eval_bg/velocity_ratio_{ratio}/D_state_{D_state}/")
 
             os.makedirs(save_path_eval, exist_ok=True)
 
@@ -192,13 +213,13 @@ def evaluate_after_training(
                 states_per_epsiode,
                 actions_per_espiode,
             ) = evaluate_agent(
-                agent = agent,
-                env = env,
-                eval_episodes = config_eval["eval_episodes"],
-                config = config_eval,
-                save_path_result_fig = save_path_eval,
+                agent=agent,
+                env=env,
+                eval_episodes=config_eval["eval_episodes"],
+                config=config_eval,
+                save_path_result_fig=save_path_eval,
                 file_name=f"eval_with" + file_name_or,
-                random_parameters = False,
+                random_parameters=False,
                 title="",
                 plot=True,
                 plot_background=True,
@@ -207,26 +228,30 @@ def evaluate_after_training(
                 sdf=sdf_func,
                 velocity_func_l=velocity_func,
                 video=False,
+                D_state=D_state
             )
-
+            if isinstance(actions_per_espiode, np.ndarray):
+                print('ARRAY')
+                actions_per_espiode = actions_per_espiode.tolist()
             plt.close()
             results_per_config[path_to_config] = {
                 "rewards": rewards_per_episode,
                 "rewards_time": rewards_t_per_episode,
                 "rewards_distance": rewards_d_per_episode,
                 "success_rate": success_rate,
+                "action":actions_per_espiode,
             }
             success_rate_list.append(success_rate)
+            # Update mean_success_rate and n_eval_episodes for this D_state
+            results[agent_name][str(D_state)]["mean_success_rate"] = mean(success_rate_list)
+            results[agent_name][str(D_state)]["n_eval_episodes"] = config_eval["eval_episodes"]
+            results[agent_name][str(D_state)]["training type"] = training_type
 
-            results[agent_name] = {
-                "mean_success_rate": mean(success_rate_list),
-                "n_eval_episodes": config_eval["eval_episodes"],
-                "training type": training_type,
-                "results_per_config": results_per_config,
-            }
+            results = convert_numpy_types(results)
+            with open('results.json', 'w') as f:
+                json.dump(results, f, indent=4)
             with open(file_name_result, "w") as f:
                 json.dump(results, f, indent=4)
-            plot_success_rate(file_name_result, agent_name, file_path_result)
         print("-----------------------------------------------")
         print("Success rate : ", mean(success_rate_list))
         print("-----------------------------------------------")
@@ -248,17 +273,20 @@ def initialize_parameters(agent_file):
     config_eval["random_helix"] = (
         config["random_helix"] if "random_helix" in config else False
     )
-    config_eval["t_max"] = 20
-    config_eval["eval_episodes"] = 5
+    config_eval["t_max"] = 40
+    config_eval["eval_episodes"] = 1
     config_eval["velocity_bool"] = (
         config["velocity_bool"] if "velocity_bool" in config else False
     )
-    config_eval['paraview']=True
+    config_eval['paraview']=False
     config_eval["velocity_ahead"] = (
         config["velocity_ahead"] if "velocity_ahead" in config else False
     )
     config_eval["add_action"] = (
         config["add_action"] if "add_action" in config else False
+    )
+    config_eval["D_state_bool"] = (
+        config["D_state_bool"] if "D_state_bool" in config else False
     )
     config_eval["Dt_action"] = (
         config_eval["Dt_action"] if "Dt_action" in config else 1 / 30
@@ -531,14 +559,7 @@ def create_list_of_goal_point(n, start_point, ratio):
 
 if __name__ == "__main__":
     obstacle_type = "retina"
-    # agents_file = []
-    # directory_path = Path("agents/")
-    # for item in directory_path.iterdir():
-    #     if item.is_dir() and "agent_TD3" in item.name:
-    #         if "2025-04-23" in item.name or "2025-04-22" in item.name:
-    #             agents_file.append(os.path.join(directory_path, item.name))
-
-    agents_file = ["agents/agent_TD3_2025-05-21_16-55"]
+    agents_file = ["agents/agent_TD3_2025-05-21_16-55","agents/agent_TD3_2025-06-17_11-14"]
 
     print("Number of agents : ", len(agents_file))
 
@@ -572,6 +593,7 @@ if __name__ == "__main__":
 
     def sdf_func_2D(point):
         return sdf_func((point[0],point[1],z_phys[len(z_phys)//2]))
+    
     X, Y = np.meshgrid(x_phys, y_phys)
     obstacle_contour = contour_2D(sdf_func_2D, X, Y, scale)
 
@@ -584,15 +606,28 @@ if __name__ == "__main__":
 
     print("Number of path : ", len(list_config_paths))
     print("Path generated - Go for evaluation")
-    results = evaluate_after_training(
-        agents_file,
-        obstacle_contour=obstacle_contour,
-        obstacle_type=obstacle_type,
-        velocity_func=velocity_retina,
-        sdf_func=sdf_func,
-        list_config_paths=list_config_paths,
-        sigma=config_par_path["sigma"],
-    )
+    lenght_scale = 0.269/20 #Ratio between biggest radius in the simulation domain and physical domain micro_meter
+    # D_state_list = np.flip(np.linspace(0.15,10,30)*lenght_scale)
+    D_state_list=np.array([10])*lenght_scale
+    print("Noise adding on state :",D_state_list)
+    file_path_result_global = "grid_search"
+    file_path_result = str(create_numbered_run_folder(file_path_result_global))
+    os.makedirs(file_path_result, exist_ok=True)
+    for id,D_state in enumerate(D_state_list) :
+        print("Noise adding on state : ",D_state)
+        print(" NB : ",id)
+        results = evaluate_after_training(
+            agents_file,
+            obstacle_contour=obstacle_contour,
+            obstacle_type=obstacle_type,
+            velocity_func=velocity_retina,
+            sdf_func=sdf_func,
+            list_config_paths=list_config_paths,
+            sigma=config_par_path["sigma"],
+            D_state = D_state,
+            file_path_result=file_path_result
+            
+        )
     end_time_eva = time.time()
     elapsed_time = (end_time_eva - start_time_eva) / 60
     print("Execution time:", elapsed_time, "minutes")

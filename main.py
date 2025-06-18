@@ -16,7 +16,7 @@ from src.evaluate_agent import evaluate_agent
 from src.generate_path import *
 from src.invariant_state import *
 from src.simulation import rankine_vortex, uniform_velocity
-from src.utils import ReplayBuffer, courbures, random_bg_parameters
+from src.utils import ReplayBuffer, courbures, random_bg_parameters,generate_state_noise
 from src.frenet import compute_frenet_frame, double_reflection_rmf
 
 colors = plt.cm.tab10.colors
@@ -47,28 +47,6 @@ def load_agent_config(agent, eval_freq, random_helix, uniform_bg, rankine_bg):
     config["rankine_bg"] = rankine_bg
     return agent, config
 
-
-# def varying_curve_init(config):
-#     print("Random curve")
-
-#     p_0 = config["p_0"]
-#     p_target = config["p_target"]
-#     curve_path_plus = generate_curve(p_0, p_target, 1/2, config["nb_points_path"])
-#     curve_path_minus = generate_curve(p_0, p_target, -1/2, config["nb_points_path"])
-#     curve_path_plus_3d = np.hstack([curve_path_plus, np.zeros((curve_path_plus.shape[0], 1))])
-#     curve_path_minus_3d = np.hstack([curve_path_minus, np.zeros((curve_path_minus.shape[0], 1))])
-#     curve_tree_plus = KDTree(curve_path_plus_3d)
-#     curve_tree_minus = KDTree(curve_path_minus_3d)
-#     list_of_path_tree = [
-#         [curve_path_plus_3d, curve_tree_plus],
-#         [curve_path_minus_3d, curve_tree_minus],
-#     ]
-#     # line_path, _ = generate_simple_line(p_0, p_target, config["nb_points_path"])
-#     # line_path = np.hstack([line_path, np.zeros((line_path.shape[0], 1))])
-#     # line_tree = KDTree(line_path)
-#     # config["path"] = line_path
-#     # config["tree"] = line_tree
-#     return list_of_path_tree
 
 
 def run_expe(config, agent_file="agents"):
@@ -117,6 +95,8 @@ def run_expe(config, agent_file="agents"):
     beta = config["beta"]
     Dt_action = Dt_sim * steps_per_action
     D = config["D"]
+    D_state_bool=config["D_state_bool"]
+    D_state=None
     
     ## Agent and Replay Buffer ##
     state_dim = env.observation_space.shape[0]
@@ -184,13 +164,13 @@ def run_expe(config, agent_file="agents"):
     
     
         
-        
+    
     print("Both pertubations : ", config["uniform_bg"] and config["rankine_bg"])
 
     ########### TRAINING LOOP ###########
     while episode_num < nb_episode:
         iter += 1
-
+            
         if iter % steps_per_action == 0 or iter == 1:
             action = agent.select_action(state)
 
@@ -198,7 +178,7 @@ def run_expe(config, agent_file="agents"):
             u_bg = velocity_func(x)
 
         next_state, reward, done, info = env.step(
-            action = action, tree = tree,path= path, T=T,x_target =p_target,beta= beta,D= D, u_bg = u_bg, threshold =threshold,N=N,B=B
+            action = action, tree = tree,path= path, T=T,x_target =p_target,beta= beta,D= D, u_bg = u_bg, threshold =threshold,N=N,B=B,D_state=D_state
         )
         x = info["x"]
         replay_buffer.add(state.flatten(), action, next_state.flatten(), reward, done)
@@ -308,6 +288,11 @@ def run_expe(config, agent_file="agents"):
                 config["x_0"] = p_0
                 config["p_target"] = p_target
                 T,N,B = double_reflection_rmf(path)
+            
+            if D_state_bool:
+                lower_bound,upper_bound = generate_state_noise(episode_num,nb_episode)
+                D_state =np.random.uniform(lower_bound, upper_bound)
+            
 
             state, done = env.reset(x_0=config['x_0'],tree=tree, path=path,T=T,velocity_func=velocity_func,N=N,B=B), False
             
@@ -324,14 +309,6 @@ def set_parameters_training(threshold,maximum_curv):
 
 if __name__ == "__main__":
 
-    # p_target = np.array([2,0,0])
-    # p_0 = np.zeros(3)
-    # nb_points_path = 2000
-    # path, d = generate_simple_line(p_0, p_target, nb_points_path)
-    # print(
-    #     "Distance path points:      ",
-    #     format_sci(np.linalg.norm(path[1, :] - path[0, :])),
-    # )
     nb_points_path = 5000
     path =  generate_helix(nb_points_path, radius = 1/2, pitch = 2.5,turns=1,clockwise = False)
     p_0 = path[0]
@@ -392,6 +369,7 @@ if __name__ == "__main__":
         'add_action' : True,
         'dim':dim,
         'paraview':False,
+        'D_state_bool':True,
     }
     start_time = time.time()
     run_expe(config)
