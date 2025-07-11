@@ -14,6 +14,7 @@ class MicroSwimmer(gym.Env):
         C,
         Dt,
         velocity_bool,
+        U=1,
         n_lookahead=5,
         velocity_ahead=False,
         add_action=False,
@@ -52,7 +53,7 @@ class MicroSwimmer(gym.Env):
         self.previous_x = x_0
         self.C = C
         self.Dt = Dt
-        self.U = 1
+        self.U = U
         self.bounce_thr = bounce_thr
         self.dir_path = np.zeros(self.dim)
         self.t = np.zeros(self.dim)
@@ -61,6 +62,7 @@ class MicroSwimmer(gym.Env):
         self.id_cp = 0
         self.d_cp = 0
         self.action = np.zeros(self.dim)
+        self.previous_action = np.zeros(self.dim)
         self.velocity_ahead = velocity_ahead
         self.velocity_bool = velocity_bool
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -128,26 +130,40 @@ class MicroSwimmer(gym.Env):
                 result.append(np.concatenate(lookahead_vel, axis=0))
         if self.add_action:
             result.append(self.action.reshape(1, self.dim))
+        self.previous_action=self.action
         return np.concatenate(result, axis=0)
 
-    def reward(self, x_target, beta):
+    def reward(self, x_target, beta,gamma,pow_d=1):
         d = self.d
         rew_t = -self.C * self.Dt
+        action_smoothness = - gamma * np.linalg.norm(self.action - self.previous_action)**2
+
         rew_target = -np.linalg.norm(self.x - x_target) + np.linalg.norm(
             self.previous_x - x_target
         )
-        rew_d = -beta * d
-        rew = rew_t + rew_d + rew_target
-        return rew_t, rew_d, rew_target, rew
+        rew_d = -beta * d**pow_d
+        rew = rew_t + rew_d + rew_target + action_smoothness
+
+        # print(
+        #     f"rew_t (time penalty): {rew_t:.3e}, "
+        #     f"rew_d (distance penalty): {rew_d:.3e}, "
+        #     f"rew_target (target reward): {rew_target:.3e}, "
+        #     f"action_smoothness: {action_smoothness:.3e}, "
+        #     f"total rew: {rew:.3e}"
+        # )
+        return rew_t, rew_d, rew_target,action_smoothness, rew
 
     def step(
         self,
         action,
+        past_action,
         tree,
         path,
         T,
         x_target,
         beta,
+        gamma,
+        pow_d,
         D=0.1,
         u_bg=None,
         threshold=0.2,
@@ -156,7 +172,8 @@ class MicroSwimmer(gym.Env):
         B=None,
         D_state = None,
     ):
-        rew_t, rew_d, rew_tar, rew = self.reward(x_target, beta)
+        self.previous_action=past_action
+        rew_t, rew_d, rew_tar,action_smoothness ,rew = self.reward(x_target, beta,gamma,pow_d)
         self.previous_x = self.x
         self.action = action
         if self.dim == 2:
@@ -194,6 +211,7 @@ class MicroSwimmer(gym.Env):
                 "rew_t": rew_t,
                 "rew_d": rew_d,
                 "rew_target": rew_tar,
+                "action_smoothness" :action_smoothness
             },
         )
 

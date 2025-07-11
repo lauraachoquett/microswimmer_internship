@@ -49,10 +49,12 @@ def evaluate_agent(
     Dt_action = config["Dt_action"]
     Dt_sim = Dt_action / steps_per_action
     beta = config["beta"]
+    gamma = config['gamma'] if 'gamma' in config else 0.001
+    pow_d = config['pow_d'] if 'pow_d' in config else 1
     D = config["D"]
     threshold = config["threshold"]
     x = config["x_0"]
-    
+    action = np.zeros(3)
 
     iter = 0
     episode_num = 0
@@ -62,8 +64,9 @@ def evaluate_agent(
     rewards_per_episode = []
     rewards_t_per_episode = []
     rewards_d_per_episode = []
-    states_episode = []
-    states_list_per_episode = []
+    x_pos_episode = []
+    x_pos_list_per_episode = []
+    state_episode = []
     action_list=[]
     action_list_per_episode=[]
     count_succes = 0
@@ -118,11 +121,21 @@ def evaluate_agent(
     T, N, B = double_reflection_rmf(path)
     state, done = env.reset(x,tree, path, T, velocity_func, N, B), False
     while episode_num < eval_episodes:
-        states_episode.append(x)
+        x_pos_episode.append(x)
+        state_episode.append(state)
+
         iter += 1
 
-        if iter % steps_per_action == 0 or iter == 1:
+        if iter == 1 : 
+            past_action=action
             action = agent.select_action(state)
+            action_list.append(list(action))
+            
+        if iter % steps_per_action == 0 :
+            past_action = action
+            action = agent.select_action(state)
+            # print("State :",state)
+            # print("Action :",action)
             action_list.append(list(action))
 
 
@@ -132,15 +145,17 @@ def evaluate_agent(
         if velocity_func is not None:
             u_bg = velocity_func(x)
             v = np.linalg.norm(u_bg)
-            v_hist.append(v)
 
         next_state, reward, done, info = env.step(
             action=action,
+            past_action = past_action,
             tree=tree,
             path=path,
             T=T,
             x_target=p_target,
             beta=beta,
+            gamma=gamma,
+            pow_d=pow_d,
             D=D,
             u_bg=u_bg,
             threshold=threshold,
@@ -159,11 +174,11 @@ def evaluate_agent(
         if done or iter * Dt_sim > t_max:
             if done:
                 count_succes += 1
-            states_list_per_episode.append([np.array(states_episode), iter])
+            x_pos_list_per_episode.append([np.array(x_pos_episode), iter])
             action_list_per_episode.append(action_list)
             iter = 0
             episode_num += 1
-            states_episode = []
+            x_pos_episode = []
             action_list = []
             rewards_per_episode.append(episode_reward)
             rewards_t_per_episode.append(episode_rew_t)
@@ -206,7 +221,7 @@ def evaluate_agent(
         video_trajectory(
             fig,
             ax,
-            states_list_per_episode[0][0],
+            x_pos_list_per_episode[0][0],
             path,
             title,
             a,
@@ -219,10 +234,10 @@ def evaluate_agent(
         )
 
     if plot:
-        if len(states_list_per_episode) >= 4:
-            trajectories = states_list_per_episode[-4:]
+        if len(x_pos_list_per_episode) >= 4:
+            trajectories = x_pos_list_per_episode[-4:]
         else:
-            trajectories = states_list_per_episode
+            trajectories = x_pos_list_per_episode
         path_save_fig = os.path.join(save_path_result_fig, file_name)
         save_path_html = os.path.join(save_path_result_fig, file_name + "_3D.html")
         save_path_paraview = os.path.join(save_path_result_fig, file_name + "_paraview/")
@@ -296,23 +311,38 @@ def evaluate_agent(
             if config['paraview']:
                 paraview_export(path,  save_path_paraview,trajectories)
 
-    # print(mean(v_hist))
-    # path_save_fig = os.path.join(save_path_result_fig, file_name + "_hist_v.png")
-    # plt.hist(v_hist, bins=50, color="blue", alpha=0.7)
-    # plt.axvline(
-    #     mean(v_hist), color="green", linestyle="dashed", linewidth=1.5, label="Mean"
-    # )
-    # plt.xlabel(r"$u_{bg} / \|U\|$")
-    # plt.legend()
-    # plt.savefig(path_save_fig, dpi=100, bbox_inches="tight")
-    # plt.close()
-    
-    if len(states_list_per_episode) >= 4:
-        trajectories = states_list_per_episode[-4:]
-    else:
-        trajectories = states_list_per_episode
+        os.makedirs(path_save_fig, exist_ok=True)
+        state_episode = np.array(state_episode)
+        n = state_episode.shape[1]
+        states_reshaped = state_episode.reshape(-1, n, 3)
+        norms = np.linalg.norm(states_reshaped, axis=2)  # shape: (n_steps, n)
+
+        fig, axs = plt.subplots(2, 4, figsize=(15, 6))
+        axs = axs.flatten()
+
+        for i in range(n):
+            if i ==1:
+                min_norm = norms[:, i].min()
+                max_norm = 5
+            else :
+                min_norm = norms[:, i].min()
+                max_norm = norms[:, i].max()
+            axs[i].hist(norms[:, i], bins=40, edgecolor='black', range=(min_norm, max_norm))
+            axs[i].set_title(f"Vecteur {i}")
+            axs[i].set_xlabel("Norme")
+            axs[i].set_ylabel("Fréquence")
+            axs[i].set_xlim(min_norm, max_norm)
+
+        plt.tight_layout()
+        plt.savefig(os.path.join(path_save_fig, 'hist_norm.png'))
+        plt.close(fig)
         
-    if len(states_list_per_episode) >= 4:
+    if len(x_pos_list_per_episode) >= 4:
+        trajectories = x_pos_list_per_episode[-4:]
+    else:
+        trajectories = x_pos_list_per_episode
+        
+    if len(x_pos_list_per_episode) >= 4:
         actions = action_list_per_episode[-4:]
     else:
         actions = action_list_per_episode

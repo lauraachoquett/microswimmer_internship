@@ -37,14 +37,8 @@ from src.Astar_ani import astar_anisotropic, compute_v, resample_and_smooth
 from src.plot_visualize_a_star import contour_2D
 
 from src.data_loader import load_sdf_from_csv, load_sim_sdf, vel_read
-from src.distance_to_path import min_dist_closest_point
 from src.evaluate_agent import evaluate_agent
-from src.fmm import compute_fmm_path
-from src.invariant_state import coordinate_in_global_ref
 from src.plot import plot_action, plot_success_rate, plot_trajectories
-from src.rank_agents import rank_agents_by_rewards
-from src.sdf import get_contour_coordinates, sdf_circle, sdf_many_circle
-from src.simulation import solver
 from src.utils import create_numbered_run_folder
 from src.visualize import (plot_robust_D, plot_robust_u_bg_rankine,
                            plot_robust_u_bg_uniform, visualize_streamline)
@@ -142,7 +136,6 @@ def evaluate_after_training(
             
             
             if len(path) == 0:
-                print("Path empty : ", path_config["path_path"])
                 continue
             file_path_result_parameters = os.path.join(
                 file_path_result, "parameters.json"
@@ -253,7 +246,7 @@ def initialize_parameters(agent_file):
     config_eval["velocity_bool"] = (
         config["velocity_bool"] if "velocity_bool" in config else False
     )
-    config_eval['paraview']=True
+    config_eval['paraview']=False
     config_eval["velocity_ahead"] = (
         config["velocity_ahead"] if "velocity_ahead" in config else False
     )
@@ -538,7 +531,7 @@ if __name__ == "__main__":
     #         if "2025-04-23" in item.name or "2025-04-22" in item.name:
     #             agents_file.append(os.path.join(directory_path, item.name))
 
-    agents_file = ["agents/agent_TD3_2025-05-21_16-55"]
+    agents_file = ["agents/agent_TD3_2025-07-10_10-33"]
 
     print("Number of agents : ", len(agents_file))
 
@@ -551,7 +544,7 @@ if __name__ == "__main__":
 
     file_to_config_path_g = f"config_path/velocity_ratio_{ratio}"
     # file_to_config_path = str(create_numbered_run_folder(file_to_config_path_g))
-    file_to_config_path = 'config_path/velocity_ratio_5/config_paraview'
+    file_to_config_path = 'config_path/velocity_ratio_5/32'
     types = [""]
     # types = ["free","v1",""]
     # goal_point = (10.79606786617848/24.067712783813477,12.296130605776128/22.062068939208984,0.5)

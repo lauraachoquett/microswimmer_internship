@@ -153,6 +153,7 @@ def evaluate_after_training(
             rewards_d_per_episode,
             success_rate,
             _,
+            action,
         ) = evaluate_agent(
             agent=agent,
             env=env,
@@ -206,7 +207,7 @@ def initialize_parameters(agent_file, p_target, p_0, nb_points_path):
     config_eval["x_0"] = p_0
     config_eval["nb_points_path"] = nb_points_path
     config_eval["t_max"] = 12
-    config_eval["eval_episodes"] = 10
+    config_eval["eval_episodes"] = 4
     config_eval["velocity_bool"] = (
         config["velocity_bool"] if "velocity_bool" in config else False
     )
@@ -231,22 +232,13 @@ def initialize_parameters(agent_file, p_target, p_0, nb_points_path):
 
 
 if __name__ == "__main__":
-    agent_name = "agents/agent_TD3_2025-05-16_14-56"
 
     agents_file = [
-        agent_name,
-        "agents/agent_TD3_2025-05-16_15-12",
-        "agents/agent_TD3_2025-05-20_17-07",
-        "agents/agent_TD3_2025-05-20_13-19",
-        "agents/agent_TD3_2025-05-20_12-51",
-        "agents/agent_TD3_2025-05-20_17-16",
-        "agents/agent_TD3_2025-05-20_17-37",
-        "agents/agent_TD3_2025-05-21_11-27",
         "agents/agent_TD3_2025-05-21_16-55",
-        "agents/agent_TD3_2025-05-21_17-33",
-        "agents/agent_TD3_2025-05-30_13-38",
-        "agents/agent_TD3_2025-05-30_14-55",
-        "agents/agent_TD3_2025-06-17_11-14"
+        "agents/agent_TD3_2025-06-17_11-14",
+        "agents/agent_TD3_2025-07-08_11-16",
+        "agents/agent_TD3_2025-07-10_10-33",
+        "agents/agent_TD3_2025-07-10_16-44"
     ]
 
     # directory_path = Path("agents/")
@@ -273,6 +265,8 @@ if __name__ == "__main__":
             title_add=title_add,
         )
         rank_agents_by_rewards(results)
+        
+        
     norm = 0.5
     dict = {
         "dir1_05": np.array([1, 0, 0]),

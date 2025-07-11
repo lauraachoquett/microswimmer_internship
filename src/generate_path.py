@@ -3,15 +3,16 @@ from math import atan2, cos, exp, pi
 import matplotlib.pyplot as plt
 import numpy as np
 from scipy.interpolate import CubicSpline
-
+from pathlib import Path
+import os
 # from .utils import courbures
 
 
-def random_radius_pitch(n, nb_episodes):
-    R_max = 1 / 8 + (2 - 1 / 8) * n / nb_episodes
-    pitch_min = 2.5 + (1.5 - 2.5) * n / nb_episodes
-    R = np.random.uniform(1 / 8, R_max)
-    pitch = np.random.uniform(pitch_min, 2.5)
+def random_radius_pitch(n, nb_episodes,R1,R2,p1,p2):
+    R_max = R1 + (R2 - R1) * n / nb_episodes
+    pitch_min = p1 + (p2 - p1) * n / nb_episodes
+    R = np.random.uniform(R1, R_max)
+    pitch = np.random.uniform(pitch_min, p1)
     return R, pitch
 
 
@@ -127,36 +128,34 @@ def plot_path(p_0, p_target, nb_points, type="line"):
     plt.title(f"Path : {type}")
     plt.savefig(f"fig/path_{type}.png", dpi=100, bbox_inches="tight")
 
+def maximum_curvature(files):
+    scale = 0.269 / 6.43
+    def curvature_3d(path):
+        # Calculate curvature for 3D path
+        dp = np.gradient(path, axis=0)
+        ddp = np.gradient(dp, axis=0)
+        cross = np.cross(dp, ddp)
+        num = np.linalg.norm(cross, axis=1)
+        denom = np.linalg.norm(dp, axis=1) ** 3
+        with np.errstate(divide='ignore', invalid='ignore'):
+            kappa = np.where(denom != 0, num / denom, 0)
+        return kappa
+
+    max_curvatures = []
+    for file in files:
+        path = np.load(file)/scale
+        if path.shape[1] >= 3:
+            kappa = curvature_3d(path)
+            if kappa is not None :
+                max_curvatures.append(np.max(np.abs(kappa)))
+
+    return np.array(max_curvatures)
 
 if __name__ == "__main__":
-    p_0 = np.array([0, 0])
-    p_target = np.array([2, 0])
-    nb_points = 200
-    # plot_path(p_0,p_target,nb_points,'line')
-    A = 2
-    N = 400
-    f = 4
-    n_values = np.linspace(1, 700, 700, dtype=int)
-    output = [func_k_max(A, N, f, n) for n in n_values]
-    nb_points = 700
-    plt.figure(figsize=(25, 10))
-    plt.subplot(1, 2, 1)
-    plt.plot(n_values, output)
-    colors = plt.cm.viridis(np.linspace(0, 1, 20))
-    for n in n_values:
-        if n > 100 and n < 120:
-            k = func_k_max(A, N, f, n)
-            plt.scatter(n, k, color=colors[n % 20])
-
-    plt.subplot(1, 2, 2)
-    for n in n_values:
-        if n > 100 and n < 120:
-            k = func_k_max(A, N, f, n)
-            path = generate_curve(p_0, p_target, k, nb_points)
-            plt.plot(path[:, 0], path[:, 1], label=f"k : {k:.2f}", color=colors[n % 20])
-    plt.xlabel("x")
-    plt.ylabel("y")
-    plt.scatter(p_0[0], p_0[1], color="black")
-    plt.scatter(p_target[0], p_target[1], color="black")
-    plt.legend()
-    plt.savefig("fig/smooth_curve.png", dpi=200, bbox_inches="tight")
+    directory_path = Path('data/')
+    files_path = []
+    for item in directory_path.iterdir():
+        if "npy" in item.name:
+            files_path.append(os.path.join(directory_path, item.name))  
+    curvature = (maximum_curvature(files_path))
+    print(np.max(curvature))

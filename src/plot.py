@@ -25,18 +25,9 @@ def video_trajectory(
     fig,
     ax,
     trajectory,
-    path,
-    title,
-    a=0,
-    center=np.zeros(2),
-    cir=0,
-    dir=np.zeros(2),
-    norm=0,
-    plot_background=False,
     path_save_video="",
     color_id=0,
     colors=plt.cm.tab10.colors,
-    label="",
 ):
     trajectory = np.array(trajectory)
     step = max(1, len(trajectory) // 1000)
@@ -83,7 +74,6 @@ def plot_trajectories(
     norm=0,
     plot_background=False,
     type="",
-    dim=2,
     color_id=0,
     colors=plt.cm.tab10.colors,
     label="",
@@ -92,10 +82,7 @@ def plot_trajectories(
         colors = colors_default
     if isinstance(trajectories_list[0][0], np.ndarray):
         for idx, list_state in enumerate(trajectories_list):
-            """indices = np.linspace(0, len(path) - 1, list_state[1]).astype(int)
-            path_sampled = path[indices]
-            ax.plot(path_sampled[:, 0], path_sampled[:, 1], label='path', color='black', linewidth=2)
-            """
+
             states = list_state[0]
 
             color_id_t = max(idx, color_id)
@@ -110,7 +97,7 @@ def plot_trajectories(
             ax.scatter(states[0, 0], states[0, 1], color=colors[color_id_t], s=5)
             ax.set_aspect("equal")
     else:
-        states = trajectories_list
+        states = np.array(trajectories_list[0])
         color_id_t = color_id
         ax.plot(
             states[:, 0],
@@ -194,7 +181,7 @@ def plot_html_3d(
                 )
             )
     else:
-        states = trajectories_list
+        states = np.array(trajectories_list[0])
         color_id_t = color_id
         fig.add_trace(
             go.Scatter3d(
@@ -679,57 +666,61 @@ def draw_circle(center,radius):
     circle = np.stack((x,y,z),axis=1)
     return x,y,z
 
-def plot_success_rate_D_state(path):
-    length_scale = 0.269/20
+def plot_success_rate_D_state(file, title):
+    length_scale = 0.269 / 20
     ms_length = 15
     import matplotlib.ticker as ticker
 
     fig, axs = plt.subplots(3, 1, figsize=(8, 12), sharex=True, gridspec_kw={'hspace': 0.25})
-    with open(path, 'r') as f:
-        data = json.load(f)
 
-    agent = list(data.keys())[0]
-    results = data[agent]
+    markers = ['o', 'x']  # rond pour le premier fichier, croix pour le second
+    labels = ['Training 1','Training 2']
+    for idx, path in enumerate(file):
+        with open(path, 'r') as f:
+            data = json.load(f)
 
-    D_states = []
-    success_rates = []
-    mean_rewards_time = []
-    mean_rewards_distance = []
+        agent = list(data.keys())[0]
+        results = data[agent]
 
-    for D_state, infos in results.items():
-        D_states.append(float(D_state))
-        config = list(infos["results_per_config"].values())[0]
-        success_rates.append(config["success_rate"])
-        rewards_time = config.get("rewards_time", [])
-        rewards_distance = config.get("rewards_distance", [])
-        mean_rewards_time.append(np.mean(rewards_time) if rewards_time else np.nan)
-        mean_rewards_distance.append(np.mean(rewards_distance) if rewards_distance else np.nan)
+        D_states = []
+        success_rates = []
+        mean_rewards_time = []
+        mean_rewards_distance = []
 
-    D_states = (np.array(D_states)/length_scale)/ms_length
-    # Sort by D_state for nice plots
-    D_states, success_rates, mean_rewards_time, mean_rewards_distance = zip(
-        *sorted(zip(D_states, success_rates, mean_rewards_time, mean_rewards_distance))
-    )
+        for D_state, infos in results.items():
+            D_states.append(float(D_state))
+            config = list(infos["results_per_config"].values())[0]
+            success_rates.append(config["success_rate"])
+            rewards_time = config.get("rewards_time", [])
+            rewards_distance = config.get("rewards_distance", [])
+            mean_rewards_time.append(np.mean(rewards_time) if rewards_time else np.nan)
+            mean_rewards_distance.append(np.mean(rewards_distance) if rewards_distance else np.nan)
 
-    # Plot 1: Success rate
-    axs[0].plot(D_states, success_rates, 'o-', color='tab:blue', label='Success rate')
-    axs[0].set_ylabel("Success rate", fontsize=12)
-    # axs[0].set_title(r"Success rate vs Noise % of micro-swimmers lenght", fontsize=14)
-    axs[0].grid(True, which='both', linestyle='--', alpha=0.6)
-    axs[0].set_ylim(0, 1.05)
+        D_states = (np.array(D_states) / length_scale) / ms_length
+        # Sort by D_state for nice plots
+        D_states, success_rates, mean_rewards_time, mean_rewards_distance = zip(
+            *sorted(zip(D_states, success_rates, mean_rewards_time, mean_rewards_distance))
+        )
 
-    # Plot 2: Mean rewards_time
-    axs[1].plot(D_states, mean_rewards_time, 'o-', color='tab:orange', label='Mean rewards_time')
-    axs[1].set_ylabel(r"$\bar{J}_t$", fontsize=12)
-    # axs[1].set_title(r"Mean time return vs  Noise % of micro-swimmers lenght", fontsize=14)
-    axs[1].grid(True, which='both', linestyle='--', alpha=0.6)
+        marker = markers[idx % len(markers)]
+        label_fig = labels[idx%len(labels)]
 
-    # Plot 3: Mean rewards_distance
-    axs[2].plot(D_states, mean_rewards_distance, 'o-', color='tab:green', label='Mean rewards_distance')
-    axs[2].set_xlabel(r" Noise % of micro-swimmer lenght", fontsize=12)
-    axs[2].set_ylabel(r"$\bar{J}_d$", fontsize=12)
-    # axs[2].set_title(r"Mean distance return vs  Noise % of micro-swimmers lenght", fontsize=14)
-    axs[2].grid(True, which='both', linestyle='--', alpha=0.6)
+        # Plot 1: Success rate
+        axs[0].plot(D_states, success_rates, linestyle='-', marker=marker,label=label_fig)
+        axs[0].set_ylabel("Success rate", fontsize=12)
+        axs[0].grid(True, which='both', linestyle='--', alpha=0.6)
+        axs[0].set_ylim(0, 1.05)
+
+        # Plot 2: Mean rewards_time
+        axs[1].plot(D_states, mean_rewards_time, linestyle='-', marker=marker,label=label_fig)
+        axs[1].set_ylabel(r"$\bar{J}_t$", fontsize=12)
+        axs[1].grid(True, which='both', linestyle='--', alpha=0.6)
+
+        # Plot 3: Mean rewards_distance
+        axs[2].plot(D_states, mean_rewards_distance, linestyle='-', marker=marker,label=label_fig)
+        axs[2].set_xlabel(r" Noise magnitude (% of swimmer length)", fontsize=12)
+        axs[2].set_ylabel(r"$\bar{J}_d$", fontsize=12)
+        axs[2].grid(True, which='both', linestyle='--', alpha=0.6)
 
     # Scientific style
     for ax in axs:
@@ -737,9 +728,11 @@ def plot_success_rate_D_state(path):
         ax.xaxis.set_major_locator(ticker.MaxNLocator(integer=True))
         ax.spines['top'].set_visible(False)
         ax.spines['right'].set_visible(False)
+        ax.legend(fontsize=10)
 
     plt.tight_layout()
-    plt.savefig('fig/success_rate_D_state.png', dpi=200, bbox_inches='tight')
+    save_path = os.path.join('fig', title)
+    plt.savefig(save_path, dpi=200, bbox_inches='tight')
     plt.close(fig)
 
 def hist_scientific(data, xlabel='', ylabel='Relative Frequency', title='', 
@@ -766,6 +759,7 @@ def hist_scientific(data, xlabel='', ylabel='Relative Frequency', title='',
     
     # Optionally, scale to sum to 1 (relative frequency per bin, not density)
     n = len(data)
+    print("Largeur des bins :",np.diff(bin_edges))
     rel_freq = counts * np.diff(bin_edges)
     ax.clear()
     ax.bar(bin_edges[:-1], rel_freq, width=np.diff(bin_edges), align='edge',
@@ -789,11 +783,11 @@ def compute_cos_theta_action(file):
     with open(file, 'r') as f:
         data = json.load(f)
 
-    cos_theta_all_agents = {}
+    theta_all_agents = {}
 
     for agent in data.keys():
         results = data[agent]
-        cos_theta_list = []
+        theta_list = []
 
         for D_state, infos in results.items():
             config = list(infos["results_per_config"].values())[0]
@@ -812,18 +806,20 @@ def compute_cos_theta_action(file):
                     if norm1 == 0 or norm2 == 0:
                         continue
                     cos_theta = np.dot(a1, a2) / (norm1 * norm2)
-                    cos_theta_list.append(cos_theta)
-        cos_theta_all_agents[agent] = cos_theta_list
+                    theta_list.append(cos_theta)
+        theta_all_agents[agent] = theta_list
 
-    return cos_theta_all_agents
+    return theta_all_agents
     
 
 if __name__ == "__main__":
-    file = 'grid_search/71/result_evaluation_retina_.json'
-    # agent_name = 'agents/agent_TD3_2025-06-17_11-14'
-    # plot_success_rate_D_state(file,agent_name)    
-    cos_theta_all_agents = compute_cos_theta_action(file)
-    i=0
-    for agent,cos_theta_agent in cos_theta_all_agents.items():
-        hist_scientific(cos_theta_agent,xlabel=r'$\cos(\theta)$',title=f'{agent} level of noise : 66% of the microswimmer lenght',save_name=f"fig/histogramme_agent_{i}")
-        i+=1
+    file = ['grid_search/66/result_evaluation_retina_.json','grid_search/65/result_evaluation_retina_.json']
+    title = 'D_success_rate'
+    plot_success_rate_D_state(file,title)    
+    # cos_theta_all_agents = compute_cos_theta_action(file)
+    # i=0
+    # for agent,cos_theta_agent in cos_theta_all_agents.items():
+    #     hist_scientific(cos_theta_agent,xlabel=r'$\cos(\theta)$',title='',save_name=f"fig/histogramme_agent_{i}_cos_theta_no_title",bins=20)
+    #     i+=1
+    
+    
