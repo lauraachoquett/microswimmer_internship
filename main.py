@@ -406,7 +406,7 @@ if __name__ == "__main__":
         "load_model": "",
         "episode_per_update": 3,
         "discount_factor": 1,
-        "beta": 0.3,
+        "beta": 0.4,
         "uniform_bg": True,  # Random uniform background flow during the training
         "rankine_bg": True,  # Random rankine vortex during the training
         "pertubation_after_episode": 1,  # Background flow add in the training after this episode
@@ -422,7 +422,7 @@ if __name__ == "__main__":
         'D_state_bool':True,
         'helix_par':helix_par,
         'U':1,
-        'gamma':0.001,
+        'gamma':0.01,
         'pow_d':1,
     }
     start_time = time.time()

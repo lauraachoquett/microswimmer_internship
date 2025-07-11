@@ -17,6 +17,51 @@ from src.TD3 import TD3
 import plotly.graph_objects as go
 
 
+def initialize_parameters(agent_file, p_target, p_0, nb_points_path):
+    path_config = os.path.join(agent_file, "config.pkl")
+    with open(path_config, "rb") as f:
+        config = pickle.load(f)
+    config_eval = copy.deepcopy(config)
+
+    config_eval["random_helix"] = (
+        config["random_helix"] if "random_helix" in config else False
+    )
+    config_eval["p_target"] = p_target
+    config_eval["p_0"] = p_0
+    config_eval["x_0"] = p_0
+    config_eval["nb_points_path"] = nb_points_path
+    config_eval["t_max"] = 12
+    config_eval["eval_episodes"] = 4
+    config_eval["velocity_bool"] = (
+        config["velocity_bool"] if "velocity_bool" in config else False
+    )
+    config_eval["paraview"] = False
+    config_eval["velocity_ahead"] = (
+        config["velocity_ahead"] if "velocity_ahead" in config else False
+    )
+    config_eval["add_action"] = (
+        config["add_action"] if "add_action" in config else False
+    )
+    config_eval["Dt_action"] = (
+        config_eval["Dt_action"] if "Dt_action" in config else 1 / 30
+    )
+    config_eval["U"] = (
+        config_eval["U"] if "U" in config else 1
+    )
+    config_eval['U']=1/10
+    config_eval["gamma"] = (
+        config_eval["gamma"] if "gamma" in config else 0
+    )
+    config_eval["n_lookahead"] = config["n_lookahead"] if "n_lookahead" in config else 5
+    config_eval['dim']=3
+    maximum_curvature = 30
+    l = 1 / maximum_curvature
+    Dt_action = 1 / maximum_curvature
+    threshold = 0.5
+    D = threshold**2 / (20 * Dt_action)
+    config_eval["D"] = D
+    return config_eval
+
 def visualize_streamline(
     agent_name,
     file_name_or,
@@ -128,6 +173,7 @@ def visualize_streamline(
 def test_state_action_pos(
     agent_name,
     save_path_eval,
+    previous_action
 ):
     save_path_streamline = os.path.join(save_path_eval, "streamlines/")
     if not os.path.exists(save_path_streamline):
@@ -170,6 +216,8 @@ def test_state_action_pos(
     # Scan pos[0], pos[1], pos[2] over several orders of magnitude between 1e-6 and 1e-1
     pos_range = np.logspace(-6, -1, 50)
     results = []
+    past_action = np.array([1, 0.00000000e+00, 0.00000000e+00])
+    past_action = past_action[None, :]  # shape (1, 3)
     for x in pos_range:
         for y in pos_range:
             for z in pos_range:
@@ -181,8 +229,10 @@ def test_state_action_pos(
                     [1.00001000e-04, 0.00000000e+00, 0.00000000e+00],
                     [1.50001500e-04, 0.00000000e+00, 0.00000000e+00],
                     [2.00002000e-04, 0.00000000e+00, 0.00000000e+00],
-                    [2.50002500e-04, 0.00000000e+00, 0.00000000e+00]
+                    [2.50002500e-04, 0.00000000e+00, 0.00000000e+00],
                 ])
+                if previous_action:
+                    state = np.concatenate((state,past_action),axis=0)
                 action = agent.select_action(state)
                 if action[0] > 0.995:
                     results.append((x, y, z, action[0]))
@@ -205,9 +255,9 @@ def test_state_action_pos(
             print(f"{name}: min={min_val:.2e}, max={max_val:.2e}, significant digits={sig_digits}")
     else:
         ax.text2D(0.5, 0.5, "Aucune position trouvée où action[0] > 0.99", transform=ax.transAxes, ha='center')
-    ax.set_xlabel('log10(v_x)')
-    ax.set_ylabel('log10(v_y)')
-    ax.set_zlabel('log10(v_z)')
+    ax.set_xlabel('v_x')
+    ax.set_ylabel('v_y')
+    ax.set_zlabel('v_z')
 
     plt.tight_layout()
     plt.savefig(os.path.join(save_path_eval,'test_action_pos.png'),dpi=200,bbox_inches='tight')
@@ -253,6 +303,7 @@ def test_state_action_pos(
 def test_state_action_vel(
     agent_name,
     save_path_eval,
+    previous_action
 ):
     save_path_streamline = os.path.join(save_path_eval, "streamlines/")
     if not os.path.exists(save_path_streamline):
@@ -295,6 +346,8 @@ def test_state_action_vel(
     # Scan pos[0], pos[1], pos[2] over several orders of magnitude between 1e-6 and 1e-1
     pos_range = np.logspace(-6, 0, 50)
     results = []
+    past_action = np.array([1,0,0])
+    past_action = past_action[None, :]  # shape (1, 3)
     for v_x in pos_range:
         for v_y in pos_range:
             for v_z in pos_range:
@@ -307,8 +360,10 @@ def test_state_action_vel(
                     [1.00001000e-04, 0.00000000e+00, 0.00000000e+00],
                     [1.50001500e-04, 0.00000000e+00, 0.00000000e+00],
                     [2.00002000e-04, 0.00000000e+00, 0.00000000e+00],
-                    [2.50002500e-04, 0.00000000e+00, 0.00000000e+00]
+                    [2.50002500e-04, 0.00000000e+00, 0.00000000e+00],
                 ])
+                if previous_action:
+                    state = np.concatenate((state,past_action),axis=0)
                 action = agent.select_action(state)
                 if action[0] > 0.99:
                     results.append((v_x, v_y, v_z, action[0]))
@@ -321,7 +376,7 @@ def test_state_action_vel(
                         c=results[:, 3], cmap='Reds', s=50, alpha=0.5)
     
         plt.colorbar(sc, ax=ax, label='action[0]')
-        ax.set_title("Zones (log) où action[0] > 0.99")
+        ax.set_title("Zones où action[0] > 0.99")
         for i, name in enumerate(['v_x', 'v_y', 'v_z']):
             vals = results[:, i]
             min_val = abs(vals.min())
@@ -333,9 +388,9 @@ def test_state_action_vel(
             print(f"{name}: min={min_val:.2e}, max={max_val:.2e}, significant digits={sig_digits}")
     else:
         ax.text2D(0.5, 0.5, "Aucune position trouvée où action[0] > 0.99", transform=ax.transAxes, ha='center')
-    ax.set_xlabel('log10(v_x)')
-    ax.set_ylabel('log10(v_y)')
-    ax.set_zlabel('log10(v_z)')    
+    ax.set_xlabel('v_x')
+    ax.set_ylabel('v_y')
+    ax.set_zlabel('v_z')    
     plt.tight_layout()
     plt.savefig(os.path.join(save_path_eval, 'test_action_vel.png'), dpi=200, bbox_inches='tight')
 
@@ -387,8 +442,11 @@ def test_state_action_vel(
         [1.00001000e-04, 0.00000000e+00, 0.00000000e+00],
         [1.50001500e-04, 0.00000000e+00, 0.00000000e+00],
         [2.00002000e-04, 0.00000000e+00, 0.00000000e+00],
-        [2.50002500e-04, 0.00000000e+00, 0.00000000e+00]
+        [2.50002500e-04, 0.00000000e+00, 0.00000000e+00],
+       
     ])
+    if previous_action:
+        state = np.concatenate((state,past_action),axis=0)
     action = agent.select_action(state)
     print('Action :',action)
     
@@ -400,8 +458,12 @@ def test_state_action_vel(
         [1.00001000e-04, 0.00000000e+00, 0.00000000e+00],
         [1.50001500e-04, 0.00000000e+00, 0.00000000e+00],
         [2.00002000e-04, 0.00000000e+00, 0.00000000e+00],
-        [2.50002500e-04, 0.00000000e+00, 0.00000000e+00]
+        [2.50002500e-04, 0.00000000e+00, 0.00000000e+00],
+       
     ])
+    if previous_action:
+        state = np.concatenate((state,past_action),axis=0)
+
     action = agent.select_action(state)
     print("Action : ", action)
     
@@ -413,63 +475,22 @@ def test_state_action_vel(
         [1.00001000e-04, 0.00000000e+00, 0.00000000e+00],
         [1.50001500e-04, 0.00000000e+00, 0.00000000e+00],
         [2.00002000e-04, 0.00000000e+00, 0.00000000e+00],
-        [2.50002500e-04, 0.00000000e+00, 0.00000000e+00]
+        [2.50002500e-04, 0.00000000e+00, 0.00000000e+00],
+       
     ])
+    if previous_action:
+        state = np.concatenate((state,past_action),axis=0)
     action = agent.select_action(state)
     print("Action : ", action)
 
     
 
-def initialize_parameters(agent_file, p_target, p_0, nb_points_path):
-    path_config = os.path.join(agent_file, "config.pkl")
-    with open(path_config, "rb") as f:
-        config = pickle.load(f)
-    config_eval = copy.deepcopy(config)
-
-    config_eval["random_helix"] = (
-        config["random_helix"] if "random_helix" in config else False
-    )
-    config_eval["p_target"] = p_target
-    config_eval["p_0"] = p_0
-    config_eval["x_0"] = p_0
-    config_eval["nb_points_path"] = nb_points_path
-    config_eval["t_max"] = 12
-    config_eval["eval_episodes"] = 4
-    config_eval["velocity_bool"] = (
-        config["velocity_bool"] if "velocity_bool" in config else False
-    )
-    config_eval["paraview"] = False
-    config_eval["velocity_ahead"] = (
-        config["velocity_ahead"] if "velocity_ahead" in config else False
-    )
-    config_eval["add_action"] = (
-        config["add_action"] if "add_action" in config else False
-    )
-    config_eval["Dt_action"] = (
-        config_eval["Dt_action"] if "Dt_action" in config else 1 / 30
-    )
-    config_eval["U"] = (
-        config_eval["U"] if "U" in config else 1
-    )
-    config_eval['U']=1/10
-    config_eval["gamma"] = (
-        config_eval["gamma"] if "gamma" in config else 0
-    )
-    config_eval["n_lookahead"] = config["n_lookahead"] if "n_lookahead" in config else 5
-    config_eval['dim']=3
-    maximum_curvature = 30
-    l = 1 / maximum_curvature
-    Dt_action = 1 / maximum_curvature
-    threshold = 0.5
-    D = threshold**2 / (20 * Dt_action)
-    config_eval["D"] = D
-    return config_eval
 
 
 if __name__ == "__main__":
     agents_file = []
 
-    agent_name = 'agents/agent_TD3_2025-07-10_10-33'
+    agent_name = 'agents/agent_TD3_2025-06-17_11-14'
     save_path_eval = os.path.join(agent_name,'eval_bg/')
     file_name_or ='streamlines'
     type='line'
@@ -482,14 +503,17 @@ if __name__ == "__main__":
         parameters=[],
         offset=0.05,
     )
+    previous_action=True
     print("TEST ACTION VELOCITY")
     test_state_action_vel(
         agent_name,
         save_path_eval,
+        previous_action,
     )
     
     print("TEST ACTION POSITION")
     test_state_action_pos(
         agent_name,
         save_path_eval,
+        previous_action,
     )
