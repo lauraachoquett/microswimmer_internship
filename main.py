@@ -111,7 +111,7 @@ def run_expe(config, agent_file="agents"):
     print('State dimension :',state_dim)
     action_dim = env.action_space.shape[0]
     max_action = float(env.action_space.high[0])
-    agent = TD3.TD3(state_dim, action_dim, max_action)
+    agent = TD3.TD3(state_dim, action_dim, max_action,decay_rate=config['decay_rate'])
     replay_buffer = ReplayBuffer(state_dim, action_dim)
 
     ## Training parameters ##
@@ -185,8 +185,8 @@ def run_expe(config, agent_file="agents"):
     while episode_num < nb_episode:
         iter += 1
         if iter == 1 : 
-            past_action=action
             action = T[0]
+            past_action=action
             
         if iter % steps_per_action == 0 :
             past_action = action
@@ -227,6 +227,7 @@ def run_expe(config, agent_file="agents"):
             training_reward.append(episode_reward)
 
             if (episode_num) % eval_freq == 0 and episode_num >= 10:
+                agent.update_policy_noise(episode_num)
                 print(
                     f"Total iter: {iter+1} Episode Num: {episode_num} Reward: {episode_reward:.3f} Success rate: {count_reach_target/eval_freq}"
                 )
@@ -381,8 +382,7 @@ if __name__ == "__main__":
     print("Distance during Dt_action: ", format_sci(Dt_action))
     # print("Distance to cover:         ", format_sci(d))
     # print("Expected precision:        ", format_sci(threshold / d))
-
-    
+    D = D/4
     config = {
         "x_0": p_0,  # m
         "C": 1,  # m/s
@@ -422,8 +422,9 @@ if __name__ == "__main__":
         'D_state_bool':True,
         'helix_par':helix_par,
         'U':1,
-        'gamma':0.01,
+        'gamma':0.001,
         'pow_d':1,
+        'decay_rate':500 # decay rate of policy noise
     }
     start_time = time.time()
     run_expe(config)

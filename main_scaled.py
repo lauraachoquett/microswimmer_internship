@@ -314,8 +314,8 @@ def set_parameters_training(threshold,maximum_curv,U,D):
     return Dt_action
 
 if __name__ == "__main__":
-    U=0.5
-    D=0.02
+    U=1
+    D=0.013
     nb_points_path = 5000
     helix_par = {
         'radius':2,
@@ -333,7 +333,7 @@ if __name__ == "__main__":
     print("Curvature max du chemin :  ", format_sci(np.max(courbures(path))))
     t_max = 250
     t_init = 0
-    maximum_curvature = 7.065
+    maximum_curvature = 3 * 1.413
     threshold=1/2
     Dt_action = set_parameters_training(threshold=threshold,maximum_curv=maximum_curvature,U=U,D=D)
     dim=3
@@ -369,7 +369,7 @@ if __name__ == "__main__":
         "load_model": "",
         "episode_per_update": 3,
         "discount_factor": 1,
-        "beta": 0.04,
+        "beta": 0.1,
         "uniform_bg": True,  # Random uniform background flow during the training
         "rankine_bg": True,  # Random rankine vortex during the training
         "pertubation_after_episode": 1,  # Background flow add in the training after this episode
@@ -382,7 +382,7 @@ if __name__ == "__main__":
         'add_action' : True,
         'dim':dim,
         'paraview':False,
-        'D_state_bool':True,
+        'D_state_bool':False,
         'helix_par':helix_par,
         'U' :U,
     }

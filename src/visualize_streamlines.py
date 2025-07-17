@@ -242,7 +242,7 @@ def test_state_action_pos(
     if results.shape[0] > 0:
         sc = ax.scatter(results[:, 0], results[:, 1], results[:, 2], c=results[:, 3], cmap='Reds', s=40,alpha=0.5)
         plt.colorbar(sc, ax=ax, label='action[0]')
-        ax.set_title("Positions où action[0] > 0.99")
+        ax.set_title("Positions where action[0] > 0.99")
         # Statistiques sur x, y, z
         for i, name in enumerate(['x', 'y', 'z']):
             vals = results[:, i]
@@ -254,10 +254,10 @@ def test_state_action_pos(
                 sig_digits = 'N/A'
             print(f"{name}: min={min_val:.2e}, max={max_val:.2e}, significant digits={sig_digits}")
     else:
-        ax.text2D(0.5, 0.5, "Aucune position trouvée où action[0] > 0.99", transform=ax.transAxes, ha='center')
-    ax.set_xlabel('v_x')
-    ax.set_ylabel('v_y')
-    ax.set_zlabel('v_z')
+        ax.text2D(0.5, 0.5, "No position found with action[0] > 0.99", transform=ax.transAxes, ha='center')
+    ax.set_xlabel('x')
+    ax.set_ylabel('y')
+    ax.set_zlabel('z')
 
     plt.tight_layout()
     plt.savefig(os.path.join(save_path_eval,'test_action_pos.png'),dpi=200,bbox_inches='tight')
@@ -282,11 +282,11 @@ def test_state_action_pos(
             )])
             fig_plotly.update_layout(
                 scene=dict(
-                    xaxis_title='v_x',
-                    yaxis_title='v_y',
-                    zaxis_title='v_z'
+                    xaxis_title='x',
+                    yaxis_title='y',
+                    zaxis_title='z'
                 ),
-                title="Positions où action[0] > 0.99 (interactive)",
+                title="Positions where action[0] > 0.99",
                 margin=dict(l=0, r=0, b=0, t=40)
             )
             interactive_path = os.path.join(save_path_eval, 'test_action_pos_interactive.html')
@@ -376,7 +376,7 @@ def test_state_action_vel(
                         c=results[:, 3], cmap='Reds', s=50, alpha=0.5)
     
         plt.colorbar(sc, ax=ax, label='action[0]')
-        ax.set_title("Zones où action[0] > 0.99")
+        ax.set_title("Velocity where action[0] > 0.99")
         for i, name in enumerate(['v_x', 'v_y', 'v_z']):
             vals = results[:, i]
             min_val = abs(vals.min())
@@ -387,7 +387,7 @@ def test_state_action_vel(
                 sig_digits = 'N/A'
             print(f"{name}: min={min_val:.2e}, max={max_val:.2e}, significant digits={sig_digits}")
     else:
-        ax.text2D(0.5, 0.5, "Aucune position trouvée où action[0] > 0.99", transform=ax.transAxes, ha='center')
+        ax.text2D(0.5, 0.5, "No position leads to action[0] > 0.99", transform=ax.transAxes, ha='center')
     ax.set_xlabel('v_x')
     ax.set_ylabel('v_y')
     ax.set_zlabel('v_z')    
@@ -490,7 +490,7 @@ def test_state_action_vel(
 if __name__ == "__main__":
     agents_file = []
 
-    agent_name = 'agents/agent_TD3_2025-06-17_11-14'
+    agent_name = 'agents/agent_TD3_2025-07-16_18-13'
     save_path_eval = os.path.join(agent_name,'eval_bg/')
     file_name_or ='streamlines'
     type='line'

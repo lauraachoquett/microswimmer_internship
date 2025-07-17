@@ -173,12 +173,13 @@ def states_scaled(agents_file):
     # Sauvegarde
     axs.legend(handles=legend_elements)
     plt.tight_layout()
-    # plt.savefig(os.path.join(save_path_eval, 'pos_scaled_action_summary_log.png'), dpi=300, bbox_inches='tight')
-    plt.savefig('fig/pos_scaled_action_summary_log.png', dpi=300, bbox_inches='tight')
+    plt.savefig(os.path.join(save_path_eval, 'pos_scaled_action_summary_log_line_start.png'), dpi=300, bbox_inches='tight')
+    # plt.savefig('fig/pos_scaled_action_summary_line_bis.png', dpi=300, bbox_inches='tight')
     plt.close(fig)
 
 if __name__ == '__main__':
     agents_file = ['agents/agent_TD3_2025-07-11_15-11','agents/agent_TD3_2025-07-10_16-44','agents/agent_TD3_2025-05-21_16-55','agents/agent_TD3_2025-07-10_10-33']
+    agents_file = ['agents/agent_TD3_2025-07-16_18-13']
     states_scaled(agents_file)
             
             
