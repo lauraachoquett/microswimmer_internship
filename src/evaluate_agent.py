@@ -10,7 +10,6 @@ from src.utils import random_bg_parameters
 colors = plt.cm.tab10.colors
 import copy
 
-from src.generate_path import generate_curve
 from src.plot import plot_trajectories,video_trajectory
 
 
@@ -221,23 +220,7 @@ def evaluate_agent(
             ax.set_aspect("equal")
             ax.set_axis_off()
 
-        elif dim == 3:
-            fig = plt.figure(figsize=(10, 8))
-            ax = fig.add_subplot(111, projection='3d')
 
-            for elt in list_of_path_tree:
-                path, _ = elt
-                ax.plot(path[:, 0], path[:, 1], path[:, 2], color="black", linewidth=2)
-
-            plot_trajectories_3D(
-                ax,
-                states_list_per_episode[-4:],
-                title=title,
-                type=type,
-                a=a,
-                cir=cir,
-                norm=norm,
-            )
             
 
         ax.set_aspect("equal")
@@ -247,11 +230,6 @@ def evaluate_agent(
         plt.close(fig)
         
         
-        
-    if dim == 3:
-        path_save_html =  os.path.join(save_path_result_fig, "trajectoires_3d.html")
-        plot_interactif(path,states_list_per_episode[-4:],path_save_html)
-
     return (
         rewards_per_episode,
         rewards_t_per_episode,

@@ -161,48 +161,46 @@ def analyse_retina_json(name_file):
     # print(df_sample.head())
     # print(df_sample.shape)
     # print(df_sample.columns)
-    
 if __name__ == "__main__":
-    name_file = 'grid_search/17/result_evaluation_retina_.json'
-    analyse_retina_json(name_file)
+    # name_file = 'grid_search/17/result_evaluation_retina_.json'
+    # analyse_retina_json(name_file)
     
-    # types = ["ondulating", "curve_minus", "curve_plus", "line"]
-    # types = ["ondulating","line"]
-    # file = "results_evaluation"
-    # files_results = []
-    # for type in types:
-    #     files_results.extend(
-    #         [
-    #             f"results_evaluation/result_evaluation_east_05_{type}.json",
-    #             f"results_evaluation/result_evaluation_west_05_{type}.json",
-    #             f"results_evaluation/result_evaluation_north_05_{type}.json",
-    #             f"results_evaluation/result_evaluation_south_05_{type}.json",
-    #         ]
-    #     )
-    #     files_results.extend(
-    #         [
-    #             f"results_evaluation/result_evaluation_rankine_a_05__cir_3_center_1_075_{type}.json"
-    #         ]
-    #     )
-    #     files_results.extend([f"results_evaluation/result_evaluation_free_{type}.json"])
-    # print("Overall ranking of agents:")
-    # print(files_results)
-    # agents_file = []
+    types = ["ondulating", "curve_minus", "curve_plus", "line"]
+    file = "results_evaluation"
+    files_results = []
+    for type in types:
+        # files_results.extend(
+        #     [
+        #         f"results_evaluation/result_evaluation_east_05_{type}.json",
+        #         f"results_evaluation/result_evaluation_west_05_{type}.json",
+        #         f"results_evaluation/result_evaluation_north_05_{type}.json",
+        #         f"results_evaluation/result_evaluation_south_05_{type}.json",
+        #     ]
+        # )
+        # files_results.extend(
+        #     [
+        #         f"results_evaluation/result_evaluation_rankine_a_05_cir_0_75_2_pi_center_1_0_{type}.json"
+        #     ]
+        # )
+        files_results.extend([f"results_evaluation/result_evaluation_free_{type}.json"])
+    print("Overall ranking of agents:")
+    print(files_results)
+    agents_file = []
 
-    # directory_path = Path("agents/")
+    directory_path = Path("agents/")
 
-    # for item in directory_path.iterdir():
-    #     agents_file.append(os.path.join(directory_path, item.name))
+    for item in directory_path.iterdir():
+        agents_file.append(os.path.join(directory_path, item.name))
 
-    # stats = rank_agents_all_criterion(files_results, agents_file)
-    # timestamp = datetime.now().strftime("%Y-%m-%d_%H")
-    # save_rank_file = os.path.join(file, f"results_rank_overall_line_ondu.json")
-    # with open(save_rank_file, "w") as f:
-    #     json.dump(stats, f, indent=4)
+    stats = rank_agents_all_criterion(files_results, agents_file)
+    timestamp = datetime.now().strftime("%Y-%m-%d_%H")
+    save_rank_file = os.path.join(file, f"results_rank_overall_free.json")
+    with open(save_rank_file, "w") as f:
+        json.dump(stats, f, indent=4)
 
-    # file_path = "results_evaluation/results_rank_overall_line_ondu.json"
-    # with open(file_path, "r") as f:
-    #     data = json.load(f)
+    file_path = "results_evaluation/results_rank_overall_free.json"
+    with open(file_path, "r") as f:
+        data = json.load(f)
 
     # analyze_and_visualize_agent_data(data=data,name_fig='result_3_agents')
     # file_path = "/Users/laura/Documents/MVA/Stage_Harvard/Project/results_evaluation/results_rank_overall_beta_values.json"

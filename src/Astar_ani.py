@@ -446,15 +446,17 @@ if __name__ == "__main__":
             
     plt.figure(figsize=(12, 10))
     start_point = (float(physical_width * 0.98), float(physical_height * 0.3))
-    goal_point_tmp = ( 17.38728683339246/20, 12.3556761323975/20)
-    goal_point = (float(physical_width * goal_point_tmp[0]), float(physical_height * goal_point_tmp[1]))
+    # goal_point_tmp = ( 17.38728683339246/20, 12.3556761323975/20)
+    # goal_point = (float(physical_width * goal_point_tmp[0]), float(physical_height * goal_point_tmp[1]))
+    
+    goal_point = (12.991832733154297,13.56390380859375)
     print('distance between the two points : ',  np.linalg.norm(np.array(goal_point)-np.array(start_point)))
 
     c = 0.4
     B = 1.6
-    h = 2
-    pow_v0 = 5
-    pow_al = 7
+    h = 0
+    pow_v0 = 0
+    pow_al = 5
     max_radius = 2
 
     shortest_geo_path = False
@@ -484,15 +486,15 @@ if __name__ == "__main__":
     with open(os.path.join(save_dir, "params.json"), "w") as f:
         json.dump(params, f, indent=4)
 
-    for B in np.linspace(1,6,4):
+    for pow_v0 in np.linspace(0,7,7,dtype=int):
         v0, vx, vy, _, _ = compute_v(
             x_phys, y_phys, velocity_retina, B, grid_size, ratio, sdf_func, c
         )
         speed = np.sqrt(vx**2 + vy**2)
-        print(f"Speed: min={speed.min():.3e}, max={speed.max():.3e}, mean={speed.mean():.3e}, std={speed.std():.3e}")
+        # print(f"Speed: min={speed.min():.3e}, max={speed.max():.3e}, mean={speed.mean():.3e}, std={speed.std():.3e}")
         
-        for name, arr in zip(["vx", "vy","v0"], [vx, vy,v0]):
-            print(f"{name}: min={arr.min():.3e}, max={arr.max():.3e}, mean={arr.mean():.3e}, std={arr.std():.3e}")
+        # for name, arr in zip(["vx", "vy","v0"], [vx, vy,v0]):
+        #     print(f"{name}: min={arr.min():.3e}, max={arr.max():.3e}, mean={arr.mean():.3e}, std={arr.std():.3e}")
         
         if shortest_geo_path: 
             v0 = np.ones_like(v0)
@@ -506,7 +508,7 @@ if __name__ == "__main__":
             pow_v0 = 0
             pow_al = 0
             h = 0.0
-            max_radius=5
+            max_radius= 1
         
             
         start_time = time.time()
@@ -526,22 +528,22 @@ if __name__ == "__main__":
             max_radius=max_radius
         )
         # path = shortcut_path(path,is_collision_free,sdf_interpolator)
-        print("Travel time :", travel_time)
+        # print("Travel time :", travel_time)
 
         path = np.array(path)  # de forme (N, 2)
         dist = np.array([abs(path[i + 1] - path[i]) for i in range(len(path) - 1)])
-        print("path before resampling :", len(path))
+        # print("path before resampling :", len(path))
         n = ceil(np.max(dist) / (5 * 1e-3))
         if n > 1:
             path,distances = resample_path(path, len(path) * n)
-        print("after resampling : ", len(path))
+        # print("after resampling : ", len(path))
         smoothed_x = gaussian_filter1d(path[:, 0], sigma=30)
         smoothed_y = gaussian_filter1d(path[:, 1], sigma=30)
         path = np.stack([smoothed_x, smoothed_y], axis=1)
         print("Path length : ",distances)
         X, Y = np.meshgrid(x_phys, y_phys)
         visualize_results_a_star(
-            X, Y, sdf_func, path, vx, vy, v0, scale, label=f'B: {B:.2f}'
+            X, Y, sdf_func, path, vx, vy, v0, scale, label=f'a : {pow_v0:.2f}'
         )
         end_time = time.time()
         elapsed_time = (end_time - start_time) / 60
@@ -554,7 +556,7 @@ if __name__ == "__main__":
     plt.axis("off")
     plt.title("Path")
     plt.tight_layout()
-    path_save_fig = os.path.join(save_dir,f"Astar_ani_test_{current_time}_B.png")
+    path_save_fig = os.path.join(save_dir,f"Astar_ani_test_{current_time}_pow_v0.png")
     plt.savefig(path_save_fig, dpi=300, bbox_inches="tight")
     plt.close()
 

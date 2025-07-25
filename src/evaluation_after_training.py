@@ -40,6 +40,8 @@ def format_sci(x):
 
 def evaluate_after_training(
     agent_files,
+    p_target,
+    p_0,
     seed=42,
     type=None,
     translation=None,
@@ -51,15 +53,50 @@ def evaluate_after_training(
     cir=None,
     title_add="",
 ):
+    np.random.seed(seed)
+    random.seed(seed)
+    rng = np.random.default_rng(seed)
+    if translation is not None:
+        translation = translation
+    else:
+        translation = np.zeros(2)
 
-    nb_points_path = 2000
-    radius = 1/2
-    pitch = 1
-    turns=1
+    if theta is not None:
+        theta = theta
+        sin_th = sin(theta)
+        cos_th = cos(theta)
+        R = np.array([[cos_th, -sin_th], [sin_th, cos_th]])
+    else:
+        R = np.eye(2)
+
+    p_target = R @ p_target + translation
+    p_0 = R @ p_0 + translation
+    p_1 = [1 / 4, -1 / 4] + translation
+    nb_points_path = 500
     k = 0
-    if type=='helix':
-        path = generate_helix(nb_points_path, radius, pitch,turns,False)
+    if type == "line":
+        path, _ = generate_simple_line(p_0, p_target, nb_points_path)
+    if type == "two_line":
+        path, _ = generate_line_two_part(p_0, p_1, p_target, nb_points_path)
+    if type == "circle":
+        path, _ = generate_demi_circle_path(p_0, p_target, nb_points_path)
+    if type == "ondulating":
+        path = generate_random_ondulating_path_old(
+            p_0, p_target, n_points=5000, amplitude=0.5, frequency=2
+        )
+    if type == "ondulating_hard":
+        path = generate_random_ondulating_path(
+            p_0, p_target, n_points=5000, kappa_max=17, frequency=2
+        )
+    if type == "curve_minus":
+        k = -1.72
+        path = generate_curve_with_target_curvature(p_0, p_target, k, nb_points_path)
+    if type == "curve_plus":
+        k = 1.72
+        path = generate_curve_with_target_curvature(p_0, p_target, k, nb_points_path)
     tree = KDTree(path)
+    
+    
     p_0 = path[0]
     p_target = path[-1]
     results = {}
@@ -131,7 +168,6 @@ def evaluate_after_training(
             n_lookahead = config_eval["n_lookahead"],
             velocity_ahead= config_eval["velocity_ahead"],
             add_action = config_eval["add_action"],
-            dim = config_eval["dim"],
         )
 
         state_dim = env.observation_space.shape[0]
@@ -166,18 +202,21 @@ def evaluate_after_training(
 
         results[agent_name] = {
             "rewards": rewards_per_episode,
+            "rewards_mean":mean(rewards_per_episode),
             "rewards_time": rewards_t_per_episode,
+            "rewards_time_mean": mean(rewards_t_per_episode),
             "rewards_distance": rewards_d_per_episode,
+            "rewards_distance_mean": mean(rewards_d_per_episode),
             "success_rate": success_rate,
             "n_eval_episodes": config_eval["eval_episodes"],
             "training type": training_type,
         }
         print("-----------------------------------------------")
-        print("Success rate : ", success_rate)
-        print("Mean rewards : ", format_sci(mean(rewards_per_episode)))
-        print("Mean rewards t : ", format_sci(mean(rewards_t_per_episode)))
-        print("Mean rewards d : ", format_sci(mean(rewards_d_per_episode)))
-        print("-----------------------------------------------")
+        # print("Success rate : ", success_rate)
+        # print("Mean rewards : ", format_sci(mean(rewards_per_episode)))
+        # print("Mean rewards t : ", format_sci(mean(rewards_t_per_episode)))
+        # print("Mean rewards d : ", format_sci(mean(rewards_d_per_episode)))
+        # print("-----------------------------------------------")
 
 
     with open(file_name_result, "w") as f:
@@ -209,7 +248,7 @@ def initialize_parameters(agent_file, p_target, p_0):
     config_eval["x_0"] = p_0
     config_eval["nb_points_path"] = 2000
     config_eval["t_max"] = 30
-    config_eval["eval_episodes"] = 10
+    config_eval["eval_episodes"] = 50
     config_eval["velocity_bool"] = (
         config["velocity_bool"] if "velocity_bool" in config else False
     )
@@ -223,6 +262,7 @@ def initialize_parameters(agent_file, p_target, p_0):
         config_eval["Dt_action"] if "Dt_action" in config else 1 / 30
     )
     config_eval["n_lookahead"] = config["n_lookahead"] if "n_lookahead" in config else 5
+    
     maximum_curvature = 30
     l = 1 / maximum_curvature
     Dt_action = 1 / maximum_curvature
@@ -233,7 +273,7 @@ def initialize_parameters(agent_file, p_target, p_0):
 
 
 if __name__ == "__main__":
-    agent_name = "agents/agent_TD3_2025-05-16_14-56"
+    agent_name = "agents/agent_TD3_2025-07-24_11-16"
     # p_target = np.array([2,0])
     # p_0 = np.array([0,0])
     # u_bg = np.array([0.0,0.2])
@@ -242,15 +282,28 @@ if __name__ == "__main__":
     # os.makedirs(save_path_eval, exist_ok=True)
     # offset=0.2
     # compare_p_line(agent_name,config_eval_comp,'comparison_north_02',save_path_eval,u_bg,'',offset)
-
+    agents_file=[agent_name,
+                 "agents/agent_TD3_2025-07-24_10-12",
+                 "agents/agent_TD3_2025-07-24_16-45",
+                 "agents/agent_TD3_2025-07-24_11-02",
+                 "agents/agent_TD3_2025-07-24_11-49",
+                 "agents/agent_TD3_2025-07-24_12-13",
+                 "agents/agent_TD3_2025-07-24_12-38",
+                 "agents/agent_TD3_2025-07-24_13-03",
+                 "agents/agent_TD3_2025-07-24_13-27",
+                 "agents/agent_TD3_2025-07-24_13-57",
+                 
+                 ]
+    agents_file = ['agents/agent_TD3_2025-07-24_17-30']
+           
     print("Agents files : ", agents_file)
-    types = ["ondulating", "line"]
-    title_add = "rankine_a_05__cir_3_center_1_075"
+    types = ["ondulating","line","curve_minus","curve_plus"]
+    title_add = "rankine_a_05_cir_0_75_2_pi_center_1_0"
     print("--------------------- Evaluation with rankine bg ---------------------")
     for type in types:
         a = 0.5
-        cir = 2
-        center = np.array([1, 3 / 4])
+        cir =3/4*2*pi*a
+        center = np.array([1,0])
         results = evaluate_after_training(
             agents_file,
             type=type,
@@ -295,6 +348,4 @@ if __name__ == "__main__":
                 norm=norm,
             )
             rank_agents_by_rewards(results)
-
-
 

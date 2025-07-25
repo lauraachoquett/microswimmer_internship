@@ -19,7 +19,6 @@ class MicroSwimmer(gym.Env):
         add_action=False,
         seed=None,
         bounce_thr=0,
-        in_3D = False,
     ):
         super(MicroSwimmer, self).__init__()
         self.n_lookahead = n_lookahead

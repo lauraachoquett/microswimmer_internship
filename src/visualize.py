@@ -17,7 +17,7 @@ from scipy.spatial import KDTree
 
 from src.env_swimmer import MicroSwimmer
 from src.generate_path import (
-    generate_curve,
+    generate_curve_with_target_curvature,
     generate_demi_circle_path,
     generate_random_ondulating_path,
     generate_simple_line,
@@ -458,21 +458,16 @@ def plot_streamlines_beta(agents_file, dict):
 
 
 if __name__ == "__main__":
-    agents_file = []
 
-    directory_path = Path("agents/")
-
-    for item in directory_path.iterdir():
-        if item.is_dir() and "agent_TD3" in item.name:
-            if "2025-04-23" in item.name or "2025-04-22" in item.name:
-                agents_file.append(os.path.join(directory_path, item.name))
-
-    print(agents_file)
-    dict = {
-        "free": np.array([0, 0]),
-        # "east_02": np.array([1, 0]),
-        # "west_02": np.array([-1, 0]),
-        # "north_05": np.array([0, 1]),
-        # "south_05": np.array([0, -1]),
-    }
-    plot_streamlines_beta(agents_file, dict)
+    agent_name = []
+    visualize_streamline(
+        agent,
+        config_eval,
+        file_name_or,
+        save_path_eval,
+        type="",
+        title="",
+        k=0,
+        parameters=[],
+        offset=0.2,
+    )

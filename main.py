@@ -8,6 +8,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import torch
 from scipy.spatial import KDTree
+import shutil
 
 import src.TD3 as TD3
 from src.env_swimmer import MicroSwimmer
@@ -51,8 +52,8 @@ def varying_curve_init(config):
 
     p_0 = config["p_0"]
     p_target = config["p_target"]
-    curve_path_plus = generate_curve(p_0, p_target, 1, config["nb_points_path"])
-    curve_path_minus = generate_curve(p_0, p_target, -1, config["nb_points_path"])
+    curve_path_plus = generate_curve_with_target_curvature(p_0, p_target, 1, config["nb_points_path"])
+    curve_path_minus = generate_curve_with_target_curvature(p_0, p_target, -1, config["nb_points_path"])
     curve_tree_plus = KDTree(curve_path_plus)
     curve_tree_minus = KDTree(curve_path_minus)
     list_of_path_tree = [
@@ -74,7 +75,8 @@ def run_expe(config, agent_file="agents"):
     os.makedirs(file_name, exist_ok=True)
     with open(os.path.join(file_name, "config.pkl"), "wb") as f:
         pickle.dump(config, f)
-
+    current_py = os.path.abspath(__file__)
+    shutil.copy(current_py, os.path.join(file_name, os.path.basename(current_py)))
     ## Path ##
     p_target = config["p_target"]
     p_0 = config["p_0"]
@@ -204,6 +206,7 @@ def run_expe(config, agent_file="agents"):
                 print(
                     f"Total iter: {iter+1} Episode Num: {episode_num} Reward: {episode_reward:.3f} Success rate: {count_reach_target/eval_freq}"
                 )
+                print('----------------------------------------------------------------------------------------------------------------------------------------')
                 path_save_fig = os.path.join(
                     save_path_result_fig, "training_reward.png"
                 )
@@ -286,7 +289,7 @@ def run_expe(config, agent_file="agents"):
 
             if config["random_curve"] and episode_num > 10:
                 k = func_k_max(A, N, f, episode_num)
-                path = generate_curve(p_0, p_target, k, config["nb_points_path"])
+                path = generate_curve_with_target_curvature(p_0, p_target, k, config["nb_points_path"])
                 tree = KDTree(path)
                 config["path"] = path
                 config["tree"] = tree
@@ -310,7 +313,7 @@ if __name__ == "__main__":
     path, d = generate_simple_line(p_0, p_target, nb_points_path)
     print(
         "Distance path points:      ",
-        format_sci(np.linalg.norm(path[1, :] - path[0, :])),
+        format_sci(np.linalg.norm(path[25, :] - path[0, :])),
     )
     tree = KDTree(path)
     print("Curvature max du chemin :  ", format_sci(np.max(courbures(path))))
@@ -350,16 +353,17 @@ if __name__ == "__main__":
         "load_model": "",
         "episode_per_update": 3,
         "discount_factor": 1,
-        "beta": 0.5,
+        "beta": 0.25,
         "uniform_bg": True,  # Random uniform background flow during the training
         "rankine_bg": True,  # Random rankine vortex during the training
         "pertubation_after_episode": 20,  # Background flow add in the training after this episode
         "random_curve": True,  # To train on varying curve (no longer random)
-        "nb_points_path": 500,  # Discretization of the path
+        "nb_points_path": nb_points_path,  # Discretization of the path
         "Dt_action": Dt_action,
-        "velocity_bool": True,  # Add the velocity in the state or not
+        "velocity_bool": False,  # Add the velocity in the state or not
         "n_lookahead": 10,  # Number of points in the lookahead
         "velocity_ahead":  False,
-        'add_action' : True
+        'add_action' : False
     }
+
     run_expe(config)

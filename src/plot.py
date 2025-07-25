@@ -11,11 +11,6 @@ import numpy as np
 import pandas as pd
 import seaborn as sns
 
-from src.generate_path import (
-    generate_curve,
-    generate_demi_circle_path,
-    generate_random_ondulating_path,
-)
 
 from src.simulation import rankine_vortex, uniform_velocity
 
