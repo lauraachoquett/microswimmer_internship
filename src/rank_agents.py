@@ -4,12 +4,15 @@ from collections import OrderedDict, defaultdict
 from datetime import datetime
 from pathlib import Path
 from statistics import mean
+from pprint import pprint
 
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import seaborn as sns
+
 from src.plot import analyze_and_visualize_agent_data
+
 
 def rank_agents_by_rewards(results, print_stats=True):
     # Calculer les moyennes pour chaque agent
@@ -121,12 +124,47 @@ def rank_agents_all_criterion(files_results, agents_file):
     return filtered_stats
 
 
+def analyse_retina_json(name_file):
+    with open(name_file,'r') as f:
+        data = json.load(f)
+    if "type" in data:
+        del data["type"]
+    df = pd.DataFrame.from_dict(data, orient='index')
+    df_agent = df['results_per_config']
+    sample = df_agent.iloc[0]
+    df_sample = pd.DataFrame(sample)
+
+    success_rates = df_sample.loc["success_rate"].astype(float)
 
 
+    filtered_success_rates = success_rates[success_rates < 0.7]
 
+    filtered_success_rates = filtered_success_rates.sort_values()
+    case_names = list(filtered_success_rates.index)
+    save_failure_case_file = 'config_path/velocity_ratio_5/failure_case.json'
+    with open(save_failure_case_file, 'w') as f:
+        json.dump(case_names, f, indent=4)
+        
+    print(filtered_success_rates.describe())
+    print(filtered_success_rates.shape)
+    # Plot
+    plt.figure(figsize=(12, 5))
+    filtered_success_rates.plot(kind='bar', color='skyblue', edgecolor='black')
 
-
+    plt.title('Configurations with success rate < 0.7')
+    plt.ylabel('Success Rate')
+    plt.xlabel('Configuration')
+    plt.xticks(rotation=90)
+    plt.ylim(0, 1.05)
+    plt.grid(axis='y', linestyle='--', alpha=0.9)
+    plt.savefig('fig/sucess_rate_failure_cases.png',dpi=100,bbox_inches='tight')
+    # print(df_sample.head())
+    # print(df_sample.shape)
+    # print(df_sample.columns)
 if __name__ == "__main__":
+    # name_file = 'grid_search/17/result_evaluation_retina_.json'
+    # analyse_retina_json(name_file)
+    
     types = ["ondulating", "curve_minus", "curve_plus", "line"]
     file = "results_evaluation"
     files_results = []
@@ -139,12 +177,12 @@ if __name__ == "__main__":
         #         f"results_evaluation/result_evaluation_south_05_{type}.json",
         #     ]
         # )
-        files_results.extend(
-            [
-                f"results_evaluation/result_evaluation_rankine_a_05__cir_3_center_1_075_{type}.json"
-            ]
-        )
-        # files_results.extend([f"results_evaluation/result_evaluation_free_{type}.json"])
+        # files_results.extend(
+        #     [
+        #         f"results_evaluation/result_evaluation_rankine_a_05_cir_0_75_2_pi_center_1_0_{type}.json"
+        #     ]
+        # )
+        files_results.extend([f"results_evaluation/result_evaluation_free_{type}.json"])
     print("Overall ranking of agents:")
     print(files_results)
     agents_file = []
@@ -154,13 +192,13 @@ if __name__ == "__main__":
     for item in directory_path.iterdir():
         agents_file.append(os.path.join(directory_path, item.name))
 
-    stats = rank_agents_all_criterion(files_results,agents_file)
+    stats = rank_agents_all_criterion(files_results, agents_file)
     timestamp = datetime.now().strftime("%Y-%m-%d_%H")
-    save_rank_file = os.path.join(file, f"results_rank_overall_rankine.json")
+    save_rank_file = os.path.join(file, f"results_rank_overall_free.json")
     with open(save_rank_file, "w") as f:
         json.dump(stats, f, indent=4)
 
-    file_path = "results_evaluation/results_rank_overall_rankine.json"
+    file_path = "results_evaluation/results_rank_overall_free.json"
     with open(file_path, "r") as f:
         data = json.load(f)
 

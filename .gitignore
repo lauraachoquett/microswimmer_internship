@@ -13,3 +13,7 @@ config_path/
 sdf_path.md
 grid_search/
 data/
+fig/Astar_*
+*.mp4
+*.html
+fig/

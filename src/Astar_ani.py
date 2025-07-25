@@ -3,17 +3,36 @@ import os
 import time
 from datetime import datetime
 from math import ceil, sqrt
-
+import seaborn as sns
 import matplotlib.pyplot as plt
 import numpy as np
+import json
 from matplotlib.colors import LogNorm
 from scipy.interpolate import RegularGridInterpolator, splev, splprep
 from scipy.ndimage import gaussian_filter1d
 
 from src.Astar import resample_path
-from src.data_loader import load_sdf_from_csv, vel_read
+from src.data_loader import load_sdf_from_csv, vel_read,load_sim_sdf
 from src.fmm import sdf_func_and_velocity_func
 from src.sdf import get_contour_coordinates
+
+from math import gcd, sqrt
+from matplotlib import cm
+from matplotlib.colors import Normalize
+
+def generate_directions(max_radius):
+    directions = set()
+    for dx in range(-max_radius, max_radius + 1):
+        for dy in range(-max_radius, max_radius + 1):
+            if dx == 0 and dy == 0:
+                continue
+            distance = sqrt(dx**2 + dy**2)
+            if distance <= max_radius:
+                # Réduction de la direction (évite les doublons comme (2,2) si (1,1) est déjà là)
+                g = gcd(abs(dx), abs(dy))
+                reduced = (dx // g, dy // g)
+                directions.add(reduced)
+    return list(directions)
 
 
 def contour_2D(sdf_function, X_new, Y_new, scale):
@@ -35,7 +54,19 @@ def contour_2D(sdf_function, X_new, Y_new, scale):
 
 
 def astar_anisotropic(
-    x, y, v0, vx, vy, start_point, goal_point, sdf_function, heuristic_weight=1.0,weight_sdf=1
+    x,
+    y,
+    v0,
+    vx,
+    vy,
+    start_point,
+    goal_point,
+    sdf_function,
+    heuristic_weight=1.0,
+    weight_sdf=1,
+    pow_v0=1,
+    pow_al=1,
+    max_radius=2,
 ):
     """
     Implémentation de l'algorithme A* adapté pour les écoulements anisotropes.
@@ -61,9 +92,17 @@ def astar_anisotropic(
     i_goal = np.argmin(np.abs(x - goal_point[0]))
     j_goal = np.argmin(np.abs(y - goal_point[1]))
 
-    dir_offsets = [(1, 0), (1, 1), (0, 1), (-1, 1), (-1, 0), (-1, -1), (0, -1), (1, -1)]
-    move_costs = precalculate_move_costs(v0, vx, vy, dir_offsets, dx, dy,weight_sdf)
-
+    dir_offsets = generate_directions(max_radius)
+    print("Number of directions : ", len(dir_offsets))
+    move_costs = precalculate_move_costs(
+        v0, vx, vy, dir_offsets, dx, dy, weight_sdf, pow_v0,pow_al
+    )
+    print("Cost computed")
+    if sdf_function(goal_point)>0 or sdf_function(start_point)>0:
+        print("Invalid points")
+        print(sdf_function(goal_point))
+        print(sdf_function(start_point))
+        
     closed_set = set()
     open_set = [(0, i_start, j_start)]
     heapq.heapify(open_set)
@@ -95,7 +134,7 @@ def astar_anisotropic(
 
         closed_set.add((current_i, current_j))
 
-        for di, dj in dir_offsets:
+        for d_idx,(di, dj) in enumerate(dir_offsets):
             neighbor_i, neighbor_j = current_i + di, current_j + dj
 
             if not (0 <= neighbor_i < nx and 0 <= neighbor_j < ny):
@@ -106,7 +145,7 @@ def astar_anisotropic(
             if (neighbor_i, neighbor_j) in closed_set:
                 continue
 
-            cost = move_costs[current_j, current_i, dir_offsets.index((di, dj))]
+            cost = move_costs[current_j, current_i, d_idx]
             if cost == np.inf:
                 continue
 
@@ -129,38 +168,86 @@ def astar_anisotropic(
     return [], travel_time
 
 
-def precalculate_move_costs(v0, vx, vy, dir_offsets, dx, dy, weight_sdf):
+
+def precalculate_move_costs(v0, vx, vy, dir_offsets, dx, dy, weight_sdf, pow_v0, pow_al):
     """
     Pré-calcule les coûts de déplacement pour chaque direction à chaque point.
+    Version vectorisée optimisée.
 
     Retourne:
     - move_costs: tableau 3D (ny, nx, n_directions) des coûts
     """
     ny, nx = v0.shape
     n_directions = len(dir_offsets)
+    
+    dir_offsets = np.array(dir_offsets)  # shape: (n_directions, 2)
+    
+    distances = np.sqrt((dir_offsets[:, 0] * dx) ** 2 + (dir_offsets[:, 1] * dy) ** 2)
+    
+    valid_dirs = distances > 0
+
     move_costs = np.full((ny, nx, n_directions), np.inf)
-
+    
+    if vx is None or vy is None:
+        move_costs[:, :, valid_dirs] = distances[valid_dirs]
+        return move_costs
+    
     U = 1
-    for j in range(ny):
-        for i in range(nx):
-            for d_idx, (di, dj) in enumerate(dir_offsets):
-                distance = np.sqrt((di * dx) ** 2 + (dj * dy) ** 2)
-
-                if distance > 0:
-                    dir_x = di * dx / distance
-                    dir_y = dj * dy / distance
-                    d = np.array([dir_x, dir_y])
-                    v_l = np.array([vx[j, i], vy[j, i]]) + U * d
-                    v = v_l + U * d
-                    flow_component = v @ d
-                    alignment = np.linalg.norm(v_l@d) / (
-                        np.linalg.norm(v_l) * np.linalg.norm(d)
-                    )
-                    alignment = alignment**(1)
-                    effective_speed = flow_component * alignment
-                    effective_speed =v0[j, i]**(2) * max(effective_speed, 0.001)
-                    if flow_component > 0 and v0[j, i] >0:
-                        move_costs[j, i, d_idx] = distance / effective_speed
+    
+    dir_norm = np.zeros((n_directions, 2))
+    dir_norm[valid_dirs, 0] = dir_offsets[valid_dirs, 0] * dx / distances[valid_dirs]
+    dir_norm[valid_dirs, 1] = dir_offsets[valid_dirs, 1] * dy / distances[valid_dirs]
+    
+    for d_idx in np.where(valid_dirs)[0]:
+        di, dj = dir_offsets[d_idx]
+        distance = distances[d_idx]
+        dir_x, dir_y = dir_norm[d_idx]
+        
+        neighbor_i = np.clip(np.arange(nx)[None, :] + di, 0, nx-1)
+        neighbor_j = np.clip(np.arange(ny)[:, None] + dj, 0, ny-1)
+        
+        # Champ de vitesse local en chaque point
+        v_l_x = vx  # shape: (ny, nx)
+        v_l_y = vy  # shape: (ny, nx)
+        
+        # Vitesse totale v = v_l + U * d
+        v_x = v_l_x + U * dir_x
+        v_y = v_l_y + U * dir_y
+        
+        # Composante du flux dans la direction
+        flow_component = v_x * dir_x + v_y * dir_y
+        
+        # Calcul de l'alignement
+        v_l_norm = np.sqrt(v_l_x**2 + v_l_y**2)
+        v_l_dot_d = v_l_x * dir_x + v_l_y * dir_y
+        
+        # Éviter division par zéro
+        alignment = np.ones_like(v_l_norm)
+        mask_nonzero = v_l_norm > 0.0001
+        alignment[mask_nonzero] = (np.abs(v_l_dot_d[mask_nonzero]) / v_l_norm[mask_nonzero]) ** pow_al
+        
+        # Vitesse effective
+        effective_speed = flow_component * alignment
+        
+        # Facteur de vitesse du voisin
+        v0_neighbor = v0[neighbor_j, neighbor_i]
+        effective_speed = (v0_neighbor ** pow_v0) * np.maximum(effective_speed, 0.001)
+        
+        # Conditions pour calculer le coût
+        if pow_al > 0 or pow_v0 > 0:
+            valid_mask = (v_l_dot_d > 0.0)
+        else:
+            valid_mask = flow_component > 0
+        
+        # Calculer les coûts
+        costs = np.full((ny, nx), np.inf)
+        if pow_al > 0 or pow_v0 > 0:
+            costs[valid_mask] = distance / effective_speed[valid_mask]
+        else:
+            costs[valid_mask] = distance / flow_component[valid_mask]
+        
+        move_costs[:, :, d_idx] = costs
+    
     return move_costs
 
 
@@ -173,83 +260,92 @@ def heuristic(i1, j1, i2, j2, dx, dy):
     v_max = 1.0
     return distance / v_max
 
+def plot_velocity(step,vx,vy,v0,X,Y,grid_size):
+    step = 5
 
-def visualize_results_a_star(x, y, sdf_function, path, vx, vy, scale,par=None,label=''):
+    X_sub = X[::step, ::step]
+    Y_sub = Y[::step, ::step]
+    vx_sub = vx[::step, ::step]
+    vy_sub = vy[::step, ::step]
+    v0_sub = v0[::step, ::step]
+    print(v0_sub.shape)
+    mask = ((vx_sub != 0) | (vy_sub != 0))  & (v0_sub>0.15)
+
+    X_masked = X_sub[mask]
+    Y_masked = Y_sub[mask]
+    vx_masked = vx_sub[mask]
+    vy_masked = vy_sub[mask]
+    
+    save_path_phi = f"data/phi/grid_size_{grid_size[0]}_{grid_size[1]}_phi_bis.npy"
+    if os.path.exists(save_path_phi):
+        phi = np.load(save_path_phi)
+        
+
+    # plt.contourf(X, Y, phi, levels=[0, phi.max()], colors='darkred')
+
+    v_norm = np.sqrt(vx**2 + vy**2)
+
+    # plt.contourf(X, Y, v_norm, levels=50, cmap="Reds")  # ou autre cmap : 'viridis', 'plasma', etc.
+    # plt.colorbar(label='||v||')
+    # Couleur des flèches dépend de la norme locale
+    arrow_colors = v_norm[::step, ::step][mask]
+    quiv = plt.quiver(
+        X_masked,
+        Y_masked,
+        vx_masked,
+        vy_masked,
+        arrow_colors,
+        cmap="Reds",
+        scale=90,
+        alpha=0.9,
+    )
+    # Utiliser une colormap où la valeur minimale n'est pas trop claire
+
+    # Choisir une colormap adaptée (par exemple 'Reds') et tronquer les valeurs basses
+    cmap = cm.get_cmap("Reds")
+    norm = Normalize(vmin=np.percentile(arrow_colors, 5), vmax=arrow_colors.max())
+    quiv.set_cmap(cmap)
+    quiv.set_norm(norm)
+    plt.colorbar(quiv, label='||v|| (arrows)')
+
+def visualize_results_a_star(
+    X, Y, sdf_function, path, vx, vy, v0, scale, label='', color=None
+):
     """
     Visualise les résultats de l'algorithme A*.
     """
-
-
-    # phi = np.zeros((len(y), len(x)))
-    # for i in range(len(x)):
-    #     for j in range(len(y)):
-    #         a = sdf_function((x[i], y[j]))
-    #         phi[j, i] = a
-    # phi = phi / np.max(np.abs(phi))
-
-
-    X, Y = np.meshgrid(x, y)
-
     obstacle_contour = contour_2D(sdf_function, X, Y, scale)
-
     plt.scatter(obstacle_contour[:, 0], obstacle_contour[:, 1], color="black", s=0.5)
 
-    if len(path) > 0:
-        path_x, path_y = zip(*path)
-        plt.plot(path_x, path_y, linewidth=2,label=f'{label} : {par}')
+    path_x, path_y = zip(*path)
+    plt.plot(path_x, path_y, linewidth=2, label=label, color=color)
 
-        plt.scatter([path[0][0]], [path[0][1]], s=50)
-        plt.scatter([path[-1][0]], [path[-1][1]], s=50)
-    # step = 40
+    
 
-    # X_sub = X[::step, ::step]
-    # Y_sub = Y[::step, ::step]
-    # vx_sub = vx[::step, ::step]
-    # vy_sub = vy[::step, ::step]
-
-    # mask = (vx_sub != 0) | (vy_sub != 0)
-
-    # X_masked = X_sub[mask]
-    # Y_masked = Y_sub[mask]
-    # vx_masked = vx_sub[mask]
-    # vy_masked = vy_sub[mask]
-
-    # plt.quiver(
-    #     X_masked,
-    #     Y_masked,
-    #     vx_masked,
-    #     vy_masked,
-    #     color="darkred",
-    #     scale=100,
-    #     alpha=0.7,
-    # )
-
-
-
-
-def compute_v(x, y, velocity_retina, B, grid_size, ratio, sdf_function,c):
+def compute_v(x, y, velocity_retina, B, grid_size, ratio, sdf_function, c):
 
     if len(x) != grid_size[0] and len(y) != grid_size[1]:
         raise ValueError("x,y are not coherent with the size of the grid")
     flow_field = velocity_retina
-    save_path_phi = f"data/phi/grid_size_{grid_size[0]}_{grid_size[1]}_phi.npy"
+    save_path_phi = f"data/phi/grid_size_{grid_size[0]}_{grid_size[1]}_phi_bis.npy"
     if os.path.exists(save_path_phi):
         phi = np.load(save_path_phi)
-        print("Phi loaded")
     else:
         phi = np.zeros((grid_size[1], grid_size[0]))
         for i in range(grid_size[0]):
             for j in range(grid_size[1]):
                 a = sdf_function((x[i], y[j]))
                 phi[j, i] = a
-        phi = 3 * phi / np.max(np.abs(phi))
         os.makedirs(os.path.dirname(save_path_phi), exist_ok=True)
         np.save(save_path_phi, phi)
-    print("SDF computed")
+    print("Shape of phi :",phi.shape)
+    print("X :",len(x))
+    print("Y :",len(y))
     speed = (1.0 / (1.0 + np.exp(B * phi))) - c
-    speed = np.clip(speed, 0.001, 1.0)
 
-    save_path_flow = f"data/velocity_flow/grid_size_{grid_size[0]}_{grid_size[1]}/"
+
+    
+    save_path_flow = f"data/velocity_flow/grid_size_{grid_size[0]}_{grid_size[1]}_bis/"
     if flow_field is not None:
         if os.path.exists(save_path_flow):
             flow_strength = ratio * np.load(
@@ -261,7 +357,6 @@ def compute_v(x, y, velocity_retina, B, grid_size, ratio, sdf_function,c):
             flow_direction_y = np.load(
                 os.path.join(save_path_flow, "flow_direction_y.npy")
             )
-            print("Flow loaded")
 
         else:
             flow_strength = np.zeros((grid_size[1], grid_size[0]))
@@ -270,7 +365,7 @@ def compute_v(x, y, velocity_retina, B, grid_size, ratio, sdf_function,c):
 
             for i in range(grid_size[0]):
                 for j in range(grid_size[1]):
-                    vx, vy = flow_field((x[i], y[j])) / ratio
+                    vx, vy = flow_field((x[i], y[j]))
                     magnitude = np.sqrt(vx**2 + vy**2)
                     if magnitude > 0:
                         flow_strength[j, i] = magnitude
@@ -285,112 +380,194 @@ def compute_v(x, y, velocity_retina, B, grid_size, ratio, sdf_function,c):
                 os.path.join(save_path_flow, "flow_direction_y.npy"), flow_direction_y
             )
 
-        print("Flow computed")
+        print("Flow ready")
         vx = flow_direction_x * flow_strength
         vy = flow_direction_y * flow_strength
-
+        print("vx shape :",vx.shape)
+        print("vy shape :",vy.shape)
     return speed, vx, vy, save_path_phi, save_path_flow
 
+def plot_different_path(files_path,label_list,x_phys,y_phys,sdf_function,vx,vy,v0,scale,grid_size) : 
+    path_list = []
+    palette = ['cornflowerblue','navy','darkgreen']
+    X, Y = np.meshgrid(x_phys, y_phys)
 
-def shortcut_path(path, is_collision_free, sdf):
-    smoothed = [path[0]]
-    i = 0
-    while i < len(path) - 1:
-        j = len(path) - 1
-        while j > i:
-            if is_collision_free(path[i], path[j], sdf):
-                smoothed.append(path[j])
-                i = j
-                break
-            j -= 1
-    return smoothed
+    plot_velocity(6,vx,vy,v0,X,Y,grid_size)
+    
+    if os.path.exists(f"data/retina2D_SDF_neg_scale_{scale}.npy"):
+        Z = np.load(
+            f"data/retina2D_SDF_neg_scale_{scale}.npy", allow_pickle=False
+        )
+        print("Contour loaded")
+    else:
+        Z = np.vectorize(lambda px, py: sdf_function((px, py)))(X, Y)
+        np.save(
+            f"data/retina2D_SDF_neg_scale_{scale}.npy",
+            Z,
+            allow_pickle=False,
+        )
 
-
-def is_collision_free(p1, p2, sdf_interpolator):
-    points = np.linspace(p1, p2, 20)
-    try:
-        values = sdf_interpolator(points)
-    except ValueError:
-        # Si les points sont hors des limites du domaine
-        return False
-    return np.all(values <= 0)
-
-
-if __name__ == "__main__":
-
-    scale = 20
-    ratio = 5
-    start_point = (0.98, 0.3)
-    goal_point = (0.54, 0.675)
-    domain_size = (1 * scale, 1 * scale)
-
-    # Determine the size of the domain. It maps each point of the domain to each point on the grid.
-    x, y, N, h, sdf = load_sdf_from_csv(domain_size)
-
-    # Define sdf and velocity interpolator regarding the size of the domain. x,y and sdf must have the same size
-    sdf_function, velocity_retina = sdf_func_and_velocity_func(domain_size, ratio)
-
-    # sdf_function :  Calculate the sdf in any point of the domain py interpolation
-    # velocity_retina :  Calculate the velocity in any point of the domain py interpolation
-
-    # Reduce the cell size by a factor : res_factor
-    res_factor = 1
-    grid_size = (N[0] * res_factor, N[1] * res_factor)
-    x_new = np.linspace(0, domain_size[0], grid_size[0])
-    y_new = np.linspace(0, domain_size[1], grid_size[1])
-
-    c = 0.44
-    # Compute v0,vx and vy on this new domain.
-    plt.figure(figsize=(12, 10))
-    weight_sdf=1
-    start_point = (start_point[0] * scale, start_point[1] * scale)
-    goal_point = (goal_point[0] * scale, goal_point[1] * scale)
-    # goal_point = (17.14455146061312,11.52041838191506)
-    B = 1.6
-    h = 3.8
-    start_time = time.time()
-
-    v0, vx, vy, _, _ = compute_v(
-        x_new, y_new, velocity_retina, B, grid_size, ratio, sdf_function,c
-    )
-    ## Compute the path
-    path, travel_time = astar_anisotropic(
-        x_new,
-        y_new,
-        v0,
-        vx,
-        vy,
-        start_point,
-        goal_point,
-        sdf_function,
-        heuristic_weight=h,
-    )
-    # path = shortcut_path(path,is_collision_free,sdf_interpolator)
-    print("Travel time :", travel_time)
-
-    path = np.array(path)  # de forme (N, 2)
-    dist = np.array([abs(path[i + 1] - path[i]) for i in range(len(path) - 1)])
-    print("path before resampling :", len(path))
-    n = ceil(np.max(dist) / (5 * 1e-3))
-    if n > 1:
-        path = resample_path(path, len(path) * n)
-    print("after resampling : ",len(path))
-    smoothed_x = gaussian_filter1d(path[:, 0], sigma=20)
-    smoothed_y = gaussian_filter1d(path[:, 1], sigma=20)
-    path = np.stack([smoothed_x, smoothed_y], axis=1)
-    print("smoooooth")
-    visualize_results_a_star(x_new, y_new, sdf_function, path, vx, vy, scale,B,'B')
-    end_time = time.time()
-    elapsed_time = (end_time - start_time) / 60
-    print("Execution time:", elapsed_time, "minutes")
-
-
-
+    plt.contourf(X, Y, Z, levels=[Z.min(), 0], colors='linen', alpha=0.5, zorder=0)
+    
+    for id,file_path in enumerate(files_path) : 
+        path = np.load(file_path)
+        path,distances = resample_path(path, len(path))
+        print(f"{file_path} distances : {distances}")
+        visualize_results_a_star(
+            X, Y, sdf_function, path, vx, vy,v0,scale,label = label_list[id],color = palette[id]
+        )
+    plt.scatter([path[0][0]], [path[0][1]], s=50,color=palette[1],label = 'Start')
+    plt.scatter([path[-1][0]], [path[-1][1]], s=50, color = 'red',label = 'Target')
     
     plt.legend()
     current_time = datetime.now().strftime("%m-%d_%H-%M-%S")
     plt.gca().set_aspect("equal", adjustable="box")
     plt.axis("off")
-    plt.title("SDF with path")
+    plt.title("Path")
     plt.tight_layout()
-    plt.savefig(f"fig/Astar_ani_test_{current_time}.png", dpi=300, bbox_inches="tight")
+    plt.savefig(f"fig/Astar_ani_test_{current_time}.png", dpi=600, bbox_inches="tight")
+
+
+
+if __name__ == "__main__":
+
+    ratio=5
+    
+    # Determine the size of the domain. It maps each point of the domain to each point on the grid.
+    sdf_func,velocity_retina,x_phys,y_phys,physical_width,physical_height,scale= load_sim_sdf(ratio)
+
+    # sdf_function :  Calculate the sdf in any point of the domain py interpolation
+    # velocity_retina :  Calculate the velocity in any point of the domain py interpolation
+
+    # Reduce the cell size by a factor : res_factor
+            
+    # Compute v0,vx and vy on this new domain.
+               
+            
+    plt.figure(figsize=(12, 10))
+    start_point = (float(physical_width * 0.98), float(physical_height * 0.3))
+    # goal_point_tmp = ( 17.38728683339246/20, 12.3556761323975/20)
+    # goal_point = (float(physical_width * goal_point_tmp[0]), float(physical_height * goal_point_tmp[1]))
+    
+    goal_point = (12.991832733154297,13.56390380859375)
+    print('distance between the two points : ',  np.linalg.norm(np.array(goal_point)-np.array(start_point)))
+
+    c = 0.4
+    B = 1.6
+    h = 0
+    pow_v0 = 0
+    pow_al = 5
+    max_radius = 2
+
+    shortest_geo_path = False
+    v1 = False
+    grid_size = (len(x_phys),len(y_phys))
+
+    current_time = datetime.now().strftime("%m-%d_%H-%M-%S")
+    save_dir = f"fig/Astar_ani_test_{current_time}"
+    os.makedirs(save_dir, exist_ok=True)
+
+
+    params = {
+        "start_point": tuple(float(x) for x in start_point),
+        "goal_point": tuple(float(x) for x in goal_point),
+        "c": float(c),
+        "B": float(B),
+        "h": float(h),
+        "pow_v0": float(pow_v0),
+        "pow_al": float(pow_al),
+        "max_radius": int(max_radius),
+        "shortest_geo_path": bool(shortest_geo_path),
+        "v1": bool(v1),
+        "grid_size": tuple(int(x) for x in grid_size),
+        "ratio": float(ratio),
+        "scale": float(scale),
+    }
+    with open(os.path.join(save_dir, "params.json"), "w") as f:
+        json.dump(params, f, indent=4)
+
+    for pow_v0 in np.linspace(0,7,7,dtype=int):
+        v0, vx, vy, _, _ = compute_v(
+            x_phys, y_phys, velocity_retina, B, grid_size, ratio, sdf_func, c
+        )
+        speed = np.sqrt(vx**2 + vy**2)
+        # print(f"Speed: min={speed.min():.3e}, max={speed.max():.3e}, mean={speed.mean():.3e}, std={speed.std():.3e}")
+        
+        # for name, arr in zip(["vx", "vy","v0"], [vx, vy,v0]):
+        #     print(f"{name}: min={arr.min():.3e}, max={arr.max():.3e}, mean={arr.mean():.3e}, std={arr.std():.3e}")
+        
+        if shortest_geo_path: 
+            v0 = np.ones_like(v0)
+            vx = None
+            vy = None
+            h = 0.0
+            max_radius=5
+        
+        if v1 : 
+            v0 = np.ones_like(v0)
+            pow_v0 = 0
+            pow_al = 0
+            h = 0.0
+            max_radius= 1
+        
+            
+        start_time = time.time()
+        # Compute the path
+        path, travel_time = astar_anisotropic(
+            x_phys,
+            y_phys,
+            v0,
+            vx,
+            vy,
+            start_point,
+            goal_point,
+            sdf_func,
+            heuristic_weight=h,
+            pow_v0=pow_v0,
+            pow_al=pow_al,
+            max_radius=max_radius
+        )
+        # path = shortcut_path(path,is_collision_free,sdf_interpolator)
+        # print("Travel time :", travel_time)
+
+        path = np.array(path)  # de forme (N, 2)
+        dist = np.array([abs(path[i + 1] - path[i]) for i in range(len(path) - 1)])
+        # print("path before resampling :", len(path))
+        n = ceil(np.max(dist) / (5 * 1e-3))
+        if n > 1:
+            path,distances = resample_path(path, len(path) * n)
+        # print("after resampling : ", len(path))
+        smoothed_x = gaussian_filter1d(path[:, 0], sigma=30)
+        smoothed_y = gaussian_filter1d(path[:, 1], sigma=30)
+        path = np.stack([smoothed_x, smoothed_y], axis=1)
+        print("Path length : ",distances)
+        X, Y = np.meshgrid(x_phys, y_phys)
+        visualize_results_a_star(
+            X, Y, sdf_func, path, vx, vy, v0, scale, label=f'a : {pow_v0:.2f}'
+        )
+        end_time = time.time()
+        elapsed_time = (end_time - start_time) / 60
+        print("Execution time:", elapsed_time, "minutes")
+            
+    # if vx is not None and vy is not None : 
+    #     plot_velocity(6,vx,vy,v0,X,Y,grid_size)
+    plt.legend()
+    plt.gca().set_aspect("equal", adjustable="box")
+    plt.axis("off")
+    plt.title("Path")
+    plt.tight_layout()
+    path_save_fig = os.path.join(save_dir,f"Astar_ani_test_{current_time}_pow_v0.png")
+    plt.savefig(path_save_fig, dpi=300, bbox_inches="tight")
+    plt.close()
+
+    
+    # save_path_path = f"data/retina2D_path_time_4_v1_bg.npy"
+    # np.save(save_path_path, path, allow_pickle=False)
+
+    
+    # files_path = ['data/retina2D_path_time_4_free_bg.npy','data/retina2D_path_time_4_v1_bg.npy','data/retina2D_path_time_4_v2_bg.npy']
+    # label_list = ['Shortest geometrical path','Algorithm 1', 'Algorithm 2']
+    # plot_different_path(files_path,label_list,x_phys,y_phys,sdf_func,vx,vy,v0,scale,grid_size)
+
+        
+    

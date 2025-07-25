@@ -1,19 +1,69 @@
 import json
 import os
-import seaborn as sns
-import matplotlib.pyplot as plt
-import numpy as np
-import pandas as pd
 from collections import OrderedDict, defaultdict
 from datetime import datetime
 from pathlib import Path
 from statistics import mean
-colors_default = plt.cm.tab10.colors
-from src.generate_path import (generate_curve, generate_demi_circle_path,
-                            generate_random_ondulating_path)
+
+import matplotlib.pyplot as plt
+import matplotlib.animation as animation
+import numpy as np
+import pandas as pd
+import seaborn as sns
+
+
 from src.simulation import rankine_vortex, uniform_velocity
 
+colors_default = ['purple', 'blue', 'green', 'orange', 'red', 'brown']
 
+
+def video_trajectory(
+    fig,
+    ax,
+    trajectory,
+    path,
+    title,
+    a=0,
+    center=np.zeros(2),
+    cir=0,
+    dir=np.zeros(2),
+    norm=0,
+    plot_background=False,
+    path_save_video ='',
+    color_id=0,
+    colors=plt.cm.tab10.colors,
+    label="",
+):
+    trajectory = np.array(trajectory)
+    step = max(1, len(trajectory) // 1000)  
+    trajectory = trajectory[::step]
+    print(trajectory.shape)
+    # Initialisation de la ligne de trajectoire animée
+    line, = ax.plot([], [], color=colors[color_id], linewidth=0.9)
+    start_dot = ax.scatter([], [], color=colors[color_id], s=5)
+    end_dot = ax.scatter([], [], color=colors[color_id], s=5)
+    ax.set_aspect("equal")
+    ax.set_axis_off()
+
+    def init():
+        line.set_data([], [])
+        start_dot.set_offsets(np.empty((0, 2)))
+        end_dot.set_offsets(np.empty((0, 2)))
+        return line, start_dot, end_dot
+
+    def update(i):
+        x, y = trajectory[:i + 1, 0], trajectory[:i + 1, 1]
+        line.set_data(x, y)
+        start_dot.set_offsets([trajectory[0]])
+        end_dot.set_offsets([trajectory[i]])
+        return line, start_dot, end_dot
+
+    ani = animation.FuncAnimation(fig, update, frames=len(trajectory), init_func=init,
+                                blit=True, interval=20)
+
+    ani.save(path_save_video, writer='ffmpeg', dpi=200)
+
+    plt.close(fig)
 def plot_trajectories(
     ax,
     trajectories_list,
@@ -125,42 +175,40 @@ def plot_background_velocity(
     plt.ylabel("y")
 
 
-def plot_success_rate(path_json_file,agent_file,save_plot):
-    with open(path_json_file,'r') as f:
+def plot_success_rate(path_json_file, agent_file, save_plot):
+    with open(path_json_file, "r") as f:
         results = json.load(f)
-    result_agent = results[f'{agent_file}']['results_per_config']
-    
+    result_agent = results[f"{agent_file}"]["results_per_config"]
+
     short_labels = []
     for k in result_agent.keys():
         name = k.split("__")[-1].replace(".json", "")  # Extrait '2025-05-06_17-26-52'
         short_labels.append(name)
-    name={}
-    sucess_rate_d={}
-    for id,config in enumerate(result_agent.keys()):
-        sucess_rate_d[id] = result_agent[config]['success_rate']
-        name[id]=short_labels[id]
-        
+    name = {}
+    sucess_rate_d = {}
+    for id, config in enumerate(result_agent.keys()):
+        sucess_rate_d[id] = result_agent[config]["success_rate"]
+        name[id] = short_labels[id]
+
     ids = list(sucess_rate_d.keys())
     values = list(sucess_rate_d.values())
     plt.figure(figsize=(10, 5))
     plt.bar(ids, values, tick_label=[f"{i}" for i in ids])
-    plt.xlabel("Agent ID")
+    plt.xlabel("path ID")
     plt.ylabel("Success rate")
     plt.title("Success rate")
     plt.grid(True)
-    file_table = os.path.join(save_plot,'table.json')
-    with open(file_table,'w') as f:
-        json.dump(name,f,indent=4)
-    file_plot = os.path.join(save_plot,f'{agent_file}_result_success_rate.png')
-    os.makedirs(os.path.join(save_plot, 'agents'), exist_ok=True)
-    plt.savefig(file_plot,dpi=200,bbox_inches='tight')
+    file_table = os.path.join(save_plot, "table.json")
+    with open(file_table, "w") as f:
+        json.dump(name, f, indent=4)
+    file_plot = os.path.join(save_plot, f"{agent_file}_result_success_rate.png")
+    os.makedirs(os.path.join(save_plot, "agents"), exist_ok=True)
+    plt.savefig(file_plot, dpi=200, bbox_inches="tight")
 
-        
-    
 
 def analyze_and_visualize_agent_data(
-    data, output_dir="./results_evaluation", fig_dir="./fig",name_fig=''
-    ):
+    data, output_dir="./results_evaluation", fig_dir="./fig", name_fig=""
+):
     df = pd.json_normalize(data)
     training_columns = [
         col
@@ -271,7 +319,8 @@ def analyze_and_visualize_agent_data(
     fig_path = os.path.join(fig_dir, f"{name_fig}.png")
     plt.savefig(fig_path, dpi=300, bbox_inches="tight")
     print(f"Figure saved to {fig_path}")
-    
+
+
 def plot_return_beta(file_path):
 
     with open(file_path, "r") as file:
@@ -327,7 +376,7 @@ def plot_return_beta(file_path):
     plt.savefig("fig/rank_beta_return.png", dpi=200, bbox_inches="tight")
 
 
-if __name__ =='__main__':
-    path_json_file = 'results_evaluation/result_evaluation_retina.json'
+if __name__ == "__main__":
+    path_json_file = "results_evaluation/result_evaluation_retina.json"
     agent_file = "agents/agent_TD3_2025-04-18_13-33"
-    plot_success_rate(path_json_file,agent_file)
+    plot_success_rate(path_json_file, agent_file)

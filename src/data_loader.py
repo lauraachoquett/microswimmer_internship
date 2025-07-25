@@ -21,115 +21,241 @@ def vel_read(path):
     return N, h, field
 
 
+import numpy as np
+import matplotlib.pyplot as plt
+from scipy.interpolate import RegularGridInterpolator
+
 def load_sdf_from_csv(domain_size):
-    path = "data/retina.sdf"
+    path = "/home/lchoquet/project/microswimmer_internship/data/retina.sdf"
     N, h, sdf = sdf_read(path)
     sdf = sdf[N[2] // 2, :, :]
     x = np.linspace(0, domain_size[0], N[0])
     y = np.linspace(0, domain_size[1], N[1])
     return x, y, N, h, sdf
 
+def load_sim_sdf(ratio):
+    L = 0.269
+    x, y, N, _, sdf = load_sdf_from_csv((1, 1))
+    scale = L / abs(np.min(sdf))
+    sdf_interpolator = RegularGridInterpolator(
+        (y, x), sdf, bounds_error=False, fill_value=None
+    )
+    
+
+    physical_height = scale * N[1]
+    physical_width = scale  * N[0]
+    
+    y_phys = np.linspace(0, physical_height, N[1])
+    x_phys = np.linspace(0, physical_width, N[0])
+    X_phys, Y_phys = np.meshgrid(x_phys, y_phys)
+    
+    
+    ratio_original = N[1] / N[0]
+    ratio_physique =   physical_height / physical_width
+    
+    Y_norm = Y_phys / physical_height  
+    X_norm = X_phys / physical_width   
+    
+    points = np.vstack([Y_norm.ravel(), X_norm.ravel()]).T
+    
+    sdf_interp = sdf_interpolator(points).reshape(Y_phys.shape)
+    
+    sdf_phys = sdf_interp * scale
+    sdf_interp_phys = RegularGridInterpolator(
+        (y_phys, x_phys), sdf_phys, bounds_error=False, fill_value=None
+    )
+    def sdf_func_phys(point):
+        return(sdf_interp_phys(point[::-1]))
+    
+    path_vel = "data/vel.sdf"
+    N, h, vel = vel_read(path_vel)
+    v = vel[N[2] // 2, :, :, 0:2]
+    vx, vy = v[:, :, 0], v[:, :, 1]
+    velocity_interpolator_x = RegularGridInterpolator(
+        (y, x), vx, bounds_error=False, fill_value=None
+    )
+    velocity_interpolator_y = RegularGridInterpolator(
+        (y, x), vy, bounds_error=False, fill_value=None
+    )
+    vx_interp =  velocity_interpolator_x(points).reshape(Y_phys.shape)
+    vy_interp =  velocity_interpolator_y(points).reshape(Y_phys.shape)
+    vx_phys = vx_interp * scale
+    vy_phys = vy_interp * scale
+
+    velocity_interpolator_x_phys= RegularGridInterpolator(
+        (y_phys, x_phys), vx_phys, bounds_error=False, fill_value=None
+    )
+    velocity_interpolator_y_phys = RegularGridInterpolator(
+        (y_phys, x_phys), vy_phys, bounds_error=False, fill_value=None
+    )
+
+    v_magnitude = np.sqrt(vx_phys**2 + vy_phys**2)
+    def velocity_retina(point):
+        
+        return (
+            ratio
+            * np.array(
+                [
+                    velocity_interpolator_x_phys(point[::-1]),
+                    velocity_interpolator_y_phys(point[::-1]),
+                ]
+            )
+            / np.max(v_magnitude)
+        )
+    return sdf_func_phys,velocity_retina,x_phys,y_phys, physical_width,physical_height,scale
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 if __name__ == "__main__":
-    import matplotlib.pyplot as plt
-
-    domain_size = (1, 1)
-
-    x, y, N, _, sdf = load_sdf_from_csv(domain_size)
-    print(np.min(sdf))
-    print("SDF shape after slice :", sdf.shape)
-    fig, ax = plt.subplots(figsize=(15, 7))
-    grid_size = (N[0], N[1])
-
-    start_point = (0.98, 0.3)
-
+    L = 0.269
+    
+    x, y, N, _, sdf = load_sdf_from_csv((1, 1))
+    
+    scale = L / abs(np.min(sdf))
+    print("Scale :", scale)
+    print("N :", N)
+    print("Min SDF value:", np.min(sdf))
+    print("SDF shape after slice:", sdf.shape)
+    
     sdf_interpolator = RegularGridInterpolator(
         (y, x), sdf, bounds_error=False, fill_value=None
     )
 
-    def sdf_function(point):
-        return sdf_interpolator(
-            point[::-1]
-        )  # Inverser car l'interpolateur attend (y, x)
+ 
 
-    point_list = np.random.rand(20, 2)
-
-    goal_points = [
-        point
-        for point in point_list
-        if (sdf_function(point) < -0.15 and point[0] < 0.95)
-    ]
-    goal_points = [(0.54, 0.675)]
-
-    x_new = np.linspace(0, domain_size[0], N[0] * 5)
-    y_new = np.linspace(0, domain_size[1], N[1] * 5)
-    X_new, Y_new = np.meshgrid(x_new, y_new)
-    X, Y = np.meshgrid(x, y)
-    print("Acc_x : ", 1 / (N[0] * 5))
-    print("Acc_y : ", 1 / (N[1] * 5))
-    sdf_new = sdf_interpolator((Y_new, X_new))
-    print(sdf_new.shape)
+    physical_height = scale * N[1]
+    physical_width = scale  * N[0]
+    print('physical height :',physical_height)
+    print('physical width :',physical_width)
+    
+    y_phys = np.linspace(0, physical_height, N[1])
+    x_phys = np.linspace(0, physical_width, N[0])
+    X_phys, Y_phys = np.meshgrid(x_phys, y_phys)
+    
+    
+    ratio_original = N[1] / N[0]
+    ratio_physique =   physical_height / physical_width
+    print(f"Ratio d'aspect original (points) : {ratio_original}")
+    print(f"Ratio d'aspect physique (unités) : {ratio_physique}")
+    
+    
+    Y_norm = Y_phys / physical_height  
+    X_norm = X_phys / physical_width   
+    
+    
+    points = np.vstack([Y_norm.ravel(), X_norm.ravel()]).T
+    
+    
+    sdf_interp = sdf_interpolator(points)
+    sdf_interp = sdf_interp.reshape(Y_phys.shape)
+    sdf_phys = sdf_interp * scale
+    print(sdf_phys.shape)
+    print(x_phys.shape)
+    print(y_phys.shape)
+    sdf_interp_phys = RegularGridInterpolator(
+        (y_phys, x_phys), sdf_phys, bounds_error=False, fill_value=None
+    )
+    def sdf_func_phys(point):
+        return(sdf_interp_phys(point[::-1]))
+    
+    print("Shape new sdf:", sdf_phys.shape)
+    
     plt.figure(figsize=(8, 6))
-    contour = plt.contourf(X, Y, sdf, levels=100, cmap="Reds")
+    contour = plt.contourf(X_phys, Y_phys, sdf_phys, levels=100, cmap="Reds")
     cbar = plt.colorbar(contour)
-    cbar.set_label("Signed Distance", fontsize=12)
-    plt.contour(X, Y, sdf, levels=[0], colors="black", linewidths=1)
-    for goal_point in goal_points:
-        plt.scatter(goal_point[0], goal_point[1], color="black", s=5)
+    cbar.set_label("Signed Distance (Physical Units)", fontsize=12)
+    plt.contour(X_phys, Y_phys, sdf_phys, levels=[0], colors="black", linewidths=1)
+    
+    start_point = (physical_width * 0.98, physical_height * 0.3)
+    goal_point = (physical_width * 0.54, physical_height * 0.675)
+    
+    # print(sdf_func_phys(start_point))
+    # print(sdf_func_phys(goal_point))
+    
+    
+    plt.scatter(goal_point[0], goal_point[1], color="black", s=5)
     plt.scatter(start_point[0], start_point[1], label="Start", color="blue", s=5)
-    plt.axis("off")
+    plt.axis("equal")  
     plt.legend()
-    plt.savefig("fig/retina_example_test.png", dpi=400, bbox_inches="tight")
-    plt.close()
-    # np.save("data/retina2D.npy", sdf_new, allow_pickle=False)
+    plt.savefig('fig/test_scale_corrected.png', dpi=300, bbox_inches='tight')
+    
+    print(f"Valeur SDF min physique: {np.min(sdf_phys)}, Target: {-L}")
+    print(f"dx : {x_phys[1]-x_phys[0]} and dy : {y_phys[1]-y_phys[0]}")
+    # np.save("/home/lchoquet/project/microswimmer_internship/data/vel.sdf", sdf_new, allow_pickle=False)
 
-    # path_vel = "data/vel.sdf"
-    # n, h, vel = vel_read(path_vel)
-    # print(vel.shape)
-    # v = vel[n[2] // 2, :, :, 0:2]
-    # vx = v[:, :, 0]
-    # vy = v[:, :, 1]
-    # v = np.sqrt(vx**2 + vy**2)
-    # print("max :", np.max(v))
-    # velocity_interpolator_x = RegularGridInterpolator(
-    #     (y, x), vx, bounds_error=False, fill_value=None
-    # )
-    # velocity_interpolator_y = RegularGridInterpolator(
-    #     (y, x), vy, bounds_error=False, fill_value=None
-    # )
+    path_vel = "data/vel.sdf"
+    N, h, vel = vel_read(path_vel)
+    v = vel[N[2] // 2, :, :, 0:2]
+    vx, vy = v[:, :, 0], v[:, :, 1]
+    velocity_interpolator_x = RegularGridInterpolator(
+        (y, x), vx, bounds_error=False, fill_value=None
+    )
+    velocity_interpolator_y = RegularGridInterpolator(
+        (y, x), vy, bounds_error=False, fill_value=None
+    )
+    
+    vx_interp =  velocity_interpolator_x(points).reshape(Y_phys.shape)
+    vy_interp =  velocity_interpolator_y(points).reshape(Y_phys.shape)
+    vx_phys = vx_interp * scale
+    vy_phys = vy_interp * scale
+    v_magnitude = np.sqrt(vx_phys**2 + vy_phys**2)
+    print("norm V_max : ", np.max(v_magnitude))
+    velocity_interpolator_x_phys= RegularGridInterpolator(
+        (y_phys, x_phys), vx_phys, bounds_error=False, fill_value=None
+    )
+    velocity_interpolator_y_phys = RegularGridInterpolator(
+        (y_phys, x_phys), vy_phys, bounds_error=False, fill_value=None
+    )
 
-    # def velocity_retina(point):
-    #     return np.array(
-    #         [velocity_interpolator_x(point[::-1]), velocity_interpolator_y(point[::-1])]
-    #     )
+    def velocity_retina(point):
+        
+        return (
+            ratio
+            * np.array(
+                [
+                    velocity_interpolator_x_phys(point[::-1]),
+                    velocity_interpolator_y_phys(point[::-1]),
+                ]
+            )
+            / np.max(v_magnitude))
+    fig, axes = plt.subplots(ncols=2, figsize=(14, 6))
 
-    # fig, axes = plt.subplots(ncols=2, figsize=(14, 6))
+    # Add contours for the signed distance function (SDF) on both subplots
+    axes[0].contour(X_phys, Y_phys, sdf_phys, levels=[0], colors="black", linewidths=1, zorder=10)
+    axes[1].contour(X_phys, Y_phys, sdf_phys, levels=[0], colors="black", linewidths=1, zorder=10)
 
-    # X, Y = np.meshgrid(x, y)  # Ensure X and Y match the dimensions of sdf
+    # Plot velocity components as filled contours
+    vxmin = np.min(vx_phys)
+    vxmax = np.max(vx_phys)
+    normx = mcolors.TwoSlopeNorm(vmin=vxmin, vcenter=0, vmax=vxmax)
+    vymin = np.min(vy_phys)
+    vymax = np.max(vy_phys)
+    normy = mcolors.TwoSlopeNorm(vmin=vymin, vcenter=0, vmax=vymax)
 
-    # # Add contours for the signed distance function (SDF) on both subplots
-    # axes[0].contour(X, Y, sdf, levels=[0], colors="black", linewidths=1, zorder=10)
-    # axes[1].contour(X, Y, sdf, levels=[0], colors="black", linewidths=1, zorder=10)
+    contourx = axes[0].contourf(X_phys, Y_phys, vx_phys, levels=100, cmap="RdBu",norm=normx)
+    contoury = axes[1].contourf(X_phys, Y_phys, vy_phys, levels=100, cmap="RdBu",norm=normy)
 
-    # # Plot velocity components as filled contours
-    # vxmin = np.min(vx)
-    # vxmax = np.max(vx)
-    # normx = mcolors.TwoSlopeNorm(vmin=vxmin, vcenter=0, vmax=vxmax)
-    # vymin = np.min(vy)
-    # vymax = np.max(vy)
-    # normy = mcolors.TwoSlopeNorm(vmin=vymin, vcenter=0, vmax=vymax)
+    # Add colorbars for the velocity components
+    cbarx = fig.colorbar(contourx, ax=axes[0], orientation="vertical")
+    cbary = fig.colorbar(contoury, ax=axes[1], orientation="vertical")
+    axes[0].set_title("Velocity X", fontsize=14)
+    axes[1].set_title("Velocity Y", fontsize=14)
 
-    # contourx = axes[0].contourf(X, Y, vx, levels=100, cmap="RdBu",norm=normx)
-    # contoury = axes[1].contourf(X, Y, vy, levels=100, cmap="RdBu",norm=normy)
-
-    # # Add colorbars for the velocity components
-    # cbarx = fig.colorbar(contourx, ax=axes[0], orientation="vertical")
-    # cbary = fig.colorbar(contoury, ax=axes[1], orientation="vertical")
-    # axes[0].set_title("Velocity X", fontsize=14)
-    # axes[1].set_title("Velocity Y", fontsize=14)
-
-    # # Remove axes
-    # axes[0].axis("off")
-    # axes[1].axis("off")
-    # plt.tight_layout()
-    # plt.savefig("fig/retina_example_velocity.png", dpi=400, bbox_inches="tight")
+    # Remove axes
+    axes[0].axis("off")
+    axes[1].axis("off")
+    plt.tight_layout()
+    plt.savefig("fig/retina_example_velocity.png", dpi=400, bbox_inches="tight")
+    plt.close(fig)

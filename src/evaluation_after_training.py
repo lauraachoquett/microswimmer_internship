@@ -26,8 +26,12 @@ from src.invariant_state import coordinate_in_global_ref
 from src.plot import plot_action, plot_trajectories
 from src.rank_agents import rank_agents_by_rewards
 from src.simulation import solver
-from src.visualize import (plot_robust_D, plot_robust_u_bg_rankine,
-                        plot_robust_u_bg_uniform, visualize_streamline)
+from src.visualize import (
+    plot_robust_D,
+    plot_robust_u_bg_rankine,
+    plot_robust_u_bg_uniform,
+    visualize_streamline,
+)
 
 
 def format_sci(x):
@@ -77,17 +81,24 @@ def evaluate_after_training(
     if type == "circle":
         path, _ = generate_demi_circle_path(p_0, p_target, nb_points_path)
     if type == "ondulating":
+        path = generate_random_ondulating_path_old(
+            p_0, p_target, n_points=5000, amplitude=0.5, frequency=2
+        )
+    if type == "ondulating_hard":
         path = generate_random_ondulating_path(
-            p_0, p_target, nb_points_path, amplitude=0.5, frequency=2
+            p_0, p_target, n_points=5000, kappa_max=17, frequency=2
         )
     if type == "curve_minus":
-        k = -0.2
-        path = generate_curve(p_0, p_target, k, nb_points_path)
+        k = -1.72
+        path = generate_curve_with_target_curvature(p_0, p_target, k, nb_points_path)
     if type == "curve_plus":
-        k = 0.2
-        path = generate_curve(p_0, p_target, k, nb_points_path)
+        k = 1.72
+        path = generate_curve_with_target_curvature(p_0, p_target, k, nb_points_path)
     tree = KDTree(path)
-
+    
+    
+    p_0 = path[0]
+    p_target = path[-1]
     results = {}
 
     uniform_bg = False
@@ -129,10 +140,10 @@ def evaluate_after_training(
             "load_model": config_eval["load_model"],
             "n_lookahead": config_eval["n_lookahead"],
             "beta": config_eval["beta"],
-            "add_action" : config_eval["add_action"],
-            "velocity_ahead" : config_eval["velocity_ahead"]
+            "add_action": config_eval["add_action"],
+            "velocity_ahead": config_eval["velocity_ahead"],
         }
-        if agent_name in results.keys() and "08_11-14" not in agent_name:
+        if agent_name in results.keys():
             results[agent_name]["training type"] = training_type
             print(f"Agent {agent_name} already evaluated.")
             continue
@@ -150,13 +161,13 @@ def evaluate_after_training(
         config_eval["path"] = path
         config_eval["tree"] = tree
         env = MicroSwimmer(
-            config_eval["x_0"],
-            config_eval["C"],
-            Dt_sim,
-            config_eval["velocity_bool"],
-            config_eval["n_lookahead"],
-            config_eval["velocity_ahead"],
-            config_eval["add_action"],
+            x_0 = config_eval["x_0"],
+            C = config_eval["C"],
+            Dt = Dt_sim,
+            velocity_bool = config_eval["velocity_bool"],
+            n_lookahead = config_eval["n_lookahead"],
+            velocity_ahead= config_eval["velocity_ahead"],
+            add_action = config_eval["add_action"],
         )
 
         state_dim = env.observation_space.shape[0]
@@ -178,8 +189,8 @@ def evaluate_after_training(
         ) = evaluate_agent(
             agent=agent,
             env=env,
-            eval_episodes = config_eval["eval_episodes"],
-            config = config_eval,
+            eval_episodes=config_eval["eval_episodes"],
+            config=config_eval,
             save_path_result_fig=save_path_eval,
             file_name=f"eval_with" + file_name_or,
             random_parameters=False,
@@ -187,48 +198,26 @@ def evaluate_after_training(
             plot=True,
             parameters=parameters,
             plot_background=True,
-            rng=rng,
         )
 
         results[agent_name] = {
             "rewards": rewards_per_episode,
+            "rewards_mean":mean(rewards_per_episode),
             "rewards_time": rewards_t_per_episode,
+            "rewards_time_mean": mean(rewards_t_per_episode),
             "rewards_distance": rewards_d_per_episode,
+            "rewards_distance_mean": mean(rewards_d_per_episode),
             "success_rate": success_rate,
             "n_eval_episodes": config_eval["eval_episodes"],
             "training type": training_type,
         }
         print("-----------------------------------------------")
-        print("Success rate : ", success_rate)
-        print("Mean rewards : ", format_sci(mean(rewards_per_episode)))
-        print("Mean rewards t : ", format_sci(mean(rewards_t_per_episode)))
-        print("Mean rewards d : ", format_sci(mean(rewards_d_per_episode)))
-        print("-----------------------------------------------")
-        if type == "line":
-            visualize_streamline(
-                agent,
-                config_eval,
-                f"streamline" + file_name_or,
-                save_path_eval,
-                type=type,
-                title="",
-                k=k,
-                parameters=parameters,
-                offset=0.02,
-            )
+        # print("Success rate : ", success_rate)
+        # print("Mean rewards : ", format_sci(mean(rewards_per_episode)))
+        # print("Mean rewards t : ", format_sci(mean(rewards_t_per_episode)))
+        # print("Mean rewards d : ", format_sci(mean(rewards_d_per_episode)))
+        # print("-----------------------------------------------")
 
-        else:
-            visualize_streamline(
-                agent,
-                config_eval,
-                f"streamline" + file_name_or,
-                save_path_eval,
-                type=type,
-                title="",
-                k=k,
-                parameters=parameters,
-                offset=0.2,
-            )
 
     with open(file_name_result, "w") as f:
         json.dump(results, f, indent=4)
@@ -243,199 +232,7 @@ def evaluate_after_training(
     return results
 
 
-def compare_p_line(
-    agent_name,
-    config_eval,
-    file_name_or,
-    save_path_eval,
-    u_bg=np.zeros(2),
-    title="",
-    offset=0.2,
-    ):
-    config_eval = copy.deepcopy(config_eval)
-    save_path_comparison = os.path.join(save_path_eval, "comparison_graph/")
-    if not os.path.exists(save_path_comparison):
-        os.makedirs(save_path_comparison)
-    trajectories = {}
-    p_target = config_eval["p_target"]
-    p_0 = config_eval["p_0"]
-    nb_points_path = config_eval["nb_points_path"]
-    nb_starting_point = 4
-    p_0_above = p_0 + np.array([0.2, offset])
-    p_target_above = p_target + np.array([0, offset])
-    p_0_below = p_0 + np.array([0.2, -offset])
-    p_target_below = p_target + np.array([0, -offset])
 
-    path, _ = generate_simple_line(p_0, p_target, nb_points_path)
-    path_above_point, _ = generate_simple_line(
-        p_0_above, p_target_above, nb_starting_point
-    )
-    path_below_point, _ = generate_simple_line(
-        p_0_below, p_target_below, nb_starting_point
-    )
-
-    config_eval["path"] = path
-    tree = KDTree(path)
-    config_eval["tree"] = tree
-
-    path_above_point = path_above_point[:-1]
-    path_below_point = path_below_point[:-1]
-    path_starting_point = np.concatenate((path_above_point, path_below_point), axis=0)
-    L = len(path_starting_point)
-    print("path_starting_point : ", path_starting_point)
-    file_name_or += title
-    path_save_fig = os.path.join(save_path_comparison, file_name_or)
-
-    config_eval["D"] = 0
-    steps_per_action = config_eval["steps_per_action"] - 2
-    t_max = config_eval["t_max"]
-    Dt_action = config_eval["Dt_action"]
-    Dt_sim = Dt_action / steps_per_action
-
-    id = 0
-    starting_point = path_starting_point[id]
-    dot_product = []
-    config_eval["x_0"] = starting_point
-    x = starting_point
-    env = MicroSwimmer(
-        config_eval["x_0"],
-        config_eval["C"],
-        Dt_sim,
-        config_eval["velocity_bool"],
-        config_eval["n_lookahead"],
-    )
-    state, done = env.reset(config_eval["tree"], config_eval["path"]), False
-    iter = 0
-
-    policy_file = os.path.join(agent_name, "models/agent")
-    state_dim = env.observation_space.shape[0]
-    action_dim = env.action_space.shape[0]
-    max_action = float(env.action_space.high[0])
-    agent = TD3.TD3(state_dim, action_dim, max_action)
-    agent.load(policy_file)
-    states_list = [x]
-
-    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(16, 8))
-
-    ax1.plot(
-        path[:, 0], path[:, 1], label="path", color="black", linewidth=2, zorder=10
-    )
-
-    while id < len(path_starting_point):
-        iter += 1
-        if iter % steps_per_action == 0 or iter == 1:
-            action = agent.select_action(state)
-            v, p_dir = find_next_v(
-                x, config_eval["p_target"], config_eval["beta"], Dt_sim, num_angles=90
-            )
-            x_previous = x
-        next_state, reward, done, info = env.step(
-            action,
-            tree,
-            path,
-            p_target,
-            config_eval["beta"],
-            config_eval["D"],
-            u_bg,
-            config_eval["threshold"],
-        )
-        x = info["x"]
-        states_list.append(x)
-        state = next_state
-
-        if iter % steps_per_action == 1:
-            dir_act = (x - x_previous) / np.linalg.norm(x - x_previous)
-            product = dir_act @ p_dir
-            dot_product.append(product)
-
-        if done or iter * Dt_sim > t_max:
-            trajectories[f"{path_starting_point[id]}"] = dot_product
-            color = plot_trajectories(
-                ax1, np.array(states_list), path, title="streamlines", color_id=id
-            )
-
-            p_1 = path_starting_point[id]
-            x_values = np.linspace(p_1[0], p_target[0], len(dot_product))
-            ax2.plot(x_values, dot_product, color=color, label=f"Traj {id}")
-
-            iter = 0
-            id += 1
-            if id < L:
-                x_0 = path_starting_point[id]
-                config_eval["x_0"] = x_0
-                dot_product = []
-                states_list = [x_0]
-                x = x_0
-                env = MicroSwimmer(
-                    config_eval["x_0"],
-                    config_eval["C"],
-                    Dt_sim,
-                    config_eval["velocity_bool"],
-                    config_eval["n_lookahead"],
-                )
-                state, done = env.reset(config_eval["tree"], config_eval["path"]), False
-            if ax1.get_ylim()[1] - ax1.get_ylim()[0] < 0.5:
-                ax1.set_ylim(-0.3, 0.3)
-
-    ax1.set_aspect("equal")
-    ax1.set_title("Trajectories")
-    ax1.legend()
-
-    ax2.set_aspect("equal")
-    ax2.set_title("Dot Product Evolution")
-    ax2.set_ylim(0, 1)
-    ax2.legend()
-
-    plt.tight_layout()
-    plt.savefig(path_save_fig, dpi=200, bbox_inches="tight")
-
-
-def policy_direction(agent_name, config_eval):
-    p_0 = np.zeros(2)
-    p_target = np.array([1 / 8, 1 / 64])
-    k = -0.4
-    nb_points = 100
-    path = generate_curve(p_0, p_target, k, nb_points)
-    tree = KDTree(path)
-    x_0 = np.array([0.02, -0.01])
-    x = x_0
-    config_eval["x_0"] = x_0
-    env = MicroSwimmer(
-        config_eval["x_0"],
-        config_eval["C"],
-        config_eval["Dt_action"] / config_eval["steps_per_action"],
-    )
-    beta = config_eval["beta"]
-    u_bg = np.zeros(2)
-    D = config_eval["D"]
-    threshold = config_eval["threshold"]
-
-    policy_file = os.path.join(agent_name, "models/agent")
-    state_dim = env.observation_space.shape[0]
-    action_dim = env.action_space.shape[0]
-    max_action = float(env.action_space.high[0])
-    agent = TD3.TD3(state_dim, action_dim, max_action)
-    agent.load(policy_file)
-
-    nb_steps = 5
-    state, done = env.reset(tree, path), False
-
-    plt.plot(path[:, 0], path[:, 1], label="path", color="black", linewidth=2)
-    plt.scatter(p_0[0], p_0[1], color="black")
-    for i in range(nb_steps):
-        action = agent.select_action(state)
-        d, id_cp = min_dist_closest_point(x, tree)
-        dir_path = path[id_cp + 1] - path[id_cp]
-        action_global = coordinate_in_global_ref(path[id_cp], dir_path, action)
-        plot_action(path, x, p_0, id_cp, action_global, i)
-        next_state, x, reward, done, _ = env.step(
-            action, tree, path, p_target, beta, D, u_bg, threshold
-        )
-        state = next_state
-    save_path_eval_action = os.path.join(agent_name, "eval_bg/action_choice")
-
-    plt.legend()
-    plt.savefig(save_path_eval_action, dpi=200, bbox_inches="tight")
 
 
 def initialize_parameters(agent_file, p_target, p_0):
@@ -449,9 +246,9 @@ def initialize_parameters(agent_file, p_target, p_0):
     config_eval["p_target"] = p_target
     config_eval["p_0"] = p_0
     config_eval["x_0"] = p_0
-    config_eval["nb_points_path"] = 500
-    config_eval["t_max"] = 12
-    config_eval["eval_episodes"] = 100
+    config_eval["nb_points_path"] = 2000
+    config_eval["t_max"] = 30
+    config_eval["eval_episodes"] = 50
     config_eval["velocity_bool"] = (
         config["velocity_bool"] if "velocity_bool" in config else False
     )
@@ -465,6 +262,7 @@ def initialize_parameters(agent_file, p_target, p_0):
         config_eval["Dt_action"] if "Dt_action" in config else 1 / 30
     )
     config_eval["n_lookahead"] = config["n_lookahead"] if "n_lookahead" in config else 5
+    
     maximum_curvature = 30
     l = 1 / maximum_curvature
     Dt_action = 1 / maximum_curvature
@@ -475,7 +273,7 @@ def initialize_parameters(agent_file, p_target, p_0):
 
 
 if __name__ == "__main__":
-    agent_name='agents/agent_TD3_2025-05-07_15-48'
+    agent_name = "agents/agent_TD3_2025-07-24_11-16"
     # p_target = np.array([2,0])
     # p_0 = np.array([0,0])
     # u_bg = np.array([0.0,0.2])
@@ -484,28 +282,40 @@ if __name__ == "__main__":
     # os.makedirs(save_path_eval, exist_ok=True)
     # offset=0.2
     # compare_p_line(agent_name,config_eval_comp,'comparison_north_02',save_path_eval,u_bg,'',offset)
-
-    agents_file = [agent_name,'agents/agent_TD3_2025-04-18_13-33','agents/agent_TD3_2025-05-08_10-09','agents/agent_TD3_2025-05-08_10-26','agents/agent_TD3_2025-05-08_10-40','agents/agent_TD3_2025-05-08_11-14']
-
-    # directory_path = Path("agents/")
-
-    # for item in directory_path.iterdir():
-    #     if item.is_dir() and "agent_TD3" in item.name:
-    #         if "2025-04-23" in item.name or "2025-04-22" in item.name:
-    #             agents_file.append(os.path.join(directory_path, item.name))
-
+    agents_file=[agent_name,
+                 "agents/agent_TD3_2025-07-24_10-12",
+                 "agents/agent_TD3_2025-07-24_16-45",
+                 "agents/agent_TD3_2025-07-24_11-02",
+                 "agents/agent_TD3_2025-07-24_11-49",
+                 "agents/agent_TD3_2025-07-24_12-13",
+                 "agents/agent_TD3_2025-07-24_12-38",
+                 "agents/agent_TD3_2025-07-24_13-03",
+                 "agents/agent_TD3_2025-07-24_13-27",
+                 "agents/agent_TD3_2025-07-24_13-57",
+                 
+                 ]
+    agents_file = ['agents/agent_TD3_2025-07-24_17-30']
+           
     print("Agents files : ", agents_file)
-    types = ["ondulating", "line", "curve_minus", "curve_plus"]
-    title_add = 'rankine_a_05__cir_3_center_1_075'
+    types = ["ondulating","line","curve_minus","curve_plus"]
+    title_add = "rankine_a_05_cir_0_75_2_pi_center_1_0"
     print("--------------------- Evaluation with rankine bg ---------------------")
     for type in types:
-        a= 0.5
-        cir = 2
-        center = np.array([1,3/4])
-        results = evaluate_after_training(agents_file,type=type,p_target = [2,0],p_0 = [0,0],title_add=title_add,a=a,center=center,cir=cir)
+        a = 0.5
+        cir =3/4*2*pi*a
+        center = np.array([1,0])
+        results = evaluate_after_training(
+            agents_file,
+            type=type,
+            p_target=[2, 0],
+            p_0=[0, 0],
+            title_add=title_add,
+            a=a,
+            center=center,
+            cir=cir,
+        )
         rank_agents_by_rewards(results)
 
-    
     print("--------------------- Evaluation with no bg ---------------------")
     title_add = "free"
     for type in types:

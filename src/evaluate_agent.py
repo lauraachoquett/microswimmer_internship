@@ -10,8 +10,7 @@ from src.utils import random_bg_parameters
 colors = plt.cm.tab10.colors
 import copy
 
-from src.generate_path import generate_curve
-from src.plot import plot_trajectories
+from src.plot import plot_trajectories,video_trajectory
 
 
 def evaluate_agent(
@@ -31,7 +30,9 @@ def evaluate_agent(
     obstacle_contour=None,
     sdf=None,
     velocity_func_l=None,
+    video=False
 ):
+    dim=2
     config = copy.deepcopy(config)
     parameters = copy.deepcopy(parameters)
     rewards_per_episode = []
@@ -81,7 +82,7 @@ def evaluate_agent(
         norm = np.linalg.norm(u_bg)
         dir = np.array(u_bg / norm)
         plot_background = True
-    velocity_func=None
+    velocity_func = None
     if velocity_func_l is not None:
         velocity_func = lambda x: velocity_func_l(x).squeeze()
 
@@ -89,8 +90,7 @@ def evaluate_agent(
         velocity_func = lambda x: uniform_velocity(dir, norm)
     elif config["rankine_bg"]:
         velocity_func = lambda x: rankine_vortex(x, a, center, cir)
-        
-    
+
     if list_of_path_tree is not None:
         path, tree = list_of_path_tree[0]
         nb_of_path = len(list_of_path_tree)
@@ -100,7 +100,7 @@ def evaluate_agent(
         nb_of_path = 1
 
     #### EVALUATION ####
-    state, done = env.reset(tree, path,velocity_func), False
+    state, done = env.reset(tree, path, velocity_func), False
     while episode_num < eval_episodes:
         states_episode.append(x)
         iter += 1
@@ -138,7 +138,7 @@ def evaluate_agent(
             if done:
                 count_succes += 1
             states_list_per_episode.append([np.array(states_episode), iter])
-            state, done = env.reset(tree, path,velocity_func), False
+            state, done = env.reset(tree, path, velocity_func), False
             iter = 0
             episode_num += 1
             x = p_0
@@ -150,13 +150,13 @@ def evaluate_agent(
             episode_rew_t = 0
             episode_rew_d = 0
             path, tree = list_of_path_tree[episode_num % nb_of_path]
-
-    if plot:
-        path_save_fig = os.path.join(save_path_result_fig, file_name)
+    if video : 
+        print("Making video...")
+        path_save_video = os.path.join(save_path_result_fig,file_name+"_video_trajectory.mp4")
         fig, ax = plt.subplots(figsize=(10, 8))
         if obstacle_contour is not None:
             ax.scatter(
-                obstacle_contour[:, 0], obstacle_contour[:, 1], color="black", s=0.5
+                obstacle_contour[:, 0], obstacle_contour[:, 1], color="black", s=0.2
             )
         for elt in list_of_path_tree:
             path, _ = elt
@@ -164,16 +164,17 @@ def evaluate_agent(
                 path[:, 0],
                 path[:, 1],
                 label="path",
-                color="black",
+                color="firebrick",
                 linewidth=1,
-                zorder=10,
+                zorder=0,
             )
         ylim = ax.get_ylim()
         if ylim[1] - ylim[0] < 1 / 3:
             ax.set_ylim(top=1.0, bottom=-1)
-        plot_trajectories(
+        video_trajectory(
+            fig,
             ax,
-            states_list_per_episode[-4:],
+            states_list_per_episode[0][0],
             path,
             title,
             a,
@@ -182,28 +183,57 @@ def evaluate_agent(
             dir,
             norm,
             plot_background,
-            type=type,
+            path_save_video,
         )
+
+    if plot:
+        path_save_fig = os.path.join(save_path_result_fig, file_name)
+
+        if dim == 2:
+            fig, ax = plt.subplots(figsize=(10, 8))
+
+            if obstacle_contour is not None:
+                ax.scatter(obstacle_contour[:, 0], obstacle_contour[:, 1], color="black", s=0.2)
+
+            for elt in list_of_path_tree:
+                path, _ = elt
+                ax.plot(path[:, 0], path[:, 1], label="path", color="black", linewidth=1, zorder=0)
+
+            ylim = ax.get_ylim()
+            if ylim[1] - ylim[0] < 1 / 3:
+                ax.set_ylim(top=1.0, bottom=-1)
+
+            plot_trajectories(
+                ax,
+                states_list_per_episode[-4:],
+                path,
+                title,
+                a,
+                center,
+                cir,
+                dir,
+                norm,
+                plot_background,
+                type=type,
+            )
+
+            ax.set_aspect("equal")
+            ax.set_axis_off()
+
+
+            
 
         ax.set_aspect("equal")
         ax.set_axis_off()
 
         fig.savefig(path_save_fig, dpi=400, bbox_inches="tight")
         plt.close(fig)
-    # print(mean(v_hist))
-    # path_save_fig = os.path.join(save_path_result_fig, file_name + "_hist_v.png")
-    # plt.hist(v_hist, bins=50, color="blue", alpha=0.7)
-    # plt.axvline(
-    #     mean(v_hist), color="green", linestyle="dashed", linewidth=1.5, label="Mean"
-    # )
-    # plt.xlabel(r"$u_{bg} / \|U\|$")
-    # plt.legend()
-    # plt.savefig(path_save_fig, dpi=100, bbox_inches="tight")
-    # plt.close()
+        
+        
     return (
         rewards_per_episode,
         rewards_t_per_episode,
         rewards_d_per_episode,
         count_succes / eval_episodes,
-        states_list_per_episode,
+        states_list_per_episode[-4:],
     )
