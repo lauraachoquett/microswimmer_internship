@@ -18,6 +18,7 @@ import copy
 import random
 from pathlib import Path
 from statistics import mean
+from itertools import chain
 
 from src.analytic_solution_line import find_next_v
 from src.distance_to_path import min_dist_closest_point
@@ -213,7 +214,7 @@ def evaluate_after_training(
         }
         print("-----------------------------------------------")
         # print("Success rate : ", success_rate)
-        # print("Mean rewards : ", format_sci(mean(rewards_per_episode)))
+        print("Mean rewards : ", format_sci(mean(rewards_per_episode)))
         # print("Mean rewards t : ", format_sci(mean(rewards_t_per_episode)))
         # print("Mean rewards d : ", format_sci(mean(rewards_d_per_episode)))
         # print("-----------------------------------------------")
@@ -282,22 +283,26 @@ if __name__ == "__main__":
     # os.makedirs(save_path_eval, exist_ok=True)
     # offset=0.2
     # compare_p_line(agent_name,config_eval_comp,'comparison_north_02',save_path_eval,u_bg,'',offset)
-    agents_file=[agent_name,
-                 "agents/agent_TD3_2025-07-24_10-12",
-                 "agents/agent_TD3_2025-07-24_16-45",
-                 "agents/agent_TD3_2025-07-24_11-02",
-                 "agents/agent_TD3_2025-07-24_11-49",
-                 "agents/agent_TD3_2025-07-24_12-13",
-                 "agents/agent_TD3_2025-07-24_12-38",
-                 "agents/agent_TD3_2025-07-24_13-03",
-                 "agents/agent_TD3_2025-07-24_13-27",
-                 "agents/agent_TD3_2025-07-24_13-57",
+    
+    # agents_file=[agent_name,
+    #              "agents/agent_TD3_2025-07-24_10-12",
+    #              "agents/agent_TD3_2025-07-24_16-45",
+    #              "agents/agent_TD3_2025-07-24_11-02",
+    #              "agents/agent_TD3_2025-07-24_11-49",
+    #              "agents/agent_TD3_2025-07-24_12-13",
+    #              "agents/agent_TD3_2025-07-24_12-38",
+    #              "agents/agent_TD3_2025-07-24_13-03",
+    #              "agents/agent_TD3_2025-07-24_13-27",
+    #              "agents/agent_TD3_2025-07-24_13-57",
                  
-                 ]
-    agents_file = ['agents/agent_TD3_2025-07-24_17-30']
+    #              ]
+    # agents_file = ['agents/agent_TD3_2025-04-18_13-33','agents/agent_TD3_2025-07-25_14-37']
+    with open('data/list_n_lookahaed_larger_gap.json') as f:
+        d = json.load(f)
+        agents_file=list(chain.from_iterable(d.values()))
            
     print("Agents files : ", agents_file)
-    types = ["ondulating","line","curve_minus","curve_plus"]
+    types = ["ondulating"]
     title_add = "rankine_a_05_cir_0_75_2_pi_center_1_0"
     print("--------------------- Evaluation with rankine bg ---------------------")
     for type in types:

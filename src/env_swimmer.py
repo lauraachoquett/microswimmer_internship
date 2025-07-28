@@ -60,7 +60,7 @@ class MicroSwimmer(gym.Env):
         self.velocity_ahead = velocity_ahead
         self.velocity_bool = velocity_bool
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-        self.rng = np.random.default_rng(seed)
+        self.rng = np.random.RandomState(seed)
         self.add_action = add_action
 
     def state(self, tree, path):
@@ -90,7 +90,7 @@ class MicroSwimmer(gym.Env):
             lookahead_vel = [] if self.velocity_ahead else None
 
             for i in range(1, self.n_lookahead + 1):
-                idx = min(self.id_cp + i, path_len - 1)
+                idx = min(self.id_cp + 25*i, path_len - 1)
                 next_p = path[idx]
                 lookahead.append(
                     coordinate_in_path_ref(p_cp, self.dir_path, next_p).reshape(1, 2)

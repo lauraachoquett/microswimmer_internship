@@ -27,7 +27,14 @@ from statistics import mean
 
 from src.visualize import visualize_streamline
 
-
+def set_seed(seed):
+    torch.manual_seed(seed)
+    np.random.seed(seed)
+    random.seed(seed)
+    if torch.cuda.is_available():
+        torch.cuda.manual_seed(seed)
+        
+        
 def format_sci(x):
     return "{:.3e}".format(x)
 
@@ -68,7 +75,7 @@ def varying_curve_init(config):
 
 
 def run_expe(config, agent_file="agents"):
-
+    set_seed(config['seed'])
     timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M")
     file_name = os.path.join(agent_file, f"agent_TD3_{timestamp}")
 
@@ -100,8 +107,8 @@ def run_expe(config, agent_file="agents"):
     Dt_action = config["Dt_action"]
     Dt_sim = Dt_action / steps_per_action
     n_lookahead = config["n_lookahead"]
-    env = MicroSwimmer(x_0, C, Dt_sim, config["velocity_bool"], n_lookahead,config['velocity_ahead'],config['add_action'])
-
+    env = MicroSwimmer(x_0, C, Dt_sim, config["velocity_bool"], n_lookahead,config['velocity_ahead'],config['add_action'],seed=seed)
+    
     ## Environnement parameters ##
     t_max = config["t_max"]
     threshold = config["threshold"]
@@ -322,7 +329,7 @@ if __name__ == "__main__":
     maximum_curvature = 30
     threshold=0.07
     Dt_action,D = set_parameters_training(threshold=threshold,maximum_curv=maximum_curvature)
-
+    seed= 42
     print("D:                         ", format_sci(D))
     print("Dt_action:                 ", format_sci(Dt_action))
     print("Threshold:                 ", format_sci(threshold))
@@ -360,10 +367,21 @@ if __name__ == "__main__":
         "random_curve": True,  # To train on varying curve (no longer random)
         "nb_points_path": nb_points_path,  # Discretization of the path
         "Dt_action": Dt_action,
-        "velocity_bool": False,  # Add the velocity in the state or not
+        "velocity_bool": True,  # Add the velocity in the state or not
         "n_lookahead": 10,  # Number of points in the lookahead
         "velocity_ahead":  False,
-        'add_action' : False
+        'add_action' : True,
+        'seed':seed,
     }
 
-    run_expe(config)
+    print('------------------------- RUN -------------------------')
+    seeds = [42]
+    for seed in seeds:
+        for n in [0,2,4,6,8,10]:
+            print("Seed : ",seed)
+            config['seed']=seed
+            config['n_lookahead']=n
+            run_expe(config)
+            
+        
+

@@ -1,0 +1,72 @@
+{
+    "summary_stats": {
+        "Free": {
+            "vel": {
+                "mean": 100.0,
+                "std": 0.0
+            },
+            "no_vel": {
+                "mean": 100.0,
+                "std": 0.0
+            }
+        },
+        "West": {
+            "vel": {
+                "mean": 100.0,
+                "std": 0.0
+            },
+            "no_vel": {
+                "mean": 65.2,
+                "std": 34.1197889794178
+            }
+        },
+        "East": {
+            "vel": {
+                "mean": 100.0,
+                "std": 0.0
+            },
+            "no_vel": {
+                "mean": 100.0,
+                "std": 0.0
+            }
+        },
+        "North": {
+            "vel": {
+                "mean": 100.0,
+                "std": 0.0
+            },
+            "no_vel": {
+                "mean": 80.4,
+                "std": 39.2
+            }
+        },
+        "South": {
+            "vel": {
+                "mean": 100.0,
+                "std": 0.0
+            },
+            "no_vel": {
+                "mean": 83.2,
+                "std": 33.599999999999994
+            }
+        },
+        "Rankine vortex": {
+            "vel": {
+                "mean": 100.0,
+                "std": 0.0
+            },
+            "no_vel": {
+                "mean": 64.8,
+                "std": 43.77396486497425
+            }
+        }
+    },
+    "improvement_percent": {
+        "Free": 0.0,
+        "West": 53.37423312883435,
+        "East": 0.0,
+        "North": 24.37810945273631,
+        "South": 20.19230769230769,
+        "Rankine vortex": 54.320987654320994
+    }
+}

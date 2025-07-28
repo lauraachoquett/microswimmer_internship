@@ -16,7 +16,7 @@ perturbations = [
     "rankine_a_05_cir_0_75_2_pi_center_1_0"
 ]
 labels = [
-    "Free","West", "East", "North", "South", "Rankine vortex"
+    "No Flow","West", "East", "North", "South", "Rankine vortex"
 ]
 file_dir = "results_evaluation"
 save_path_eval = os.path.join(agent_name, "eval_bg")
