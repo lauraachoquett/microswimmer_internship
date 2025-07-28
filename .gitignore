@@ -17,3 +17,6 @@ fig/Astar_*
 *.mp4
 *.html
 fig/
+*.pdf
+*.png
+data/
