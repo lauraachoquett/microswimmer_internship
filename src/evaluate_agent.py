@@ -49,7 +49,7 @@ def evaluate_agent(
     Dt_action = config["Dt_action"]
     Dt_sim = Dt_action / steps_per_action
     beta = config["beta"]
-    gamma = config['gamma'] if 'gamma' in config else 0.001
+    gamma = config['gamma'] if 'gamma' in config else 0.000
     pow_d = config['pow_d'] if 'pow_d' in config else 1
     D = config["D"]
     threshold = config["threshold"]

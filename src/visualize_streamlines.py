@@ -467,7 +467,7 @@ def test_state_action_vel(
     action = agent.select_action(state)
     print("Action : ", action)
     
-    vel = np.array([0.00708938,-0.01071362,-0.00856874])*1
+    vel = np.array([0.00708938,-0.01071362,-0.00856874])*1/2
     state = np.array([
         pos,
         vel,
@@ -490,7 +490,7 @@ def test_state_action_vel(
 if __name__ == "__main__":
     agents_file = []
 
-    agent_name = 'agents/agent_TD3_2025-07-16_18-13'
+    agent_name = 'agents/agent_TD3_2025-07-23_12-21'
     save_path_eval = os.path.join(agent_name,'eval_bg/')
     file_name_or ='streamlines'
     type='line'
@@ -503,7 +503,7 @@ if __name__ == "__main__":
         parameters=[],
         offset=0.05,
     )
-    previous_action=True
+    previous_action=False
     print("TEST ACTION VELOCITY")
     test_state_action_vel(
         agent_name,

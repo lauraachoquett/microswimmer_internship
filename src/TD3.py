@@ -73,7 +73,6 @@ class TD3(object):
         policy_noise=0.2,
         noise_clip=0.5,
         policy_freq=5,
-        decay_rate = 300
     ):
 
         self.actor = Actor(state_dim, action_dim, max_action).to(device)
@@ -94,14 +93,10 @@ class TD3(object):
         self.policy_noise_i = policy_noise
         self.policy_noise = policy_noise
         self.noise_clip = noise_clip
-        self.decay_rate = decay_rate
         self.policy_freq = policy_freq
 
         self.total_it = 0
 
-    def update_policy_noise(self,episode_num):
-        self.policy_noise = self.policy_noise_i * math.exp(-episode_num/self.decay_rate)
-        print('UPDATE policy noise :',self.policy_noise)
         
     def select_action(self, state):
         state = torch.FloatTensor(state.reshape(1, -1)).to(device)

@@ -18,7 +18,7 @@ from src.invariant_state import *
 from src.simulation import rankine_vortex, uniform_velocity
 from src.utils import ReplayBuffer, courbures, random_bg_parameters,generate_state_noise
 from src.frenet import compute_frenet_frame, double_reflection_rmf
-
+from src.analyze_state import states_scaled
 colors = plt.cm.tab10.colors
 import copy
 import json
@@ -53,7 +53,6 @@ def run_expe(config, agent_file="agents"):
 
     timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M")
     file_name = os.path.join(agent_file, f"agent_TD3_{timestamp}")
-
     os.makedirs(file_name, exist_ok=True)
     with open(os.path.join(file_name, "config.pkl"), "wb") as f:
         pickle.dump(config, f)
@@ -97,9 +96,7 @@ def run_expe(config, agent_file="agents"):
     t_max = config["t_max"]
     threshold = config["threshold"]
     beta = config["beta"]
-    D_init = config["D"]
-    # D_schedule = lambda episode: D_init * np.exp(-episode / 400)
-    D_schedule = lambda episode: D_init * 1
+    D = config["D"]
     
     D_state_bool=config["D_state_bool"]
     D_state=None
@@ -111,7 +108,7 @@ def run_expe(config, agent_file="agents"):
     print('State dimension :',state_dim)
     action_dim = env.action_space.shape[0]
     max_action = float(env.action_space.high[0])
-    agent = TD3.TD3(state_dim, action_dim, max_action,decay_rate=config['decay_rate'])
+    agent = TD3.TD3(state_dim, action_dim, max_action)
     replay_buffer = ReplayBuffer(state_dim, action_dim)
 
     ## Training parameters ##
@@ -123,6 +120,12 @@ def run_expe(config, agent_file="agents"):
     save_model = config["save_model"]
     episode_update = config["episode_per_update"]
     list_of_path_tree = None
+    noise_std = 0.5
+    noise_decay = 0.94
+    noise = lambda episode: noise_std * exp(-episode/100)  
+    noise_bis = lambda episode: noise_std * noise_decay **(episode/10)
+    
+
 
     ## Creation of file ##
     save_path_result = f"./{file_name}/results"
@@ -185,17 +188,27 @@ def run_expe(config, agent_file="agents"):
     while episode_num < nb_episode:
         iter += 1
         if iter == 1 : 
-            action = T[0]
             past_action=action
+            action = T[0]
             
         if iter % steps_per_action == 0 :
             past_action = action
             action = agent.select_action(state)
+            if len(action) > 1:
+                random_vec = np.random.randn(*action.shape)
+                # Projection orthogonale: v_perp = random_vec - (random_vec · action) * action
+                tangent_noise = random_vec - np.dot(random_vec, action) * action
+                if np.linalg.norm(tangent_noise) > 0:
+                    tangent_noise = tangent_noise / np.linalg.norm(tangent_noise) * noise(episode_num)
+                noisy_action = action + tangent_noise
+                action = noisy_action / np.linalg.norm(noisy_action)
+            
+                # action = action + np.random.randn(*action.shape) * noise(episode_num)
+            
        
         if episode_num > config["pertubation_after_episode"]:
             u_bg = velocity_func(x)
 
-        D = D_schedule(episode_num)
         next_state, reward, done, info = env.step(
             action = action,past_action=past_action, tree = tree,path= path, T=T,x_target =p_target,beta= beta,gamma=gamma,pow_d=pow_d,D= D, u_bg = u_bg, threshold =threshold,N=N,B=B,D_state=D_state
         )
@@ -225,12 +238,12 @@ def run_expe(config, agent_file="agents"):
         if done or iter * Dt_sim > t_max:
             
             training_reward.append(episode_reward)
-
+                
             if (episode_num) % eval_freq == 0 and episode_num >= 10:
-                agent.update_policy_noise(episode_num)
                 print(
                     f"Total iter: {iter+1} Episode Num: {episode_num} Reward: {episode_reward:.3f} Success rate: {count_reach_target/eval_freq}"
                 )
+                print("Noise update : ",noise(episode_num))
                 rew_t_episode = np.array(rew_t_episode)
                 rew_d_episode = np.array(rew_d_episode)
                 rew_target_episode = np.array(rew_target_episode)
@@ -242,6 +255,7 @@ def run_expe(config, agent_file="agents"):
                 path_save_fig = os.path.join(
                     save_path_result_fig, "training_reward.png"
                 )
+
                 eval_rew, _, _, _, _ , _ = evaluate_agent(
                     agent=agent,
                     env=env,
@@ -267,6 +281,7 @@ def run_expe(config, agent_file="agents"):
                     if save_model:
                         agent.save(save_path_model)
                         print("Best reward during evaluation : Model saved")
+                        states_scaled([f'{file_name}'])
                         
                 episodes_values = np.linspace(1, episode_num, episode_num, dtype="int")
                 episodes_values_freq = np.linspace(
@@ -382,7 +397,8 @@ if __name__ == "__main__":
     print("Distance during Dt_action: ", format_sci(Dt_action))
     # print("Distance to cover:         ", format_sci(d))
     # print("Expected precision:        ", format_sci(threshold / d))
-    D = D/4
+    D = D * exp(-400/400)
+    print("D :",D)
     config = {
         "x_0": p_0,  # m
         "C": 1,  # m/s
@@ -391,7 +407,7 @@ if __name__ == "__main__":
         "t_max": t_max,  # s
         "t_init": t_init,  # s
         "steps_per_action": 5,
-        "nb_episode": 650,
+        "nb_episode": 1000,
         "batch_size": 256,
         "eval_freq": 50,
         'u_bg':np.zeros(3),
@@ -406,7 +422,7 @@ if __name__ == "__main__":
         "load_model": "",
         "episode_per_update": 3,
         "discount_factor": 1,
-        "beta": 0.4,
+        "beta": 0.2,
         "uniform_bg": True,  # Random uniform background flow during the training
         "rankine_bg": True,  # Random rankine vortex during the training
         "pertubation_after_episode": 1,  # Background flow add in the training after this episode
@@ -416,7 +432,7 @@ if __name__ == "__main__":
         "velocity_bool": True,  # Add the velocity in the state or not
         "n_lookahead": 5,  # Number of points in the lookahead
         "velocity_ahead":  False,
-        'add_action' : True,
+        'add_action' : False,
         'dim':dim,
         'paraview':False,
         'D_state_bool':True,
@@ -424,7 +440,6 @@ if __name__ == "__main__":
         'U':1,
         'gamma':0.001,
         'pow_d':1,
-        'decay_rate':500 # decay rate of policy noise
     }
     start_time = time.time()
     run_expe(config)

@@ -110,7 +110,7 @@ def evaluate_after_training(
         if agent_name in results.keys():
             results[agent_name]["training type"] = training_type
             print(f"Agent {agent_name} already evaluated.")
-            continue
+            # continue
         print("Agent name : ", agent_name)
         
         ## Same config for all agent during evaluation time ##
@@ -207,7 +207,7 @@ def initialize_parameters(agent_file, p_target, p_0, nb_points_path):
     config_eval["x_0"] = p_0
     config_eval["nb_points_path"] = nb_points_path
     config_eval["t_max"] = 12
-    config_eval["eval_episodes"] = 4
+    config_eval["eval_episodes"] = 50
     config_eval["velocity_bool"] = (
         config["velocity_bool"] if "velocity_bool" in config else False
     )
@@ -234,11 +234,7 @@ def initialize_parameters(agent_file, p_target, p_0, nb_points_path):
 if __name__ == "__main__":
 
     agents_file = [
-        "agents/agent_TD3_2025-05-21_16-55",
-        "agents/agent_TD3_2025-06-17_11-14",
-        "agents/agent_TD3_2025-07-08_11-16",
         "agents/agent_TD3_2025-07-10_10-33",
-        "agents/agent_TD3_2025-07-10_16-44"
     ]
 
     # directory_path = Path("agents/")
@@ -289,13 +285,12 @@ if __name__ == "__main__":
             )
             rank_agents_by_rewards(results)
 
-    title_add = "rankine_a_025__cir_3_center_0_06_02"
+    title_add = "rankine_a_05_cir_0_5_2_pi_center_0_06_02"
     print("---------------------Evaluation with rankine bg---------------------")
     for id, type in enumerate(types):
         if type == 'counter_helix':
-            a = 0.25
-            cir = 2
-            print("Maximum velocity : ", cir/(2*np.pi*a))
+            a = 0.5
+            cir = (1./2.) * (2. * np.pi * a)
             center = np.array([0, -0.6, 0.2])
             results = evaluate_after_training(
                 agents_file,
@@ -307,8 +302,8 @@ if __name__ == "__main__":
                 cir=cir,
             )
         else:
-            a = 0.25
-            cir = 2
+            a = 0.5
+            cir = (1./2.) * (2. * np.pi * a)
             print("Maximum velocity : ", cir/(2*np.pi*a))
             
             center = np.array([0,0.6, 0.2])

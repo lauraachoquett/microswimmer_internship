@@ -78,6 +78,9 @@ def evaluate_after_training(
     file_name_result = os.path.join(
         file_path_result, f"result_evaluation_{obstacle_type}_{title_add}.json"
     )
+    file_name_result_trajectory = os.path.join(
+        file_path_result, f"result_evaluation_{obstacle_type}_{title_add}_traj.pkl"
+    )
 
     try:
         with open(file_name_result, "r") as f:
@@ -113,7 +116,7 @@ def evaluate_after_training(
         success_rate_list = []
 
         results["type"] = [obstacle_type]
-
+        trajectories=[]
         for path_to_config in tqdm(list_config_paths, desc="Processing configs"):
             if agent_name in results.keys():
                 results_per_config = results[agent_name]["results_per_config"]
@@ -219,6 +222,10 @@ def evaluate_after_training(
             }
             with open(file_name_result, "w") as f:
                 json.dump(results, f, indent=4)
+            trajectories.append(states_per_epsiode[0][0])
+            with open(file_name_result_trajectory,"wb") as f:
+                pickle.dump(trajectories,f)
+            
             plot_success_rate(file_name_result, agent_name, file_path_result)
         print("-----------------------------------------------")
         print("Success rate : ", mean(success_rate_list))
@@ -242,7 +249,7 @@ def initialize_parameters(agent_file):
         config["random_helix"] if "random_helix" in config else False
     )
     config_eval["t_max"] = 20
-    config_eval["eval_episodes"] = 5
+    config_eval["eval_episodes"] = 2
     config_eval["velocity_bool"] = (
         config["velocity_bool"] if "velocity_bool" in config else False
     )
@@ -540,11 +547,11 @@ if __name__ == "__main__":
 
     ratio = 5
     sdf_func,sdf_phys,velocity_retina,x_phys,y_phys,z_phys,vx_phys,vy_phys,vz_phys,physical_depth,physical_width,physical_height,scale = load_sim_sdf(ratio)
-    # file_to_config_path = create_all_path(config_par_path,6)
+    file_to_config_path = create_all_path(config_par_path=config_par_path,nb_points=2,failure_cases=False)
 
-    file_to_config_path_g = f"config_path/velocity_ratio_{ratio}"
+    # file_to_config_path_g = f"config_path/velocity_ratio_{ratio}"
     # file_to_config_path = str(create_numbered_run_folder(file_to_config_path_g))
-    file_to_config_path = 'config_path/velocity_ratio_5/32'
+    # file_to_config_path = 'config_path/velocity_ratio_5/34'
     types = [""]
     # types = ["free","v1",""]
     # goal_point = (10.79606786617848/24.067712783813477,12.296130605776128/22.062068939208984,0.5)
