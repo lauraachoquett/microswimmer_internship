@@ -607,7 +607,7 @@ if __name__ == "__main__":
     print("Number of path : ", len(list_config_paths))
     print("Path generated - Go for evaluation")
     lenght_scale = 0.269/20 #Ratio between biggest radius in the simulation domain and physical domain micro_meter
-    # D_state_list = np.flip(np.linspace(0.15,10,30)*lenght_scale)
+    D_state_list = np.flip(np.linspace(0.15,10,30)*lenght_scale)
     D_state_list=np.array([10])*lenght_scale
     print("Noise adding on state :",D_state_list)
     file_path_result_global = "grid_search"

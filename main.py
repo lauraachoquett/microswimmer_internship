@@ -398,7 +398,7 @@ if __name__ == "__main__":
     # print("Distance to cover:         ", format_sci(d))
     # print("Expected precision:        ", format_sci(threshold / d))
     D = D * exp(-400/400)
-    print("D :",D)
+    print("New D :",format_sci(D))
     config = {
         "x_0": p_0,  # m
         "C": 1,  # m/s
@@ -442,6 +442,6 @@ if __name__ == "__main__":
         'pow_d':1,
     }
     start_time = time.time()
-    run_expe(config)
-    print("Time to do the training :",time.time()-start_time)
+    # run_expe(config)
+    # print("Time to do the training :",time.time()-start_time)
     

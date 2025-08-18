@@ -14,6 +14,7 @@ import plotly.graph_objects as go
 import seaborn as sns
 from mpl_toolkits.mplot3d import Axes3D  # nécessaire pour l'import
 import pandas as pd
+from src.simulation import rankine_vortex, uniform_velocity
 
 colors_default = plt.cm.tab10.colors
 
@@ -363,36 +364,36 @@ def plot_action(path, x, p_0, id_cp, action, id):
     plt.ylabel("y")
 
 
-# def plot_background_velocity(
-#     type,
-#     x_bound,
-#     y_bound,
-#     a=0.25,
-#     center=(0.5, 0.5),
-#     cir=0.8,
-#     dir=np.zeros(2),
-#     norm=0.0,
-# ):
-#     x = np.linspace(x_bound[0], x_bound[1], 10)
-#     y = np.linspace(y_bound[0], y_bound[1], 10)
-#     X, Y = np.meshgrid(x, y)
-#     U = np.zeros_like(X)
-#     V = np.zeros_like(Y)
-#     for i in range(X.shape[0]):
-#         for j in range(X.shape[1]):
-#             if type == "rankine":
-#                 v = rankine_vortex((X[i, j], Y[i, j]), a, center, cir)
-#                 U[i, j] = v[0]
-#                 V[i, j] = v[1]
-#             if type == "uniform":
-#                 v = uniform_velocity(dir, norm)
-#                 U[i, j] = v[0]
-#                 V[i, j] = v[1]
-#     plt.quiver(X, Y, U, V, scale=15, width=0.002, color="gray")
-#     if type == "rankine":
-#         plt.scatter(center[0], center[1], marker="*")
-#     plt.xlabel("x")
-#     plt.ylabel("y")
+def plot_background_velocity(
+    type,
+    x_bound,
+    y_bound,
+    a=0.25,
+    center=(0.5, 0.5),
+    cir=0.8,
+    dir=np.zeros(2),
+    norm=0.0,
+):
+    x = np.linspace(x_bound[0], x_bound[1], 10)
+    y = np.linspace(y_bound[0], y_bound[1], 10)
+    X, Y = np.meshgrid(x, y)
+    U = np.zeros_like(X)
+    V = np.zeros_like(Y)
+    for i in range(X.shape[0]):
+        for j in range(X.shape[1]):
+            if type == "rankine":
+                v = rankine_vortex((X[i, j], Y[i, j]), a, center, cir)
+                U[i, j] = v[0]
+                V[i, j] = v[1]
+            if type == "uniform":
+                v = uniform_velocity(dir, norm)
+                U[i, j] = v[0]
+                V[i, j] = v[1]
+    plt.quiver(X, Y, U, V, scale=15, width=0.002, color="gray")
+    if type == "rankine":
+        plt.scatter(center[0], center[1], marker="*")
+    plt.xlabel("x")
+    plt.ylabel("y")
 
 
 def plot_success_rate(path_json_file, agent_file, save_plot):
@@ -664,28 +665,14 @@ def draw_circle(center,radius):
 
 
 def plot_success_rate_D_state(file, title):
-    # --- Style scientifique global ---
-    # plt.rcParams.update({
-    #     "text.usetex": False,
-    #     "font.family": "serif",
-    #     "axes.labelsize": 11,
-    #     "axes.titlesize": 12,
-    #     "legend.fontsize": 10,
-    #     "xtick.labelsize": 10,
-    #     "ytick.labelsize": 10,
-    #     "lines.markersize": 4.5,
-    #     "pdf.fonttype": 42,
-    #     "ps.fonttype": 42,
-    # })
     length_scale = 0.269 / 20
     ms_length = 15
 
-    # Disposition plus naturelle : horizontal
     fig, axs = plt.subplots(3, 1, figsize=(6, 8), sharex=True)
 
     markers = ['o', 'o']
-    colors = ['#0072B2', '#D55E00']  # Bleu profond, orange brique
-    labels = ['Training 1 : no noise', 'Training 2 : noise-added training']
+    colors = ['#0072B2', '#D55E00']
+    labels = ['Agent-NoNoise', 'Agent-IncNoise']
 
     for idx, path in enumerate(file):
         with open(path, 'r') as f:
@@ -693,29 +680,69 @@ def plot_success_rate_D_state(file, title):
         agent = list(data.keys())[0]
         results = data[agent]
 
-        D_states, success_rates, mean_rewards_time, mean_rewards_distance = [], [], [], []
+        D_states = []
+        success_rates = []
+        mean_rewards_time = []
+        q15_rewards_time = []
+        q75_rewards_time = []
+        mean_rewards_distance = []
+        q15_rewards_distance = []
+        q75_rewards_distance = []
 
         for D_state, infos in results.items():
             D_states.append(float(D_state))
             config = list(infos["results_per_config"].values())[0]
+
+            # Success rate
             success_rates.append(config["success_rate"])
+
+            # Rewards
             rewards_time = config.get("rewards_time", [])
             rewards_distance = config.get("rewards_distance", [])
-            mean_rewards_time.append(np.mean(rewards_time) if rewards_time else np.nan)
-            mean_rewards_distance.append(np.mean(rewards_distance) if rewards_distance else np.nan)
 
-        # Recalage
+            if rewards_time:
+                mean_rewards_time.append(np.median(rewards_time))
+                q15_rewards_time.append( np.percentile(rewards_time, 15))
+                q75_rewards_time.append( np.percentile(rewards_time, 75))
+            else:
+                mean_rewards_time.append(np.nan)
+                q15_rewards_time.append(0)
+                q75_rewards_time.append(0)
+
+            if rewards_distance:
+                mean_rewards_distance.append(np.median(rewards_distance))
+                q15_rewards_distance.append( np.percentile(rewards_distance, 15))
+                q75_rewards_distance.append( np.percentile(rewards_distance, 75))
+            else:
+                mean_rewards_distance.append(np.nan)
+                q15_rewards_distance.append(0)
+                q75_rewards_distance.append(0)
+
+
+        # Mise à l'échelle
         D_states = (np.array(D_states) / length_scale) / ms_length
-        D_states, success_rates, mean_rewards_time, mean_rewards_distance = zip(
-            *sorted(zip(D_states, success_rates, mean_rewards_time, mean_rewards_distance))
-        )
+        zipped = sorted(zip(D_states, success_rates, mean_rewards_time, q15_rewards_time,q75_rewards_time,
+                            mean_rewards_distance, q15_rewards_distance,q75_rewards_distance))
+        D_states, success_rates, mean_rt, q15_rt,q75_rt, mean_rd, q15_rd,q75_rd= zip(*zipped)
 
         # Tracés
         axs[0].plot(D_states, success_rates, label=labels[idx], color=colors[idx], marker=markers[idx])
-        axs[1].plot(D_states, mean_rewards_time, label=labels[idx], color=colors[idx], marker=markers[idx])
-        axs[2].plot(D_states, mean_rewards_distance, label=labels[idx], color=colors[idx], marker=markers[idx])
 
-    # --- Labels, styles par subplot ---
+        axs[1].plot(D_states, mean_rt, label=labels[idx], color=colors[idx], marker=markers[idx])
+        axs[1].fill_between(D_states,
+                             np.array(q15_rt),
+                             np.array(q75_rt),
+                            color=colors[idx],
+                            alpha=0.2)
+
+        axs[2].plot(D_states, mean_rd, label=labels[idx], color=colors[idx], marker=markers[idx])
+        axs[2].fill_between(D_states,
+                             np.array(q15_rd),
+                             np.array(q75_rd),
+                            color=colors[idx],
+                            alpha=0.2)
+
+    # --- Labels ---
     axs[0].set_ylabel("Success rate")
     axs[0].set_ylim(-0.02, 1.02)
     axs[1].set_ylabel(r"$\bar{J}_t$")
@@ -727,10 +754,8 @@ def plot_success_rate_D_state(file, title):
         ax.spines['right'].set_visible(False)
         ax.tick_params(direction='out')
 
-    # Légende unique
     axs[0].legend(loc='lower left', frameon=False)
 
-    # Sauvegarde
     plt.tight_layout()
     save_path = os.path.join("fig", title)
     plt.savefig(save_path + ".pdf", dpi=300, bbox_inches="tight")
@@ -870,6 +895,7 @@ def hist_cos_theta_stacked(cos_theta_all_agents, xlabel=r'$\cos(\theta)$', ylabe
     fig, axs = plt.subplots(2, 1, figsize=(7, 5.5), sharex=True)
 
     colors = ['#0072B2', '#D55E00']  # Bleu / Orange
+    labels = ['Agent-NoNoise','Agent-IncNoise']
     for i, ax in enumerate(axs):
         agent = agent_names[i]
         data = cos_theta_all_agents[agent]
@@ -886,14 +912,11 @@ def hist_cos_theta_stacked(cos_theta_all_agents, xlabel=r'$\cos(\theta)$', ylabe
             color=colors[i],
         )
 
-        mu, sigma = np.mean(data), np.std(data)
-        ax.text(0.02, 0.95, f"$\\mu$ = {mu:.2f}, $\\sigma$ = {sigma:.2f}",
-                transform=ax.transAxes, verticalalignment='top', fontsize=10)
 
         ax.set_ylabel(ylabel)
         ax.set_xlim(-1, 1)
         ax.set_ylim(0, None)
-        ax.set_title(f'Training {i+1} (n={len(data)})', fontsize=11)
+        ax.set_title(f'{labels[i]} (n={len(data)})', fontsize=11)
         ax.spines['top'].set_visible(False)
         ax.spines['right'].set_visible(False)
         ax.tick_params(direction='out')
@@ -916,12 +939,12 @@ if __name__ == "__main__":
     #     hist_scientific(cos_theta_agent,xlabel=r'$\cos(\theta)$',title='',save_name=f"fig/histogramme_agent_{i}_cos_theta_no_title",bins=20)
     #     i+=1
         
-
-    file = 'grid_search/71/result_evaluation_retina_.json'
-    cos_theta_all_agents = compute_cos_theta_action(file)
-    hist_cos_theta_stacked(
-        cos_theta_all_agents,
-        save_name='fig/histogramme_cos_theta_stacked'
-    )
+    # print("o")
+    # file = 'grid_search/71/result_evaluation_retina_.json'
+    # cos_theta_all_agents = compute_cos_theta_action(file)
+    # hist_cos_theta_stacked(
+    #     cos_theta_all_agents,
+    #     save_name='fig/histogramme_cos_theta_stacked'
+    # )
             
     

@@ -263,7 +263,7 @@ def initialize_parameters(agent_file):
     config_eval["velocity_bool"] = (
         config["velocity_bool"] if "velocity_bool" in config else False
     )
-    config_eval['paraview']=False
+    config_eval['paraview']=True
     config_eval["velocity_ahead"] = (
         config["velocity_ahead"] if "velocity_ahead" in config else False
     )
@@ -544,7 +544,7 @@ def create_list_of_goal_point(n, start_point, ratio):
 
 if __name__ == "__main__":
     obstacle_type = "retina"
-    agents_file = ["agents/agent_TD3_2025-05-21_16-55"]
+    agents_file = ["agents/agent_TD3_2025-06-17_11-14"]
 
     print("Number of agents : ", len(agents_file))
 
@@ -593,6 +593,7 @@ if __name__ == "__main__":
     print("Path generated - Go for evaluation")
     lenght_scale = 0.269/20 #Ratio between biggest radius in the simulation domain and physical domain micro_meter
     D_state_list = np.flip(np.linspace(0.15,10,30)*lenght_scale)
+    D_state_list = np.zeros(1)
     print("Noise adding on state :",D_state_list)
     file_path_result_global = "grid_search"
     file_path_result = str(create_numbered_run_folder(file_path_result_global))
