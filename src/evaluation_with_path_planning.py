@@ -88,13 +88,16 @@ def evaluate_after_training(
     file_name_result = os.path.join(
         file_path_result, f"result_evaluation_{obstacle_type}_{title_add}.json"
     )
+    file_name_result_trajectory = os.path.join(
+        file_path_result, f"result_evaluation_{obstacle_type}_{title_add}_traj.pkl"
+    )
 
     try:
         with open(file_name_result, "r") as f:
             results = json.load(f)
     except FileNotFoundError:
         results = {}
-
+    
     for agent_name in agent_files:
         config_eval = initialize_parameters(agent_name, 0.00)
         config_eval = copy.deepcopy(config_eval)
@@ -122,7 +125,7 @@ def evaluate_after_training(
         Dt_sim = Dt_action / steps_per_action
         threshold = config_eval["threshold"]
         success_rate_list = []
-
+        trajectories = []
         results["type"] = [obstacle_type]
 
         for path_to_config in tqdm(list_config_paths, desc="Processing configs"):
@@ -147,7 +150,7 @@ def evaluate_after_training(
             ) = load_config_path(path_to_config)
             print("Path length  : ",len(path))
             if len(path) == 0 :
-                print("Path empty : ", path_config['path_path'])
+                print("Path empty : ", path_to_config['path_path'])
                 continue
             file_path_result_parameters = os.path.join(
                 file_path_result, "parameters.json"
@@ -156,8 +159,8 @@ def evaluate_after_training(
             with open(file_path_result_parameters, "w") as f:
                 json.dump(parameters, f, indent=4)
 
-            smoothed_x = gaussian_filter1d(path[:, 0], sigma=15)
-            smoothed_y = gaussian_filter1d(path[:, 1], sigma=15)
+            smoothed_x = gaussian_filter1d(path[:, 0], sigma=sigma)
+            smoothed_y = gaussian_filter1d(path[:, 1], sigma=sigma)
             path = np.stack([smoothed_x, smoothed_y], axis=1)
             tree = KDTree(path)
             config_eval["path"] = path
@@ -229,6 +232,9 @@ def evaluate_after_training(
             }
             with open(file_name_result, "w") as f:
                 json.dump(results, f, indent=4)
+            trajectories.append(states_per_epsiode[0][0])
+            with open(file_name_result_trajectory,"wb") as f:
+                pickle.dump(trajectories,f)
             plot_success_rate(file_name_result, agent_name, file_path_result)
         print("-----------------------------------------------")
         print("Success rate : ", mean(success_rate_list))
@@ -252,8 +258,8 @@ def initialize_parameters(agent_file, bounce_thr):
         config["random_curve"] if "random_curve" in config else False
     )
     config_eval["nb_points_path"] = 500
-    config_eval["t_max"] = 30
-    config_eval["eval_episodes"] = 100
+    config_eval["t_max"] = 35
+    config_eval["eval_episodes"] = 20
     config_eval["velocity_bool"] = (
         config["velocity_bool"] if "velocity_bool" in config else False
     )
@@ -380,6 +386,7 @@ def obstacle_and_path(
         config_path_a = {}
 
 
+        sdf_func,velocity_retina,x_phys,y_phys,physical_width,physical_height,scale= load_sim_sdf(ratio)
         start_point = (start_point[0] * physical_width, start_point[1] * physical_height)
         goal_point = (goal_point[0] * physical_width, goal_point[1] * physical_height)
 
@@ -401,6 +408,7 @@ def obstacle_and_path(
             "current_time": current_time,
             "type" : type,
             "description": description,
+            "ratio":ratio
         }
         config_path_a["parameters"] = parameters
 
@@ -444,11 +452,11 @@ def obstacle_and_path(
             dist = np.array([abs(path[i + 1] - path[i]) for i in range(len(path) - 1)])
             n = ceil(np.max(dist) / (5 * 1e-3))
             if n > 1:
-                path,distances = resample_path(path, len(path) * n)
+                path,distance = resample_path(path, len(path) * n)
         config_path_a["path_path"] = save_path_path
         config_path_a["path_phi"] = save_path_phi
         config_path_a["path_flow"] = save_path_flow
-        config_path_a['distances'] = tuple(float(x) for x in distanes)
+        config_path_a['distances'] =distance
         config_path_a = {k: float(v) if isinstance(v, np.float32) else v for k, v in config_path_a.items()}
 
         np.save(save_path_path, path, allow_pickle=False)
@@ -477,7 +485,7 @@ def create_all_path(config_par_path,nb_points,ratio=5,failure_cases=False):
 
 
     file_to_config_path_pre_list = []
-    file_to_config_path_pre = 'config_path/velocity_ratio_5/7'
+    file_to_config_path_pre = 'config_path/velocity_ratio_5/'
     dir_config_path = Path(file_to_config_path_pre)
 
     failure_case_file = 'config_path/velocity_ratio_5/failure_case.json'
@@ -566,24 +574,25 @@ if __name__ == "__main__":
     with open("src/config_path_eva.yaml", "r") as f:
         config_par_path = yaml.safe_load(f)
           
-    file_to_config_path = create_all_path(config_par_path,500,True)
+    # file_to_config_path = create_all_path(config_par_path,5,5,False)
+    
     ratio = 5
+
     sdf_func,velocity_retina,x_phys,y_phys,physical_width,physical_height,scale= load_sim_sdf(ratio)
 
     
-    # file_to_config_path_g = f"config_path/velocity_ratio_{ratio}"
-    # file_to_config_path = str(create_numbered_run_folder(file_to_config_path_g))
-    file_to_config_path = 'config_path/velocity_ratio_5/42'
-    # types = ['']
+    file_to_config_path_g = f"config_path/velocity_ratio_{ratio}"
+    file_to_config_path = str(create_numbered_run_folder(file_to_config_path_g))
+    types = ['']
     
-    # for type in types :
-    #     obstacle_and_path(
-    #         config_par_path,
-    #         goal_point = (10.79606786617848/20,12.296130605776128/20),
-    #         path_method="astar",
-    #         file_to_config_path=file_to_config_path,
-    #         type = type,
-    #     )
+    for type in types :
+        obstacle_and_path(
+            config_par_path,
+            goal_point = (17.759339300816567/physical_width,16.67573668604268/physical_height),
+            path_method="astar",
+            file_to_config_path=file_to_config_path,
+            type = type,
+        )
         
     start_time_eva = time.time()
     list_config_paths = []
@@ -594,21 +603,22 @@ if __name__ == "__main__":
 
 
     print("Number of path : ",len(list_config_paths))
-    
-    X,Y = np.meshgrid(x_phys,y_phys)
-    obstacle_contour = contour_2D(sdf_func, X, Y, scale)
-    print("Path generated - Go for evaluation")
-    results = evaluate_after_training(
-        agents_file,
-        obstacle_contour=obstacle_contour,
-        obstacle_type=obstacle_type,
-        velocity_func=velocity_retina,
-        sdf_func=sdf_func,
-        list_config_paths=list_config_paths,
-        sigma= config_par_path['sigma'],
-        file_path_result = None,
-    )
-    end_time_eva = time.time()
-    elapsed_time = (end_time_eva - start_time_eva) / 60
-    print("Execution time:", elapsed_time, "minutes")
+    if len(list_config_paths)>0:
+        X,Y = np.meshgrid(x_phys,y_phys)
+        obstacle_contour = contour_2D(sdf_func, X, Y, scale)
+        print("Path generated - Go for evaluation")
+
+        results = evaluate_after_training(
+            agents_file,
+            obstacle_contour=obstacle_contour,
+            obstacle_type=obstacle_type,
+            velocity_func=velocity_retina,
+            sdf_func=sdf_func,
+            list_config_paths=list_config_paths,
+            sigma= config_par_path['sigma'],
+            file_path_result = None,
+        )
+        end_time_eva = time.time()
+        elapsed_time = (end_time_eva - start_time_eva) / 60
+        print("Execution time:", elapsed_time, "minutes")
     # rank_agents_by_rewards(results)

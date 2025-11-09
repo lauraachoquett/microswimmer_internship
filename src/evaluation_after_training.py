@@ -20,19 +20,10 @@ from pathlib import Path
 from statistics import mean
 from itertools import chain
 
-from src.analytic_solution_line import find_next_v
-from src.distance_to_path import min_dist_closest_point
+from src.performance_agent import performance_stats_plot,box_plot_data_free,box_plot_data
 from src.evaluate_agent import evaluate_agent
-from src.invariant_state import coordinate_in_global_ref
-from src.plot import plot_action, plot_trajectories
 from src.rank_agents import rank_agents_by_rewards
-from src.simulation import solver
-from src.visualize import (
-    plot_robust_D,
-    plot_robust_u_bg_rankine,
-    plot_robust_u_bg_uniform,
-    visualize_streamline,
-)
+from src.generate_path import length_path
 
 
 def format_sci(x):
@@ -44,6 +35,7 @@ def evaluate_after_training(
     p_target,
     p_0,
     seed=42,
+    ref=False,
     type=None,
     translation=None,
     theta=None,
@@ -83,17 +75,17 @@ def evaluate_after_training(
         path, _ = generate_demi_circle_path(p_0, p_target, nb_points_path)
     if type == "ondulating":
         path = generate_random_ondulating_path_old(
-            p_0, p_target, n_points=5000, amplitude=0.5, frequency=2
+            p_0, p_target, n_points=700, amplitude=0.5, frequency=2
         )
     if type == "ondulating_hard":
         path = generate_random_ondulating_path(
-            p_0, p_target, n_points=5000, kappa_max=17, frequency=2
+            p_0, p_target, n_points=700, kappa_max=17, frequency=2
         )
     if type == "curve_minus":
-        k = -1.72
+        k = -3.43
         path = generate_curve_with_target_curvature(p_0, p_target, k, nb_points_path)
     if type == "curve_plus":
-        k = 1.72
+        k = 3.43
         path = generate_curve_with_target_curvature(p_0, p_target, k, nb_points_path)
     tree = KDTree(path)
     
@@ -132,6 +124,8 @@ def evaluate_after_training(
     for agent_name in agent_files:
 
         config_eval = initialize_parameters(agent_name, p_target, p_0)
+        if ref :
+            config_eval['D']=0
         config_eval = copy.deepcopy(config_eval)
         training_type = {
             "rankine_bg": config_eval["rankine_bg"],
@@ -147,7 +141,7 @@ def evaluate_after_training(
         if agent_name in results.keys():
             results[agent_name]["training type"] = training_type
             print(f"Agent {agent_name} already evaluated.")
-            continue
+            # continue
         print("Agent name : ", agent_name)
         config_eval["uniform_bg"] = uniform_bg
         config_eval["rankine_bg"] = rankine_bg
@@ -187,6 +181,7 @@ def evaluate_after_training(
             rewards_d_per_episode,
             success_rate,
             _,
+            plot_t_l_d_per_episode
         ) = evaluate_agent(
             agent=agent,
             env=env,
@@ -200,7 +195,6 @@ def evaluate_after_training(
             parameters=parameters,
             plot_background=True,
         )
-
         results[agent_name] = {
             "rewards": rewards_per_episode,
             "rewards_mean":mean(rewards_per_episode),
@@ -211,6 +205,9 @@ def evaluate_after_training(
             "success_rate": success_rate,
             "n_eval_episodes": config_eval["eval_episodes"],
             "training type": training_type,
+            "plot_t_l_d":plot_t_l_d_per_episode,
+            "length_path":np.sum(length_path(path) )
+            
         }
         print("-----------------------------------------------")
         # print("Success rate : ", success_rate)
@@ -274,15 +271,7 @@ def initialize_parameters(agent_file, p_target, p_0):
 
 
 if __name__ == "__main__":
-    agent_name = "agents/agent_TD3_2025-07-24_11-16"
-    # p_target = np.array([2,0])
-    # p_0 = np.array([0,0])
-    # u_bg = np.array([0.0,0.2])
-    # config_eval_comp = initialize_parameters(agent_name,p_target,p_0)
-    # save_path_eval = os.path.join(agent_name,'eval_bg/')
-    # os.makedirs(save_path_eval, exist_ok=True)
-    # offset=0.2
-    # compare_p_line(agent_name,config_eval_comp,'comparison_north_02',save_path_eval,u_bg,'',offset)
+
     
     # agents_file=[agent_name,
     #              "agents/agent_TD3_2025-07-24_10-12",
@@ -296,61 +285,121 @@ if __name__ == "__main__":
     #              "agents/agent_TD3_2025-07-24_13-57",
                  
     #              ]
-    # agents_file = ['agents/agent_TD3_2025-04-18_13-33','agents/agent_TD3_2025-07-25_14-37']
-    with open('data/list_n_lookahaed_larger_gap.json') as f:
-        d = json.load(f)
-        agents_file=list(chain.from_iterable(d.values()))
+    agents_file = ['agents/agent_TD3_2025-05-07_15-48']
+
+    # with open('data/list_n_lookahaed_08-12.json') as f:
+    #     d = json.load(f)
+    #     agents_file=list(chain.from_iterable(d.values()))
            
+    # agent_name = "agents/agent_TD3_2025-04-18_13-33" 
+    # agents_file = [agent_name,"agents/agent_TD3_2025-05-07_15-48"]
+    
     print("Agents files : ", agents_file)
-    types = ["ondulating"]
-    title_add = "rankine_a_05_cir_0_75_2_pi_center_1_0"
-    print("--------------------- Evaluation with rankine bg ---------------------")
-    for type in types:
-        a = 0.5
-        cir =3/4*2*pi*a
-        center = np.array([1,0])
-        results = evaluate_after_training(
-            agents_file,
-            type=type,
-            p_target=[2, 0],
-            p_0=[0, 0],
-            title_add=title_add,
-            a=a,
-            center=center,
-            cir=cir,
-        )
-        rank_agents_by_rewards(results)
+    # types = ["ondulating","line","curve_minus","curve_plus"]
+    # labels=['S-curve','Straight Line','Convex Curve','Concave Curve']
+    types = ["ondulating","line"]
+    labels=['S-curve','Straight Line']
+    rankine=False
+    uniform=True
+    free = False
 
     print("--------------------- Evaluation with no bg ---------------------")
-    title_add = "free"
+    title_add = "free_D_0"
     for type in types:
         results = evaluate_after_training(
-            agents_file,
+            ["agents/agent_TD3_2025-04-18_13-33"],
             type=type,
             p_target=[2, 0],
             p_0=[0, 0],
             title_add=title_add,
+            ref=True
         )
         rank_agents_by_rewards(results)
-
-    norm = 0.5
-    dict = {
-        "east_05": np.array([1, 0]),
-        "west_05": np.array([-1, 0]),
-        "north_05": np.array([0, 1]),
-        "south_05": np.array([0, -1]),
-    }
-    print("---------------------Evaluation with uniform bg---------------------")
-    for type in types:
-        for title_add, dir in dict.items():
+        
+    if rankine : 
+        title_add = "rankine_a_05_cir_0_75_2_pi_center_1_0"
+        print("--------------------- Evaluation with rankine bg ---------------------")
+        for id,type in enumerate(types):
+            a = 0.5
+            umax =  (3./4.)
+            cir = umax * (2. * np.pi * a)
+            
+            center = np.array([1,0])
             results = evaluate_after_training(
                 agents_file,
                 type=type,
                 p_target=[2, 0],
                 p_0=[0, 0],
                 title_add=title_add,
-                dir=dir,
-                norm=norm,
+                a=a,
+                center=center,
+                cir=cir,
             )
             rank_agents_by_rewards(results)
+            for agent_name in agents_file:
+                file_path = f"results_evaluation/result_evaluation_{title_add}_{type}.json"
+                file_path_free = f"results_evaluation/result_evaluation_free_D_0_{type}.json"
+                performance_stats_plot(file_path=file_path,file_path_free=file_path_free,agent_name=agent_name,type=title_add,path=type,label = labels[id])
+
+    if free : 
+        print("--------------------- Evaluation with no bg ---------------------")
+        title_add = "free"
+        for id,type in enumerate(types):
+            results = evaluate_after_training(
+                agents_file,
+                type=type,
+                p_target=[2, 0],
+                p_0=[0, 0],
+                title_add=title_add,
+            )
+            rank_agents_by_rewards(results)
+            for agent_name in agents_file:
+                    file_path = f"results_evaluation/result_evaluation_{title_add}_{type}.json"
+                    file_path_free = f"results_evaluation/result_evaluation_free_D_0_{type}.json"
+                    performance_stats_plot(file_path=file_path,file_path_free=file_path_free,agent_name=agent_name,type=title_add,path=type,label = labels[id])
+
+    if uniform:
+        norm_list = np.linspace(0.5,1.1,20)
+        dict = {
+            "east": np.array([1, 0]),
+            "west": np.array([-1, 0]),
+            "north": np.array([0, 1]),
+            "south": np.array([0, -1]),
+        }
+        dict_normed = {}
+        for name, vec in dict.items():
+            for norm in norm_list:
+                # on arrondit à deux décimales et on formate sans le point
+                key = f"{name}_{norm:.2f}".replace(".", "")
+                dict_normed[key] = {
+                    "vec": vec * norm,
+                    "norm": norm
+                }
+
+
+        print("---------------------Evaluation with uniform bg---------------------")
+        for id,type in enumerate(types):
+            for title_add, value in dict_normed.items():
+                dir =value['vec']
+                norm =value['norm']
+                results = evaluate_after_training(
+                    agents_file,
+                    type=type,
+                    p_target=[2, 0],
+                    p_0=[0, 0],
+                    title_add=title_add,
+                    dir=dir,
+                    norm=norm,
+                )
+                rank_agents_by_rewards(results)
+                # for agent_name in agents_file:
+                #     file_path = f"results_evaluation/result_evaluation_{title_add}_{type}.json"
+                #     file_path_free = f"results_evaluation/result_evaluation_free_D_0_{type}.json"
+                #     performance_stats_plot(file_path=file_path,file_path_free=file_path_free,agent_name=agent_name,type=title_add,path=type,label = labels[id])
+                    
+                    
+    # for agent_name in agents_file:
+    #     summary_path =  os.path.join(agent_name,"performance_summary.json")
+    #     box_plot_data_free(summary_path,agent_name)
+    #     box_plot_data(summary_path, agent_name)
 

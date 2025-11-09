@@ -18,6 +18,7 @@ class MicroSwimmer(gym.Env):
         velocity_ahead=False,
         add_action=False,
         seed=None,
+        id_n=1,
         bounce_thr=0,
     ):
         super(MicroSwimmer, self).__init__()
@@ -52,11 +53,13 @@ class MicroSwimmer(gym.Env):
         self.C = C
         self.Dt = Dt
         self.U = 1
+        self.id_n = id_n
         self.bounce_thr = bounce_thr
         self.dir_path = np.zeros(dim)
         self.id_cp = 0
         self.d_cp = 0
         self.action = np.zeros(dim)
+        self.previous_action = np.zeros(dim)
         self.velocity_ahead = velocity_ahead
         self.velocity_bool = velocity_bool
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -90,7 +93,7 @@ class MicroSwimmer(gym.Env):
             lookahead_vel = [] if self.velocity_ahead else None
 
             for i in range(1, self.n_lookahead + 1):
-                idx = min(self.id_cp + 25*i, path_len - 1)
+                idx = min(self.id_cp + i*self.id_n, path_len - 1)
                 next_p = path[idx]
                 lookahead.append(
                     coordinate_in_path_ref(p_cp, self.dir_path, next_p).reshape(1, 2)
@@ -105,15 +108,18 @@ class MicroSwimmer(gym.Env):
             result.append(self.action.reshape(1, 2))
         return np.concatenate(result, axis=0)
 
-    def reward(self, x_target, beta):
+    def reward(self, x_target, beta,gamma):
         d = self.d
         rew_t = -self.C * self.Dt
         rew_target = -np.linalg.norm(self.x - x_target) + np.linalg.norm(
             self.previous_x - x_target
         )
+        action_smoothness = - gamma * np.linalg.norm(self.action - self.previous_action)**2
+        dist_to_target = np.linalg.norm(self.x - x_target)
+        dist_to_path = self.d
         rew_d = -beta * d
-        rew = rew_t + rew_d + rew_target
-        return rew_t, rew_d, rew_target, rew
+        rew = rew_t + rew_d + rew_target + action_smoothness
+        return rew_t, rew_d, rew_target,action_smoothness,dist_to_target,dist_to_path, rew
 
     def step(
         self,
@@ -125,9 +131,11 @@ class MicroSwimmer(gym.Env):
         D=0.1,
         u_bg=np.zeros(2),
         threshold=0.2,
+        gamma=0,
         sdf=None,
     ):
-        rew_t, rew_d, rew_tar, rew = self.reward(x_target, beta)
+        self.previous_action = self.action
+        rew_t, rew_d, rew_tar,action_smoothness,dist_to_target,dist_to_path, rew = self.reward(x_target, beta,gamma)
         self.previous_x = self.x
         self.action = action
         action_global_ref = coordinate_in_global_ref(np.zeros(2), self.dir_path, action)
@@ -156,6 +164,9 @@ class MicroSwimmer(gym.Env):
                 "rew_t": rew_t,
                 "rew_d": rew_d,
                 "rew_target": rew_tar,
+                "rew_action_smo":action_smoothness,
+                "dist_to_target" : dist_to_target,
+                "dist_to_path": dist_to_path
             },
         )
 

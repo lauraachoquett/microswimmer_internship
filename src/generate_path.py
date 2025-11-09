@@ -140,7 +140,7 @@ def plot_path(p_0, p_target, nb_points, type="line"):
         path, _ = generate_demi_circle_path(p_0, p_target, nb_points)
     if type == "curve":
         nb_points = 5000
-        k = 1.71
+        k = 3.43
         path = generate_curve_with_target_curvature(p_0, p_target, k, nb_points)
         print("Max curvature : ",np.max(compute_curvature(path,nb_points)))
         
@@ -154,15 +154,15 @@ def plot_path(p_0, p_target, nb_points, type="line"):
         )
     print("Length : ", np.sum(length_path(path) ))
     
-    plt.close()
-    plt.plot(path[:, 0], path[:, 1], label="path")
-    plt.xlabel("x")
-    plt.ylabel("y")
-    plt.scatter(p_0[0], p_0[1], color="red", label="Starting point")
-    plt.scatter(p_target[0], p_target[1], color="blue", label="Ending point")
-    plt.legend()
-    plt.title(f"Path : {type}")
-    plt.savefig(f"fig/path_{type}.png", dpi=100, bbox_inches="tight")
+    # plt.close()
+    # plt.plot(path[:, 0], path[:, 1], label="path")
+    # plt.xlabel("x")
+    # plt.ylabel("y")
+    # plt.scatter(p_0[0], p_0[1], color="red", label="Starting point")
+    # plt.scatter(p_target[0], p_target[1], color="blue", label="Ending point")
+    # plt.legend()
+    # plt.title(f"Path : {type}")
+    # plt.savefig(f"fig/path_{type}.png", dpi=100, bbox_inches="tight")
 
 
 if __name__ == "__main__":
@@ -170,11 +170,12 @@ if __name__ == "__main__":
     p_target = np.array([2, 0])
     nb_points = 200
     # plot_path(p_0,p_target,nb_points,'line')
-    A = 1
-    N = 400
-    f = 2
+    A = 2
+    N = 325 
+    f = 4
     n_values = np.linspace(1, 700, 700, dtype=int)
     output = [func_k_max(A, N, f, n) for n in n_values]
+    print("Max kappa  :",np.max(np.array(output)))
     nb_points = 700
     plt.figure(figsize=(25, 10))
     plt.subplot(1, 2, 1)

@@ -2,7 +2,7 @@ import argparse
 import os
 import pickle
 from datetime import datetime
-from math import sqrt
+from math import sqrt,floor
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -82,8 +82,13 @@ def run_expe(config, agent_file="agents"):
     os.makedirs(file_name, exist_ok=True)
     with open(os.path.join(file_name, "config.pkl"), "wb") as f:
         pickle.dump(config, f)
+        
     current_py = os.path.abspath(__file__)
     shutil.copy(current_py, os.path.join(file_name, os.path.basename(current_py)))
+    env_swimmer_path = os.path.abspath("./src/env_swimmer.py")
+    shutil.copy(env_swimmer_path, os.path.join(file_name, os.path.basename(env_swimmer_path)))
+
+    
     ## Path ##
     p_target = config["p_target"]
     p_0 = config["p_0"]
@@ -107,7 +112,7 @@ def run_expe(config, agent_file="agents"):
     Dt_action = config["Dt_action"]
     Dt_sim = Dt_action / steps_per_action
     n_lookahead = config["n_lookahead"]
-    env = MicroSwimmer(x_0, C, Dt_sim, config["velocity_bool"], n_lookahead,config['velocity_ahead'],config['add_action'],seed=seed)
+    env = MicroSwimmer(x_0, C, Dt_sim, config["velocity_bool"], n_lookahead,config['velocity_ahead'],config['add_action'],seed=seed,id_n=id_n)
     
     ## Environnement parameters ##
     t_max = config["t_max"]
@@ -132,6 +137,7 @@ def run_expe(config, agent_file="agents"):
     save_model = config["save_model"]
     episode_update = config["episode_per_update"]
     list_of_path_tree = None
+    gamma=config['gamma']
 
     ## Creation of file ##
     save_path_result = f"./{file_name}/results"
@@ -187,7 +193,7 @@ def run_expe(config, agent_file="agents"):
             u_bg = velocity_func(x)
 
         next_state, reward, done, info = env.step(
-            action, tree, path, p_target, beta, D, u_bg, threshold
+            action, tree, path, p_target, beta, D, u_bg, threshold,gamma
         )
         x = info["x"]
         replay_buffer.add(state.flatten(), action, next_state.flatten(), reward, done)
@@ -217,7 +223,7 @@ def run_expe(config, agent_file="agents"):
                 path_save_fig = os.path.join(
                     save_path_result_fig, "training_reward.png"
                 )
-                eval_rew, _, _, _, _ = evaluate_agent(
+                eval_rew, _, _, _, _,_ = evaluate_agent(
                     agent=agent,
                     env=env,
                     eval_episodes=eval_episodes,
@@ -300,6 +306,7 @@ def run_expe(config, agent_file="agents"):
                 tree = KDTree(path)
                 config["path"] = path
                 config["tree"] = tree
+            gamma *= 1.01
 
     ## Save evaluation returns ##
     file_reward_eval = os.path.join(save_path_result, "rewards_eval")
@@ -318,10 +325,6 @@ if __name__ == "__main__":
     p_0 = np.zeros(2)
     nb_points_path = 500
     path, d = generate_simple_line(p_0, p_target, nb_points_path)
-    print(
-        "Distance path points:      ",
-        format_sci(np.linalg.norm(path[25, :] - path[0, :])),
-    )
     tree = KDTree(path)
     print("Curvature max du chemin :  ", format_sci(np.max(courbures(path))))
     t_max = 8
@@ -330,13 +333,62 @@ if __name__ == "__main__":
     threshold=0.07
     Dt_action,D = set_parameters_training(threshold=threshold,maximum_curv=maximum_curvature)
     seed= 42
-    print("D:                         ", format_sci(D))
-    print("Dt_action:                 ", format_sci(Dt_action))
-    print("Threshold:                 ", format_sci(threshold))
-    print("Mean diffusion distance:   ", format_sci(sqrt(2 * Dt_action * D)))
-    print("Distance during Dt_action: ", format_sci(Dt_action))
-    print("Distance to cover:         ", format_sci(d))
-    print("Expected precision:        ", format_sci(threshold / d))
+    
+    U=1
+    vision_distance = 3/5 * U * Dt_action
+    step = np.linalg.norm(path[1,:] - path[0,:])
+    id_n = floor(vision_distance/step)
+    # print("ratio : ",step/(U*Dt_action))
+    
+    # print("D:                         ", format_sci(D))
+    # print("Dt_action:                 ", format_sci(Dt_action))
+    # print("Threshold:                 ", format_sci(threshold))
+    # print("Mean diffusion distance:   ", format_sci(sqrt(2 * Dt_action * D)))
+    # print("Distance during Dt_action: ", format_sci(Dt_action*U))
+    # print("Distance to cover:         ", format_sci(d))
+    # print("Expected precision:        ", format_sci(threshold / d))
+    # print("Vision distance :          ", format_sci(vision_distance))
+    # print("Path step :                ", format_sci(step))
+    # print("Id between path points :   ", format_sci(id_n))
+    
+    def drift_noise_ratios(U, Dt, D, dim=3, convention="sqrtD"):
+        # constantes c_d pour E[||ΔX||] sous convention sqrt(D)
+        if dim == 3:
+            c_d = 2*np.sqrt(2)/np.sqrt(np.pi)
+        elif dim == 2:
+            c_d = np.sqrt(np.pi/2)
+        else:
+            from math import gamma
+            c_d = np.sqrt(2)*gamma((dim+1)/2)/gamma(dim/2)
+
+        # facteurs de conversion si convention sqrt(2D)
+        alpha = 1.0 if convention == "sqrtD" else np.sqrt(2.0)  # bruit × alpha
+
+        L_drift = U * Dt
+        L_noise_mean = alpha * c_d * np.sqrt(D * Dt)
+        L_noise_rms  = alpha * np.sqrt(dim * D * Dt)
+
+        R_mean = L_drift / L_noise_mean
+        R_rms  = L_drift / L_noise_rms
+
+        # seuils (R=1)
+        Dt_star_mean = (alpha**2) * (c_d**2) * D / (U**2)
+        Dt_star_rms  = (alpha**2) * dim * D / (U**2)
+
+        return {
+            "L_drift": L_drift,
+            "L_noise_mean": L_noise_mean,
+            "L_noise_rms": L_noise_rms,
+            "R_mean": R_mean,
+            "R_rms": R_rms,
+            "Dt_star_mean": Dt_star_mean,
+            "Dt_star_rms": Dt_star_rms,
+        }
+
+    # Exemple avec u_bg=0, p unitaire => drift = U
+    res = drift_noise_ratios(U=U, Dt=Dt_action, D=D, dim=3, convention="sqrtD")
+    print({k: format_sci(v) if isinstance(v, float) else v for k, v in res.items()})
+    
     config = {
         "x_0": p_0,  # m
         "C": 1,  # m/s
@@ -372,16 +424,19 @@ if __name__ == "__main__":
         "velocity_ahead":  False,
         'add_action' : True,
         'seed':seed,
+        'gamma':0.00,
+        'id_n':id_n,
+        
     }
 
-    print('------------------------- RUN -------------------------')
-    seeds = [42]
-    for seed in seeds:
-        for n in [0,2,4,6,8,10]:
-            print("Seed : ",seed)
-            config['seed']=seed
-            config['n_lookahead']=n
-            run_expe(config)
+    # print('------------------------- RUN -------------------------')
+    # seeds = [42]
+    # for seed in seeds:
+    #     for n in [0,4,8]:
+    #         print("Seed : ",seed)
+    #         config['seed']=seed
+    #         config['n_lookahead']=n
+    #         run_expe(config)
             
         
 

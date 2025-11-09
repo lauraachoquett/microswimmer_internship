@@ -57,6 +57,7 @@ def plot_robust_D(
                 rewards_d_per_episode,
                 success_rate,
                 states_list_per_episode,
+                _
             ) = evaluate_agent(
                 agent,
                 env,
@@ -312,11 +313,11 @@ def visualize_streamline(
             p_0_below, p_target_below, nb_starting_point
         )
     if "curve" in type:
-        path = generate_curve(p_0, p_target, k, nb_points_path)
-        path_above_point = generate_curve(
+        path = generate_curve_with_target_curvature(p_0, p_target, k, nb_points_path)
+        path_above_point = generate_curve_with_target_curvature(
             p_0_above, p_target_above, k, nb_starting_point
         )
-        path_below_point = generate_curve(
+        path_below_point = generate_curve_with_target_curvature(
             p_0_below, p_target_below, k, nb_starting_point
         )
     if type == "line":
@@ -350,7 +351,7 @@ def visualize_streamline(
             config_eval_v["velocity_ahead"],
             config_eval_v["add_action"],
         )
-        _, _, _, _, states_list_per_episode = evaluate_agent(
+        _, _, _, _, states_list_per_episode,_ = evaluate_agent(
             agent=agent,
             env=env,
             eval_episodes=1,
@@ -457,17 +458,17 @@ def plot_streamlines_beta(agents_file, dict):
     plt.close(fig)
 
 
-if __name__ == "__main__":
+# if __name__ == "__main__":
 
-    agent_name = []
-    visualize_streamline(
-        agent,
-        config_eval,
-        file_name_or,
-        save_path_eval,
-        type="",
-        title="",
-        k=0,
-        parameters=[],
-        offset=0.2,
-    )
+#     agent_name = []
+#     visualize_streamline(
+#         agent,
+#         config_eval,
+#         file_name_or,
+#         save_path_eval,
+#         type="",
+#         title="",
+#         k=0,
+#         parameters=[],
+#         offset=0.2,
+#     )

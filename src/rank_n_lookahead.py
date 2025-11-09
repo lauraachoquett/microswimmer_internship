@@ -5,7 +5,7 @@ import seaborn as sns
 import numpy as np
 
 # === Chargement des agents groupés par n_lookahead ===
-with open('data/list_n_lookahaed_larger_gap.json') as f:
+with open('data/list_n_lookahaed_08-12.json') as f:
     agent_groups = json.load(f)
 
 path_type = "ondulating"
@@ -21,7 +21,7 @@ save_path_eval = os.path.join("comparison_nlookahead", "eval_bg")
 os.makedirs(save_path_eval, exist_ok=True)
 
 # === Données collectées ===
-metric_key = "rewards"
+metric_key = "rewards_time"
 data = {"Reward": [], "Perturbation": [], "n_lookahead": []}
 summary_stats = {}
 
@@ -75,7 +75,7 @@ ax = sns.boxplot(
     data=data, palette=palette, showfliers=False
 )
 ax.set_xlabel("")
-ax.set_ylabel(r"Total Reward $J$", fontsize=18)
+ax.set_ylabel(r"Time Reward $J_t$", fontsize=18)
 ax.set_title(r"Performance Comparison by $n$", fontsize=20)
 ax.tick_params(axis='x', rotation=30)
 
@@ -83,7 +83,7 @@ ax.tick_params(axis='x', rotation=30)
 ax.legend(title=r"$n$", title_fontsize=14, fontsize=12, loc="upper right")
 
 # Sauvegarde
-filename = f"{path_type}_nlookahead_few_n_rewards_comparison"
+filename = f"{path_type}_nlookahead_few_n_rewards_comparison_{metric_key}_08-12"
 plt.tight_layout()
 plt.savefig(os.path.join(save_path_eval, f"{filename}.pdf"), bbox_inches="tight")
 plt.savefig(os.path.join(save_path_eval, f"{filename}.png"), bbox_inches="tight", dpi=400)
@@ -91,23 +91,23 @@ plt.close()
 
 print(f"\n📁 Figure saved to: {os.path.join(save_path_eval, filename)}.pdf/.png")
 
-# === Nouvelle figure : Reward global par n_lookahead (agrégation toutes perturbations) ===
-plt.figure(figsize=(10, 6))
-sns.set(style="whitegrid", font_scale=1.6)
+# # === Nouvelle figure : Reward global par n_lookahead (agrégation toutes perturbations) ===
+# plt.figure(figsize=(10, 6))
+# sns.set(style="whitegrid", font_scale=1.6)
 
-ax = sns.boxplot(
-    x=r"$n$", y=r"$J$",
-    data=data, palette=palette, showfliers=False
-)
-ax.set_xlabel(r"$n$", fontsize=16)
-ax.set_ylabel(r"Total Reward $J$ (all perturbations)", fontsize=16)
-ax.set_title(r"Overall Reward by $n$", fontsize=20)
+# ax = sns.boxplot(
+#     x=r"$n$", y=r"$J$",
+#     data=data, palette=palette, showfliers=False
+# )
+# ax.set_xlabel(r"$n$", fontsize=16)
+# ax.set_ylabel(r"Total Reward $J$ (all perturbations)", fontsize=16)
+# ax.set_title(r"Overall Reward by $n$", fontsize=20)
 
-# Sauvegarde
-filename_agg = f"{path_type}_nlookahead_few_n_aggregated_boxplot"
-plt.tight_layout()
-plt.savefig(os.path.join(save_path_eval, f"{filename_agg}.pdf"), bbox_inches="tight")
-plt.savefig(os.path.join(save_path_eval, f"{filename_agg}.png"), bbox_inches="tight", dpi=400)
-plt.close()
+# # Sauvegarde
+# filename_agg = f"{path_type}_nlookahead_few_n_aggregated_boxplot_{metric_key}"
+# plt.tight_layout()
+# plt.savefig(os.path.join(save_path_eval, f"{filename_agg}.pdf"), bbox_inches="tight")
+# plt.savefig(os.path.join(save_path_eval, f"{filename_agg}.png"), bbox_inches="tight", dpi=400)
+# plt.close()
 
-print(f"📁 Aggregated figure saved to: {os.path.join(save_path_eval, filename_agg)}.pdf/.png")
+# print(f"📁 Aggregated figure saved to: {os.path.join(save_path_eval, filename_agg)}.pdf/.png")

@@ -9,14 +9,14 @@ agent_name = "agents/agent_TD3_2025-04-18_13-33"
 path_type = "ondulating"  # ou "curve_minus", etc.
 perturbations = [
     "free",
-    "west_05",
     "east_05",
-    "north_05",
     "south_05",
+    "north_05",
+    "west_05",
     "rankine_a_05_cir_0_75_2_pi_center_1_0"
 ]
 labels = [
-    "No Flow","West", "East", "North", "South", "Rankine vortex"
+    "No Flow", "East", "South", "North","West", "Rankine vortex"
 ]
 file_dir = "results_evaluation"
 save_path_eval = os.path.join(agent_name, "eval_bg")

@@ -26,7 +26,7 @@ import matplotlib.pyplot as plt
 from scipy.interpolate import RegularGridInterpolator
 
 def load_sdf_from_csv(domain_size):
-    path = "/home/lchoquet/project/microswimmer_internship/data/retina.sdf"
+    path = "data/retina.sdf"
     N, h, sdf = sdf_read(path)
     sdf = sdf[N[2] // 2, :, :]
     x = np.linspace(0, domain_size[0], N[0])

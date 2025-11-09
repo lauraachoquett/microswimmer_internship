@@ -5,9 +5,9 @@ import seaborn as sns
 import numpy as np
 
 # === Paramètres ===
-agent_name = "agents/agent_TD3_2025-04-18_13-33"  # à remplacer ou automatiser
-types = ["ondulating", "curve_minus", "curve_plus", "line"]
-labels=['S-curve','Convex curve','Concave curve','Straight line']
+agent_name = "agents/agent_TD3_2025-04-18_13-33"
+types = ["line", "curve_minus", "curve_plus", "ondulating"]
+labels=['Straight line','Convex curve','Concave curve','S-curve']
 file_dir = "results_evaluation"
 save_path_eval = os.path.join(agent_name, "eval_bg")
 os.makedirs(save_path_eval, exist_ok=True)

@@ -1,6 +1,6 @@
 import os
 from statistics import mean
-
+import json
 import matplotlib.pyplot as plt
 import numpy as np
 
@@ -51,9 +51,10 @@ def evaluate_agent(
     episode_rew_d = 0
     rewards_t_per_episode = []
     rewards_d_per_episode = []
-
     states_episode = []
     states_list_per_episode = []
+    plot_t_l_d = []
+    plot_t_l_d_per_episode = []
     u_bg = config["u_bg"]
     D = config["D"]
     type = ""
@@ -77,11 +78,6 @@ def evaluate_agent(
         else:
             dir, norm, center, a, cir = np.zeros(2), 0, np.zeros(2), 0, 0
 
-    if u_bg.any() != 0:
-        type = "uniform"
-        norm = np.linalg.norm(u_bg)
-        dir = np.array(u_bg / norm)
-        plot_background = True
     velocity_func = None
     if velocity_func_l is not None:
         velocity_func = lambda x: velocity_func_l(x).squeeze()
@@ -133,7 +129,7 @@ def evaluate_agent(
         episode_rew_d += info["rew_d"]
         episode_reward += reward
         state = next_state
-
+        plot_t_l_d.append([iter*Dt_sim,info['dist_to_target'],info['dist_to_path']])
         if done or iter * Dt_sim > t_max:
             if done:
                 count_succes += 1
@@ -146,6 +142,8 @@ def evaluate_agent(
             rewards_per_episode.append(episode_reward)
             rewards_t_per_episode.append(episode_rew_t)
             rewards_d_per_episode.append(episode_rew_d)
+            plot_t_l_d_per_episode.append(plot_t_l_d)
+            plot_t_l_d = []
             episode_reward = 0
             episode_rew_t = 0
             episode_rew_d = 0
@@ -228,12 +226,13 @@ def evaluate_agent(
 
         fig.savefig(path_save_fig, dpi=400, bbox_inches="tight")
         plt.close(fig)
-        
-        
+
+         
     return (
         rewards_per_episode,
         rewards_t_per_episode,
         rewards_d_per_episode,
         count_succes / eval_episodes,
         states_list_per_episode[-4:],
+        plot_t_l_d_per_episode
     )

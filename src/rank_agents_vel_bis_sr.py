@@ -63,7 +63,7 @@ output_json = {
     "summary_stats": summary_stats,
     "improvement_percent": improvement
 }
-with open(os.path.join(save_path_eval, "success_rate_comparison.json"), "w") as f:
+with open(os.path.join(save_path_eval, f"{path_type}_success_rate_comparison.json"), "w") as f:
     json.dump(output_json, f, indent=4)
 
 # === Plot boxplot success_rate ===

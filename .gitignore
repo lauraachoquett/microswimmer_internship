@@ -18,5 +18,10 @@ fig/Astar_*
 *.html
 fig/
 *.pdf
+*.jpeg
 *.png
 data/
+seq/
+seq_bis/
+paraview_image.py
+paraview_video.py
