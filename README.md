@@ -10,7 +10,7 @@ We adopt a two-stage approach:
 2.	A RL control policy, trained on local path segments in a reduced-order model, learns to generalize to arbitrary global trajectories.
 
 <p align="center">
-    <img src="readme_fig/RL_retina_zoom_img.png" width="800"/>
+    <img src="readme_fig/RL_retina_zoom_img.png" width="700"/>
     <br>
     <i>Schematic representation of the path-planning and path-following pipeline.. </i>
 </p>
@@ -18,7 +18,7 @@ We adopt a two-stage approach:
 The resulting policy is then evaluated in high-fidelity fluid simulations using [**Mirheo**](https://github.com/cselab/Mirheo) and trained with the TD3 algorithm
 
 <p align="center">
-    <img src="readme_fig/abf_rbc_4.png" width="500"/>
+    <img src="readme_fig/abf_rbc_4.png" width="900"/>
     <br>
     <i>Figure - Illustrative schematic of a microswimmer in a periodic blood-filled tube. </i>
 </p>
@@ -54,7 +54,7 @@ Where:
 
 
 <p align="center">
-    <img src="readme_fig/Training_loop_img.png" width="900"/>
+    <img src="readme_fig/Training_loop_img.png" width="700"/>
     <br>
     <i>Figure - Illustrative schematic of a microswimmer in a periodic blood-filled tube. </i>
 </p>
@@ -64,7 +64,7 @@ Where:
 Navigation from a fixed starting point (orange) to 500 uniformly distributed target points (red) in the capillary network. Each blue line represents a successful trajectory of the RL agent following a path planned by the modified A* algorithm (flow- and wall-aware).
 
 <p align="center">
-    <img src="readme_fig/trajectories_density.png" width="900"/>
+    <img src="readme_fig/trajectories_density.png" width="800"/>
     <br>
     <i>Figure - Illustrative schematic of a microswimmer in a periodic blood-filled tube. </i>
 </p>
