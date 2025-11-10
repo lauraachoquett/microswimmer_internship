@@ -10,13 +10,13 @@ import torch
 from scipy.spatial import KDTree
 import shutil
 
-import src.TD3 as TD3
-from src.env_swimmer import MicroSwimmer
-from src.evaluation.evaluate_agent import evaluate_agent
-from src.utils.generate_path import *
-from src.utils.invariant_state import *
-from src.utils.simulation import rankine_vortex, uniform_velocity
-from src.utils.utils import ReplayBuffer, courbures, random_bg_parameters
+import TD3 as TD3
+from .env_swimmer import MicroSwimmer
+from .evaluation.evaluate_agent import evaluate_agent
+from .utils.generate_path import *
+from .utils.invariant_state import *
+from .utils.simulation import rankine_vortex, uniform_velocity
+from .utils.utils import ReplayBuffer, courbures, random_bg_parameters
 
 colors = plt.cm.tab10.colors
 import copy
