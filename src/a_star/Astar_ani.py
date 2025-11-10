@@ -1,26 +1,30 @@
 import heapq
 import os
-import time
 from datetime import datetime
 from math import ceil, sqrt
 import seaborn as sns
 import matplotlib.pyplot as plt
 import numpy as np
-import json
-from matplotlib.colors import LogNorm
-from scipy.interpolate import RegularGridInterpolator, splev, splprep
 from scipy.ndimage import gaussian_filter1d
 
-from src.Astar import resample_path
 from src.data_loader import load_sdf_from_csv, vel_read,load_sim_sdf
-from src.fmm import sdf_func_and_velocity_func
-from src.sdf import get_contour_coordinates
+from src.utils.sdf import get_contour_coordinates
 
 from math import gcd, sqrt
 from matplotlib import cm
 from matplotlib.colors import Normalize
 import zipfile
+from scipy.interpolate import interp1d
 
+
+def resample_path(path, n_points=500):
+    distances = np.sqrt(np.sum(np.diff(path, axis=0) ** 2, axis=1))
+    cumulative = np.concatenate(([0], np.cumsum(distances)))
+    total_length = cumulative[-1]
+    fx = interp1d(cumulative, path[:, 0], kind="linear")
+    fy = interp1d(cumulative, path[:, 1], kind="linear")
+    new_distances = np.linspace(0, total_length, n_points)
+    return np.stack((fx(new_distances), fy(new_distances)), axis=1),np.sum(distances)
 
 plt.rcParams.update({
     "font.size": 10,

@@ -7,7 +7,6 @@ import numpy as np
 with open('data/list_velocity.json') as f:
     agent_groups = json.load(f)
 
-# === Paramètres ===
 path_type = "ondulating"
 perturbations = [
     "free", "west_05", "east_05", "north_05", "south_05",
@@ -20,11 +19,11 @@ file_dir = "results_evaluation"
 save_path_eval = os.path.join("comparison_vel_no_vel", "eval_bg")
 os.makedirs(save_path_eval, exist_ok=True)
 
-# === Stockage données pour plot et analyse ===
+
 all_data = {"value": [], "Perturbation": [], "Group": []}
 summary_stats = {}
 
-# === Collecte success_rate ===
+
 for perturb, label in zip(perturbations, labels):
     for group_name, agent_list in agent_groups.items():
         group_success = []
@@ -47,7 +46,7 @@ for perturb, label in zip(perturbations, labels):
         std = np.std(group_success)
         summary_stats.setdefault(label, {})[group_name] = {"mean": mean, "std": std}
 
-# === Calcul % amélioration (vel vs no_vel) ===
+
 improvement = {}
 for label in labels:
     mean_vel = summary_stats[label]["vel"]["mean"]
@@ -58,7 +57,7 @@ for label in labels:
         delta = float("inf")
     improvement[label] = delta
 
-# === Sauvegarde des stats et amélioration ===
+
 output_json = {
     "summary_stats": summary_stats,
     "improvement_percent": improvement
@@ -66,7 +65,7 @@ output_json = {
 with open(os.path.join(save_path_eval, f"{path_type}_success_rate_comparison.json"), "w") as f:
     json.dump(output_json, f, indent=4)
 
-# === Plot boxplot success_rate ===
+
 sns.set(style="whitegrid", font_scale=1.4)
 plt.figure(figsize=(10, 6))
 palette = {"vel": "#66c2a5", "no_vel": "#fc8d62"}

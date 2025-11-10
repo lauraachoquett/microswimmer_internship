@@ -12,11 +12,11 @@ import shutil
 
 import src.TD3 as TD3
 from src.env_swimmer import MicroSwimmer
-from src.evaluate_agent import evaluate_agent
-from src.generate_path import *
-from src.invariant_state import *
-from src.simulation import rankine_vortex, uniform_velocity
-from src.utils import ReplayBuffer, courbures, random_bg_parameters
+from src.evaluation.evaluate_agent import evaluate_agent
+from src.utils.generate_path import *
+from src.utils.invariant_state import *
+from src.utils.simulation import rankine_vortex, uniform_velocity
+from src.utils.utils import ReplayBuffer, courbures, random_bg_parameters
 
 colors = plt.cm.tab10.colors
 import copy
@@ -25,7 +25,7 @@ import random
 from statistics import mean
 
 
-from src.visualize import visualize_streamline
+from src.plot_visualization.visualize import visualize_streamline
 
 def set_seed(seed):
     torch.manual_seed(seed)

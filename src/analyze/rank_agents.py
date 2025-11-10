@@ -15,7 +15,6 @@ from src.plot import analyze_and_visualize_agent_data
 
 
 def rank_agents_by_rewards(results, print_stats=True):
-    # Calculer les moyennes pour chaque agent
     agent_stats = []
     for agent_name, stats in results.items():
         if not "agent" in agent_name:
@@ -34,7 +33,6 @@ def rank_agents_by_rewards(results, print_stats=True):
             }
         )
 
-    # Trier les agents par chaque critère
     sorted_by_reward = sorted(agent_stats, key=lambda x: x["mean_reward"], reverse=True)
     sorted_by_reward_t = sorted(
         agent_stats, key=lambda x: x["mean_reward_t"], reverse=True
@@ -43,7 +41,6 @@ def rank_agents_by_rewards(results, print_stats=True):
         agent_stats, key=lambda x: x["mean_reward_d"], reverse=True
     )
 
-    # Afficher les trois meilleurs agents pour chaque critère
     if print_stats:
         print("Top 5 agents by mean_reward:")
         for i, agent in enumerate(sorted_by_reward[:5], 1):
@@ -147,7 +144,6 @@ def analyse_retina_json(name_file):
         
     print(filtered_success_rates.describe())
     print(filtered_success_rates.shape)
-    # Plot
     plt.figure(figsize=(12, 5))
     filtered_success_rates.plot(kind='bar', color='skyblue', edgecolor='black')
 

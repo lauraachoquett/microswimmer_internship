@@ -12,7 +12,7 @@ import pandas as pd
 import seaborn as sns
 
 
-from src.simulation import rankine_vortex, uniform_velocity
+from src.utils.simulation import rankine_vortex, uniform_velocity
 
 colors_default = ['purple', 'blue', 'green', 'orange', 'red', 'brown']
 

@@ -6,7 +6,7 @@ import json
 import matplotlib.pyplot as plt
 from itertools import chain
 from src.data_loader import load_sdf_from_csv, vel_read, load_sim_sdf
-from src.Astar_ani import astar_anisotropic, compute_v, contour_2D
+from src.a_star.Astar_ani import astar_anisotropic, compute_v, contour_2D
 
 import pickle
 import numpy as np
@@ -14,7 +14,6 @@ import matplotlib.pyplot as plt
 from matplotlib.colors import LinearSegmentedColormap
 from scipy.ndimage import gaussian_filter
 
-# Load trajectory data
 file = 'grid_search/8/result_evaluation_retina__traj.pkl'
 file_bis = 'grid_search/9/result_evaluation_retina__traj.pkl'
 with open(file, "rb") as f:
@@ -26,22 +25,16 @@ successful_trajectories = successful_trajectories_1 + successful_trajectories_bi
 print(f"Number of successful trajectories: {len(successful_trajectories)}")
 print(f"Points per trajectory: {len(successful_trajectories[0])}")
 
-# Simulation configuration
 ratio = 5
 sdf_func, velocity_retina, x_phys, y_phys, physical_width, physical_height, scale = load_sim_sdf(ratio)
 X, Y = np.meshgrid(x_phys, y_phys)
 obstacle_contour = contour_2D(sdf_func, X, Y, scale)
 
-# =============================================================================
-# Figure 1: Raw trajectories with transparency
-# =============================================================================
 fig1, ax1 = plt.subplots(figsize=(10, 10))
 
-# Capillary network
 ax1.scatter(obstacle_contour[:, 0], obstacle_contour[:, 1], 
            color="#2C2C2C", s=0.4, alpha=0.9, rasterized=True)
 
-# Sample subset of trajectories for clarity (every 5th trajectory)
 sample_trajectories = successful_trajectories
 colors = plt.cm.plasma(np.linspace(0.2, 0.8, len(sample_trajectories)))
 
@@ -49,7 +42,6 @@ for i, trajectory in enumerate(sample_trajectories):
     traj = np.array(trajectory)
     ax1.plot(traj[:, 0], traj[:, 1], alpha=0.4, color=colors[i], 
             linewidth=0.8, rasterized=True)
-# Start and end points for sampled trajectories
 sample_trajectories = successful_trajectories[::5]
 
 for i, trajectory in enumerate(sample_trajectories):
@@ -71,18 +63,13 @@ plt.savefig('fig/trajectories_overlay.pdf', dpi=400, bbox_inches='tight',
             facecolor='white', edgecolor='none', pad_inches=0)
 plt.close()
 
-# =============================================================================
-# Figure 2: High-resolution heatmap
-# =============================================================================
 fig2, ax2 = plt.subplots(figsize=(10, 10))
 
-# Create high-resolution grid for density calculation
 nx, ny = x_phys.shape[0], y_phys.shape[0]
 xi = np.linspace(x_phys.min(), x_phys.max(), nx)
 yi = np.linspace(y_phys.min(), y_phys.max(), ny)
 density = np.zeros((ny, nx))
 
-# Calculate passage density with Gaussian weighting
 sigma = 2.0  # Gaussian smoothing parameter
 for trajectory in successful_trajectories:
     traj = np.array(trajectory)
@@ -90,7 +77,6 @@ for trajectory in successful_trajectories:
         ix = (point[0] - x_phys.min()) / (x_phys.max() - x_phys.min()) * (nx-1)
         iy = (point[1] - y_phys.min()) / (y_phys.max() - y_phys.min()) * (ny-1)
         
-        # Add Gaussian blob around each point
         x_indices = np.arange(max(0, int(ix-3*sigma)), min(nx, int(ix+3*sigma)+1))
         y_indices = np.arange(max(0, int(iy-3*sigma)), min(ny, int(iy+3*sigma)+1))
         
@@ -99,16 +85,13 @@ for trajectory in successful_trajectories:
                 dist_sq = (xi_idx - ix)**2 + (yi_idx - iy)**2
                 density[yi_idx, xi_idx] += 0.005 + np.exp(-dist_sq / (2 * sigma**2))
 
-# Apply additional Gaussian smoothing for publication quality
 density_smooth = gaussian_filter(density, sigma=1.5)
 density_transformed = np.log1p(density_smooth)
-# Create custom colormap (white -> blue -> red for high density)
 colors_custom = ['#FFFFFF','#E6F3FF', '#CCE7FF', '#80CCFF', '#3399FF', 
                 '#0066CC', '#FFD700', '#FF8C00', '#FF4500', '#CC0000']
 n_bins = 100
 cmap_custom = LinearSegmentedColormap.from_list('trajectory_density', colors_custom, N=n_bins)
 
-# Display heatmap
 im = ax2.imshow(density_transformed, extent=[x_phys.min(), x_phys.max(), y_phys.min(), y_phys.max()],
                 origin='lower', cmap=cmap_custom,  alpha=0.85, aspect='equal')
 
@@ -185,7 +168,6 @@ plt.savefig('fig/heatmap_colorbar.pdf', dpi=400, bbox_inches='tight',
             facecolor='white', edgecolor='none', pad_inches=0)
 plt.close()
 
-# Print summary statistics
 print("\n" + "="*60)
 print("FIGURES SAVED SEPARATELY")
 print("="*60)

@@ -4,7 +4,6 @@ import matplotlib.pyplot as plt
 import numpy as np
 from skimage import measure
 
-from src.Astar import astar, plot_valid_invalid_points, resample_path, shortcut_path
 from matplotlib.contour import QuadContourSet
 
 def sdf_circle(point, center, radius):
@@ -95,6 +94,4 @@ if __name__ == "__main__":
     goal_coords = (X[goal[0], goal[1]], Y[goal[0], goal[1]])
     print("Start coordinates:", start_coords)
     print("Goal coordinates:", goal_coords)
-    path_indices = np.array(astar(start, goal, Z, min_distance))
 
-    plot_sdf_path(X, Y, Z, path_indices)

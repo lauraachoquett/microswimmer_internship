@@ -10,7 +10,7 @@ import numpy as np
 from scipy.spatial import KDTree
 
 from src.env_swimmer import MicroSwimmer
-from src.generate_path import *
+from src.utils.generate_path import *
 from src.TD3 import TD3
 
 colors = plt.cm.tab10.colors
@@ -20,10 +20,10 @@ from pathlib import Path
 from statistics import mean
 from itertools import chain
 
-from src.performance_agent import performance_stats_plot,box_plot_data_free,box_plot_data
-from src.evaluate_agent import evaluate_agent
-from src.rank_agents import rank_agents_by_rewards
-from src.generate_path import length_path
+from src.analyze.performance_agent import performance_stats_plot,box_plot_data_free,box_plot_data
+from src.evaluation.evaluate_agent import evaluate_agent
+from src.analyze.rank_agents import rank_agents_by_rewards
+from src.utils.generate_path import length_path
 
 
 def format_sci(x):

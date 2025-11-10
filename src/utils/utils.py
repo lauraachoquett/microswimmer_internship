@@ -60,7 +60,7 @@ def courbures(path):
 
     numerateur = np.abs(dx * ddy - dy * ddx)
     denominateur = (dx**2 + dy**2) ** 1.5
-    courbure = numerateur / (denominateur + 1e-8)  # pour éviter la division par 0
+    courbure = numerateur / (denominateur + 1e-8)  
 
     return courbure
 
@@ -89,7 +89,7 @@ def to_numpy(x):
 
 def create_numbered_run_folder(parent_dir):
     parent_path = Path(parent_dir)
-    parent_path.mkdir(parents=True, exist_ok=True)  # crée le dossier parent si besoin
+    parent_path.mkdir(parents=True, exist_ok=True)  
 
     existing_folders = [
         p for p in parent_path.iterdir() if p.is_dir() and p.name.isdigit()
@@ -103,3 +103,34 @@ def create_numbered_run_folder(parent_dir):
 
     print(f"✔ Nouveau dossier créé : {new_folder}")
     return new_folder
+
+
+import json
+import os
+import pickle
+
+
+def convertir_pickle_en_json_recursif(repertoire):
+    for racine, sous_dossiers, fichiers in os.walk(repertoire):
+        for fichier in fichiers:
+            chemin_fichier = os.path.join(racine, fichier)
+            if fichier.endswith(".pkl") or fichier.endswith(".pickle"):
+                try:
+                    with open(chemin_fichier, "rb") as fichier_pickle:
+                        donnees = pickle.load(fichier_pickle)
+
+                    fichier_json = fichier.replace(".pkl", ".json").replace(
+                        ".pickle", ".json"
+                    )
+                    chemin_fichier_json = os.path.join(racine, fichier_json)
+
+                    with open(chemin_fichier_json, "w") as fichier_json:
+                        json.dump(donnees, fichier_json, indent=4)
+
+                    print(f"Converti : {chemin_fichier} -> {chemin_fichier_json}")
+                except Exception as e:
+                    print(f"Erreur lors de la conversion de {chemin_fichier} : {e}")
+
+
+repertoire_pickle = "agents/"  
+convertir_pickle_en_json_recursif(repertoire_pickle)

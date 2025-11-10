@@ -4,8 +4,8 @@ import json
 import matplotlib.pyplot as plt
 import numpy as np
 
-from src.simulation import rankine_vortex, uniform_velocity
-from src.utils import random_bg_parameters
+from src.utils.simulation import rankine_vortex, uniform_velocity
+from src.utils.utils import random_bg_parameters
 
 colors = plt.cm.tab10.colors
 import copy

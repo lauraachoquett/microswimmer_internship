@@ -4,7 +4,7 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 import numpy as np
 
-# === Chargement des agents groupés par n_lookahead ===
+# ===
 with open('data/list_n_lookahaed_08-12.json') as f:
     agent_groups = json.load(f)
 
@@ -20,12 +20,12 @@ file_dir = "results_evaluation"
 save_path_eval = os.path.join("comparison_nlookahead", "eval_bg")
 os.makedirs(save_path_eval, exist_ok=True)
 
-# === Données collectées ===
+
 metric_key = "rewards_time"
 data = {"Reward": [], "Perturbation": [], "n_lookahead": []}
 summary_stats = {}
 
-# === Collecte des données ===
+
 for perturb, label in zip(perturbations, labels):
     summary_stats[label] = {}
     for group_name, agent_list in agent_groups.items():
@@ -54,7 +54,7 @@ for perturb, label in zip(perturbations, labels):
         else:
             summary_stats[label][group_name] = (np.nan, np.nan)
 
-# === Affichage console ===
+
 print("\n--- PERFORMANCE COMPARISON by n_lookahead ---")
 for label in labels:
     print(f"\n  Perturbation: {label}")
@@ -65,7 +65,7 @@ for label in labels:
         else:
             print(f"    n_lookahead = {group_name}: (no data)")
 
-# === Plot académique ===
+
 sns.set(style="whitegrid", font_scale=1.6, rc={"axes.labelsize": 18, "axes.titlesize": 18})
 plt.figure(figsize=(14, 8))
 palette = sns.color_palette("Set2", n_colors=len(agent_groups))
@@ -79,10 +79,8 @@ ax.set_ylabel(r"Time Reward $J_t$", fontsize=18)
 ax.set_title(r"Performance Comparison by $n$", fontsize=20)
 ax.tick_params(axis='x', rotation=30)
 
-# Légende
 ax.legend(title=r"$n$", title_fontsize=14, fontsize=12, loc="upper right")
 
-# Sauvegarde
 filename = f"{path_type}_nlookahead_few_n_rewards_comparison_{metric_key}_08-12"
 plt.tight_layout()
 plt.savefig(os.path.join(save_path_eval, f"{filename}.pdf"), bbox_inches="tight")
@@ -91,7 +89,6 @@ plt.close()
 
 print(f"\n📁 Figure saved to: {os.path.join(save_path_eval, filename)}.pdf/.png")
 
-# # === Nouvelle figure : Reward global par n_lookahead (agrégation toutes perturbations) ===
 # plt.figure(figsize=(10, 6))
 # sns.set(style="whitegrid", font_scale=1.6)
 
@@ -103,11 +100,10 @@ print(f"\n📁 Figure saved to: {os.path.join(save_path_eval, filename)}.pdf/.pn
 # ax.set_ylabel(r"Total Reward $J$ (all perturbations)", fontsize=16)
 # ax.set_title(r"Overall Reward by $n$", fontsize=20)
 
-# # Sauvegarde
 # filename_agg = f"{path_type}_nlookahead_few_n_aggregated_boxplot_{metric_key}"
 # plt.tight_layout()
 # plt.savefig(os.path.join(save_path_eval, f"{filename_agg}.pdf"), bbox_inches="tight")
 # plt.savefig(os.path.join(save_path_eval, f"{filename_agg}.png"), bbox_inches="tight", dpi=400)
 # plt.close()
 
-# print(f"📁 Aggregated figure saved to: {os.path.join(save_path_eval, filename_agg)}.pdf/.png")
+# print(f" Aggregated figure saved to: {os.path.join(save_path_eval, filename_agg)}.pdf/.png")

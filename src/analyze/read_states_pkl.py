@@ -6,7 +6,7 @@ import json
 import matplotlib.pyplot as plt
 from itertools import chain
 from src.data_loader import load_sdf_from_csv, vel_read, load_sim_sdf
-from src.Astar_ani import astar_anisotropic, compute_v, contour_2D
+from src.a_star.Astar_ani import astar_anisotropic, compute_v, contour_2D
 
 import pickle
 import numpy as np
@@ -15,7 +15,6 @@ import pandas as pd
 import json
 import zipfile
 
-# Load trajectory data
 
 def create_data():
        file = 'grid_search/8/result_evaluation_retina__traj.pkl'
@@ -28,7 +27,6 @@ def create_data():
        successful_trajectories = successful_trajectories_1 + successful_trajectories_bis
 
        print(len(successful_trajectories))
-       # Configuration de la simulation
        ratio = 5
        sdf_func, velocity_retina, x_phys, y_phys, physical_width, physical_height, scale = load_sim_sdf(ratio)
        X, Y = np.meshgrid(x_phys, y_phys)
@@ -40,7 +38,6 @@ def create_data():
        f"traj_{i}": traj.tolist() for i, traj in enumerate(successful_trajectories)
        }
 
-       # Structure finale
        data = {
        "trajectories": trajectories_dict
        }
@@ -58,11 +55,9 @@ def create_data():
 def create_fig(successful_trajectories,obstacle_contour):
        fig, ax = plt.subplots(figsize=(12, 10))
 
-       # Obstacles (réseau capillaire)
        ax.scatter(obstacle_contour[:, 0], obstacle_contour[:, 1], 
               color="black", s=0.3, alpha=0.8, label="Réseau capillaire",rasterized=True)
 
-       # Trajectoires
        alpha_traj = 0.2 
        color_blue = '#0072B2'
        for i, trajectory in enumerate(successful_trajectories):
@@ -70,7 +65,6 @@ def create_fig(successful_trajectories,obstacle_contour):
        
               ax.plot(traj[:, 0], traj[:, 1], alpha=alpha_traj, color=color_blue, rasterized=True,linewidth=2)
               
-              # Points de départ et d'arrivée
               ax.plot(traj[0, 0], traj[0, 1], marker='o', color='orange', 
                      markersize=7, alpha=0.6,rasterized=True)
               ax.plot(traj[-1, 0], traj[-1, 1], marker='x', color='red', 

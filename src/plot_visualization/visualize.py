@@ -16,13 +16,13 @@ from statistics import mean, stdev
 from scipy.spatial import KDTree
 
 from src.env_swimmer import MicroSwimmer
-from src.generate_path import (
+from src.utils.generate_path import (
     generate_curve_with_target_curvature,
     generate_demi_circle_path,
     generate_random_ondulating_path,
     generate_simple_line,
 )
-from src.plot import plot_background_velocity, plot_trajectories
+from src.plot_visualization.plot import plot_background_velocity, plot_trajectories
 
 
 def format_sci(x):

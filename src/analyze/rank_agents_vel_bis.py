@@ -10,7 +10,7 @@ with open('data/list_velocity.json') as f:
     agent_groups = json.load(f)
            
 
-# === Paramètres ===
+
 path_type = "ondulating"
 perturbations = [
     "free", "west_05", "east_05", "north_05", "south_05",
@@ -23,7 +23,7 @@ file_dir = "results_evaluation"
 save_path_eval = os.path.join("comparison_vel_no_vel", "eval_bg")
 os.makedirs(save_path_eval, exist_ok=True)
 
-# === Stockage des données pour le plot et analyse ===
+
 metrics_keys = {
     "J": "rewards",
     "J_t": "rewards_time",
@@ -32,7 +32,6 @@ metrics_keys = {
 all_data = {k: {"value": [], "Perturbation": [], "Group": []} for k in metrics_keys}
 summary_stats = {k: {} for k in metrics_keys}
 
-# === Collecte ===
 for perturb, label in zip(perturbations, labels):
     for group_name, agent_list in agent_groups.items():
         group_rewards = {k: [] for k in metrics_keys}
@@ -54,8 +53,7 @@ for perturb, label in zip(perturbations, labels):
             mean = np.mean(group_rewards[k])
             std = np.std(group_rewards[k])
             summary_stats[k].setdefault(label, {})[group_name] = (mean, std)
-
-# === Analyse comparative (print) ===
+            
 print("\n--- PERFORMANCE COMPARISON ---")
 for k in metrics_keys:
     print(f"\nMetric: {k}")
@@ -68,7 +66,6 @@ for k in metrics_keys:
             delta = float("inf")
         print(f"{label}: vel = {mean_vel:.2f} ± {std_vel:.2f} | no_vel = {mean_novel:.2f} ± {std_novel:.2f} → Δ = {delta:.1f}%")
 
-# === Plot ===
 sns.set(style="whitegrid", font_scale=1.4)
 fig, axs = plt.subplots(1, 3, figsize=(18, 6), sharey=False)
 titles = [r"$\mathrm{Total\ reward}\ J$", r"$\mathrm{Time\ reward}\ J_t$", r"$\mathrm{Distance\ reward}\ J_d$"]
@@ -84,12 +81,10 @@ for ax, (k, data), title in zip(axs, all_data.items(), titles):
     ax.set_ylabel("Reward")
     ax.tick_params(axis='x', rotation=45)
 
-# Légende
 axs[0].legend(title="Group")
 axs[1].legend().set_visible(False)
 axs[2].legend().set_visible(False)
 
-# Sauvegarde
 filename = f"{path_type}_vel_vs_no_vel_boxplot"
 plt.tight_layout()
 plt.savefig(os.path.join(save_path_eval, f"{filename}.pdf"), bbox_inches="tight")
