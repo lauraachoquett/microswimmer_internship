@@ -58,3 +58,13 @@ Where:
     <br>
     <i>Figure - Illustrative schematic of a microswimmer in a periodic blood-filled tube. </i>
 </p>
+
+## Results
+
+Navigation from a fixed starting point (orange) to 500 uniformly distributed target points (red) in the capillary network. Each blue line represents a successful trajectory of the RL agent following a path planned by the modified A* algorithm (flow- and wall-aware).
+
+<p align="center">
+    <img src="readme_fig/trajectories_density.png" width="900"/>
+    <br>
+    <i>Figure - Illustrative schematic of a microswimmer in a periodic blood-filled tube. </i>
+</p>
