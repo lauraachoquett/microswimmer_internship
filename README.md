@@ -1,11 +1,16 @@
 # Micro-Swimmer Control using Deep Reinforcement Learning (Research Internship)
-This project aims to train a single Reinforcement Learning (RL) agent capable of following arbitrary trajectories between arbitrary start–goal pairs.
+This repository focuses on the **2D training** part of the project.  
+The [**3D training**](https://github.com/lauraachoquett/microswimmer_3d_ROM) and evaluation will be available in a separate repository (link to be added).  
+Note that the transfer to high-fidelity simulations with [**Mirheo**](https://github.com/cselab/Mirheo) is not included here.
+
+## Project
+The goal of this work is to train a single Reinforcement Learning (RL) agent capable of following arbitrary trajectories between arbitrary start–goal pairs.  
 We adopt a two-stage approach:
 1.	A flow-aware path-planning module computes feasible trajectories that account for both geometry and background flow.
 2.	A RL control policy, trained on local path segments in a reduced-order model, learns to generalize to arbitrary global trajectories.
 
 <p align="center">
-    <img src="readme_fig/RL_retina_zoom_img.png" width="500"/>
+    <img src="readme_fig/RL_retina_zoom_img.png" width="800"/>
     <br>
     <i>Schematic representation of the path-planning and path-following pipeline.. </i>
 </p>
@@ -49,7 +54,7 @@ Where:
 
 
 <p align="center">
-    <img src="readme_fig/Training_loop_img.png" width="500"/>
+    <img src="readme_fig/Training_loop_img.png" width="900"/>
     <br>
     <i>Figure - Illustrative schematic of a microswimmer in a periodic blood-filled tube. </i>
 </p>
