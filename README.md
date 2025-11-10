@@ -1,6 +1,6 @@
 # Micro-Swimmer Control using Deep Reinforcement Learning (Research Internship)
 This repository focuses on the **2D training** part of the project.  
-The [**3D training**](https://github.com/lauraachoquett/microswimmer_3d_ROM) and evaluation will be available in a separate repository (link to be added).  
+The [**3D training**](https://github.com/lauraachoquett/microswimmer_3d_ROM) and evaluation will be available in a separate repository.  
 Note that the transfer to high-fidelity simulations with [**Mirheo**](https://github.com/cselab/Mirheo) is not included here.
 
 ## Project
